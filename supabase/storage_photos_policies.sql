@@ -1,0 +1,120 @@
+-- Supabase Storage policies for user-uploaded photos (run in Supabase SQL editor)
+-- Buckets used by the app:
+--  - avatars (profiles.profile_photo_url)
+--  - horse-photos (horses.photo_url)
+--
+-- This config:
+--  - Ensures buckets exist
+--  - Makes them PUBLIC (so getPublicUrl() works)
+--  - Restricts writes so users can only write within a folder prefixed by their auth.uid()
+--
+-- NOTE: If you prefer PRIVATE buckets, you must switch the app to signed URLs instead of getPublicUrl().
+--
+-- IMPORTANT (about your error: "must be owner of table objects"):
+-- Many Supabase projects restrict direct policy/DDL changes on `storage.objects` unless you run as the table owner
+-- (typically the `postgres` role). If you see that error, do this file in TWO steps:
+--
+-- 1) Run ONLY the "Create buckets" section below in SQL editor (it usually works).
+-- 2) Create the Storage policies via the Supabase Dashboard (Storage -> Policies) OR run the policy SQL using the
+--    `postgres` connection (Database -> Connect -> use the postgres user) / migrations with elevated privileges.
+
+-- Create buckets (safe to re-run)
+insert into storage.buckets (id, name, public)
+values
+  ('avatars', 'avatars', true),
+  ('horse-photos', 'horse-photos', true)
+on conflict (id) do update
+set public = excluded.public;
+
+-- ============================================================
+-- POLICIES (requires running as the owner of storage.objects)
+-- ============================================================
+-- Helpers:
+-- storage.objects.name is the full object path, e.g. "<uid>/avatar.jpg" or "<uid>/<horseId>/photo.jpg"
+--
+-- If you cannot run the policy SQL here, create equivalent policies in the Supabase Dashboard:
+-- - Bucket: avatars
+--   - SELECT: allow (bucket_id = 'avatars')  [bucket is public anyway]
+--   - INSERT/UPDATE/DELETE: allow authenticated where object name starts with auth.uid() + "/"
+-- - Bucket: horse-photos
+--   - SELECT: allow (bucket_id = 'horse-photos') [bucket is public anyway]
+--   - INSERT/UPDATE/DELETE: allow authenticated where object name starts with auth.uid() + "/"
+
+-- ===========
+-- AVATARS
+-- ===========
+-- drop policy if exists "avatars_select_public" on storage.objects;
+-- create policy "avatars_select_public"
+-- on storage.objects for select
+-- using (bucket_id = 'avatars');
+--
+-- drop policy if exists "avatars_insert_own_folder" on storage.objects;
+-- create policy "avatars_insert_own_folder"
+-- on storage.objects for insert
+-- to authenticated
+-- with check (
+--   bucket_id = 'avatars'
+--   and name like (auth.uid()::text || '/%')
+-- );
+--
+-- drop policy if exists "avatars_update_own_folder" on storage.objects;
+-- create policy "avatars_update_own_folder"
+-- on storage.objects for update
+-- to authenticated
+-- using (
+--   bucket_id = 'avatars'
+--   and name like (auth.uid()::text || '/%')
+-- )
+-- with check (
+--   bucket_id = 'avatars'
+--   and name like (auth.uid()::text || '/%')
+-- );
+--
+-- drop policy if exists "avatars_delete_own_folder" on storage.objects;
+-- create policy "avatars_delete_own_folder"
+-- on storage.objects for delete
+-- to authenticated
+-- using (
+--   bucket_id = 'avatars'
+--   and name like (auth.uid()::text || '/%')
+-- );
+
+-- ===========
+-- HORSE PHOTOS
+-- ===========
+-- drop policy if exists "horse_photos_select_public" on storage.objects;
+-- create policy "horse_photos_select_public"
+-- on storage.objects for select
+-- using (bucket_id = 'horse-photos');
+--
+-- drop policy if exists "horse_photos_insert_own_folder" on storage.objects;
+-- create policy "horse_photos_insert_own_folder"
+-- on storage.objects for insert
+-- to authenticated
+-- with check (
+--   bucket_id = 'horse-photos'
+--   and name like (auth.uid()::text || '/%')
+-- );
+--
+-- drop policy if exists "horse_photos_update_own_folder" on storage.objects;
+-- create policy "horse_photos_update_own_folder"
+-- on storage.objects for update
+-- to authenticated
+-- using (
+--   bucket_id = 'horse-photos'
+--   and name like (auth.uid()::text || '/%')
+-- )
+-- with check (
+--   bucket_id = 'horse-photos'
+--   and name like (auth.uid()::text || '/%')
+-- );
+--
+-- drop policy if exists "horse_photos_delete_own_folder" on storage.objects;
+-- create policy "horse_photos_delete_own_folder"
+-- on storage.objects for delete
+-- to authenticated
+-- using (
+--   bucket_id = 'horse-photos'
+--   and name like (auth.uid()::text || '/%')
+-- );
+
