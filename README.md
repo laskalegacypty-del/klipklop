@@ -1,4 +1,4 @@
-# Klipklop (Vite + React + Supabase)
+# KlipKlop (Vite + React + Supabase)
 
 ## Run locally
 

@@ -20,11 +20,9 @@ import {
   UserSearch,
   UsersRound
 } from 'lucide-react'
+import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE_SIDEBAR } from '../../constants/branding'
 
-const APP_NAME = 'Klipklop'
-const APP_TAGLINE_USER = 'Western Mounted Games'
 const APP_TAGLINE_ADMIN = 'Admin Panel'
-const APP_LOGO_SRC = '/icons/icon.svg'
 
 const userNavItems = [
   { path: '/dashboard', label: 'Home', icon: Home },
@@ -147,12 +145,12 @@ export default function Layout({ children }) {
             <img
               src={APP_LOGO_SRC}
               alt={`${APP_NAME} logo`}
-              className="h-10 w-10 rounded-xl bg-white/10 p-1"
+              className="h-10 w-10 rounded-xl bg-white/10 p-1 object-contain"
             />
             <div className="min-w-0">
               <h1 className="text-base font-bold leading-tight truncate">{APP_NAME}</h1>
               <p className="text-white/70 text-xs mt-0.5 truncate">
-                {isAdmin ? APP_TAGLINE_ADMIN : APP_TAGLINE_USER}
+                {isAdmin ? APP_TAGLINE_ADMIN : APP_TAGLINE_SIDEBAR}
               </p>
             </div>
           </Link>
@@ -248,7 +246,7 @@ export default function Layout({ children }) {
             <img
               src={APP_LOGO_SRC}
               alt={`${APP_NAME} logo`}
-              className="h-8 w-8 rounded-lg bg-green-50 p-1"
+              className="h-8 w-8 rounded-lg bg-green-50 p-1 object-contain"
             />
             <h1 className="text-base font-bold text-green-900 truncate">{APP_NAME}</h1>
           </Link>

@@ -2,11 +2,8 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { Button, Input } from '../components/ui'
-
-const APP_NAME = 'Klipklop'
-const APP_TAGLINE = 'Western Mounted Games Hub'
-const APP_LOGO_SRC = '/icons/icon.svg'
+import { Button, Input, PasswordInput } from '../components/ui'
+import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE } from '../constants/branding'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -45,7 +42,7 @@ export default function Login() {
         {/* Logo / Title */}
         <div className="text-center mb-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
-            <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10" />
+            <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-green-900">{APP_NAME}</h1>
           <p className="text-gray-500 mt-2">{APP_TAGLINE}</p>
@@ -70,12 +67,12 @@ export default function Login() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
-            <Input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="••••••••"
+              autoComplete="current-password"
             />
           </div>
 

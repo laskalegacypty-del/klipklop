@@ -110,7 +110,7 @@ export default function AdminUsers() {
 
       if (actionType === 'approve') {
         newStatus = 'approved'
-        notificationMessage = 'Your account has been approved! You can now log in to Klipklop.'
+        notificationMessage = 'Your account has been approved! You can now log in to KlipKlop.'
       } else if (actionType === 'reject') {
         newStatus = 'rejected'
         notificationMessage = `Your account registration was not approved. Reason: ${reason}`

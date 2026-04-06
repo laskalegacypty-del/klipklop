@@ -5,8 +5,9 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import App from './App.jsx'
 import './index.css'
+import './lib/pwaInstall'
 
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })

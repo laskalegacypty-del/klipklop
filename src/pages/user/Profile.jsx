@@ -18,10 +18,19 @@ import {
   ChevronRight,
   UserCheck,
   UserX,
-  Users
+  Users,
+  Download
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { Badge, Card, CardContent, PageHeader } from '../../components/ui'
+import { Badge, Button, Card, CardContent, PageHeader, PasswordInput } from '../../components/ui'
+import { APP_NAME } from '../../constants/branding'
+import {
+  clearDeferredPwaInstallPrompt,
+  getDeferredPwaInstallPrompt,
+  isPwaStandaloneDisplay,
+  PWA_APP_INSTALLED_EVENT,
+  PWA_INSTALL_PROMPT_EVENT
+} from '../../lib/pwaInstall'
 
 const EMPTY_COMBO = {
   horse_id: '',
@@ -64,6 +73,9 @@ export default function Profile() {
   const [myClubHead, setMyClubHead] = useState(null)
   const [loadingMyClub, setLoadingMyClub] = useState(false)
 
+  const [pwaInstallPrompt, setPwaInstallPrompt] = useState(() => getDeferredPwaInstallPrompt())
+  const [pwaInstalledView, setPwaInstalledView] = useState(() => isPwaStandaloneDisplay())
+
   // Profile form
   const [profileForm, setProfileForm] = useState({
     rider_name: '',
@@ -93,7 +105,53 @@ export default function Profile() {
         fetchMyClubHead()
       }
     }
-  }, [profile])
+  }, [profile, isSupporter, isClubHead])
+
+  useEffect(() => {
+    const syncStandalone = () => setPwaInstalledView(isPwaStandaloneDisplay())
+    syncStandalone()
+    const mq = window.matchMedia('(display-mode: standalone)')
+    mq.addEventListener?.('change', syncStandalone)
+    return () => mq.removeEventListener?.('change', syncStandalone)
+  }, [])
+
+  useEffect(() => {
+    const onPromptReady = () => setPwaInstallPrompt(getDeferredPwaInstallPrompt())
+    const onAppInstalled = () => {
+      setPwaInstallPrompt(null)
+      setPwaInstalledView(true)
+      toast.success('App installed — open it from your home screen or desktop.')
+    }
+    window.addEventListener(PWA_INSTALL_PROMPT_EVENT, onPromptReady)
+    window.addEventListener(PWA_APP_INSTALLED_EVENT, onAppInstalled)
+    return () => {
+      window.removeEventListener(PWA_INSTALL_PROMPT_EVENT, onPromptReady)
+      window.removeEventListener(PWA_APP_INSTALLED_EVENT, onAppInstalled)
+    }
+  }, [])
+
+  async function handleInstallPwa() {
+    const ev = pwaInstallPrompt || getDeferredPwaInstallPrompt()
+    if (ev) {
+      try {
+        await ev.prompt()
+        await ev.userChoice
+      } finally {
+        clearDeferredPwaInstallPrompt()
+        setPwaInstallPrompt(null)
+      }
+      return
+    }
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    toast(
+      isIOS
+        ? 'On iPhone or iPad: tap Share, then “Add to Home Screen”.'
+        : `In Chrome: use the install icon in the address bar if you see it, or the menu (⋮) → “Save and share” → “Install ${APP_NAME}…”.`,
+      { duration: 8000 }
+    )
+  }
 
   async function fetchData() {
     try {
@@ -313,8 +371,12 @@ export default function Profile() {
       if (error) throw error
       if (!links || links.length === 0) { setMyClubHead(null); return }
 
-      // Prefer accepted, fall back to pending
-      const link = links.find(l => l.status === 'accepted') || links[0]
+      // Pending must win: a rider can have an accepted link to one head and a new pending request from another.
+      const link =
+        links.find(l => l.status === 'pending') ||
+        links.find(l => l.status === 'accepted') ||
+        null
+      if (!link) { setMyClubHead(null); return }
 
       const { data: headProfile } = await supabase
         .from('profiles')
@@ -654,6 +716,43 @@ export default function Profile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Install as app (PWA) */}
+      {!pwaInstalledView && (
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <Download size={20} className="text-gray-400" aria-hidden />
+              Install {APP_NAME}
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Add {APP_NAME} to your phone’s home screen or your computer desktop for quick access, like a normal app.
+            </p>
+            <Button type="button" onClick={handleInstallPwa} className="w-full sm:w-auto">
+              <Download size={18} aria-hidden />
+              {pwaInstallPrompt ? 'Install app' : 'How to install'}
+            </Button>
+            {!pwaInstallPrompt && (
+              <div className="mt-4 text-sm text-gray-600 space-y-2 border-t border-gray-100 pt-4">
+                <p className="font-medium text-gray-700">Chrome (desktop)</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>
+                    Check the right side of the address bar for an install icon — click it and confirm.
+                  </li>
+                  <li>
+                    Or open the menu (⋮) → <span className="font-medium">Save and share</span> →{' '}
+                    <span className="font-medium">Install {APP_NAME}…</span> (wording may vary slightly by version).
+                  </li>
+                </ul>
+                <p className="font-medium text-gray-700 pt-2">iPhone / iPad</p>
+                <p>
+                  Tap <span className="font-medium">Share</span>, then <span className="font-medium">Add to Home Screen</span>.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Personal details */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -1129,7 +1228,7 @@ export default function Profile() {
 
       {/* My Club — any rider linked to a club/family head */}
       {!isSupporter && !isClubHead && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div id="my-club-family" className="bg-white rounded-xl border border-gray-200 p-6 scroll-mt-24">
           <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
             <Users size={20} className="text-gray-400" />
             My Club / Family
@@ -1381,24 +1480,22 @@ export default function Profile() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   New Password
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={passwordForm.new_password}
                   onChange={e => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   placeholder="Minimum 6 characters"
+                  autoComplete="new-password"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Confirm New Password
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={passwordForm.confirm_password}
                   onChange={e => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   placeholder="Repeat new password"
+                  autoComplete="new-password"
                 />
               </div>
             </div>

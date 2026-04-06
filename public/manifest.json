@@ -1,6 +1,6 @@
 {
-    "name": "Klipklop",
-    "short_name": "Klipklop",
+    "name": "KlipKlop",
+    "short_name": "KlipKlop",
     "description": "South African Western Mounted Games Hub",
     "theme_color": "#166534",
     "background_color": "#f9fafb",
@@ -10,9 +10,9 @@
     "start_url": "/",
     "icons": [
       {
-        "src": "/icons/icon.svg",
-        "sizes": "any",
-        "type": "image/svg+xml",
+        "src": "/brand/klipklop-logo.png",
+        "sizes": "512x512",
+        "type": "image/png",
         "purpose": "any maskable"
       }
     ]

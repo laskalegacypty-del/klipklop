@@ -685,20 +685,60 @@ export default function Dashboard() {
   const [announcementsOpen, setAnnouncementsOpen] = useState(false)
   // Supporter / club_head specific state
   const [linkedRiderSummaries, setLinkedRiderSummaries] = useState([])
+  /** Latest pending club/family invite (riders only); accept/decline lives on Profile */
+  const [pendingClubInvite, setPendingClubInvite] = useState(null)
 
   useEffect(() => {
     if (profile) fetchDashboardData()
-  }, [profile])
+  }, [profile, isSupporter, isClubHead])
+
+  async function fetchPendingClubInvite() {
+    if (!profile?.id) {
+      setPendingClubInvite(null)
+      return
+    }
+    const { data: row, error } = await supabase
+      .from('club_member_links')
+      .select('id, club_head_id')
+      .eq('rider_id', profile.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error || !row) {
+      setPendingClubInvite(null)
+      return
+    }
+
+    const { data: head } = await supabase
+      .from('profiles')
+      .select('rider_name, profile_photo_url')
+      .eq('id', row.club_head_id)
+      .maybeSingle()
+
+    if (!head) {
+      setPendingClubInvite(null)
+      return
+    }
+
+    setPendingClubInvite({
+      headName: head.rider_name,
+      headPhoto: head.profile_photo_url
+    })
+  }
 
   async function fetchDashboardData() {
     try {
       if (isSupporter) {
+        setPendingClubInvite(null)
         await Promise.all([
           fetchAnnouncements(),
           fetchUpcomingEvents(),
           fetchLinkedRiderSummaries()
         ])
       } else if (isClubHead) {
+        setPendingClubInvite(null)
         await Promise.all([
           fetchAnnouncements(),
           fetchUpcomingEvents(),
@@ -709,7 +749,8 @@ export default function Dashboard() {
         await Promise.all([
           fetchAnnouncements(),
           fetchUpcomingEvents(),
-          fetchAllCombosStats()
+          fetchAllCombosStats(),
+          fetchPendingClubInvite()
         ])
       }
     } finally {
@@ -1032,6 +1073,43 @@ export default function Dashboard() {
         open={announcementsOpen}
         onClose={() => setAnnouncementsOpen(false)}
       />
+
+      {showRiderStats && pendingClubInvite && (
+        <Card className="border-yellow-200 bg-yellow-50/80 shadow-sm">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full overflow-hidden border border-yellow-200 bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                {pendingClubInvite.headPhoto ? (
+                  <img
+                    src={pendingClubInvite.headPhoto}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <span className="text-sm font-bold text-yellow-800">
+                    {pendingClubInvite.headName?.charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900">Club / family invitation</p>
+                <p className="text-sm text-gray-600 truncate">
+                  <span className="font-medium text-gray-800">{pendingClubInvite.headName}</span>
+                  {' '}wants to add you to their club or family. Accept or decline under Profile → My Club / Family.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/profile#my-club-family"
+              className="inline-flex items-center justify-center gap-1 flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white hover:bg-green-700 transition"
+            >
+              Open Profile
+              <ChevronRight size={16} />
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* === SUPPORTER VIEW === */}
       {isSupporter && (

@@ -697,7 +697,7 @@ export default function ClubRiders() {
         user_id: rider.id,
         type: 'club_link_request',
         message: `${profile.rider_name} wants to add you to their club/family. Check your Profile to accept or decline.`,
-        link: '/profile'
+        link: '/profile#my-club-family'
       })
       if (notifError) {
         console.warn('Rider notification insert failed:', notifError.message)

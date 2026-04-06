@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { APP_NAME } from '../../constants/branding'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1304,7 +1305,7 @@ export default function MyTimes() {
           }}>
             <div>
               <div style={{ fontSize: '7px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '2px' }}>
-                Klipklop
+                {APP_NAME}
               </div>
               <div style={{ fontSize: '16px', fontWeight: '800', color: '#15803d', letterSpacing: '-0.3px' }}>
                 {section}

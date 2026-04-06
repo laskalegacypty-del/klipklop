@@ -1,9 +1,9 @@
-const CACHE_NAME = 'klipklop-v1'
+const CACHE_NAME = 'klipklop-v2'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icons/icon.svg'
+  '/brand/klipklop-logo.png'
 ]
 
 self.addEventListener('install', event => {

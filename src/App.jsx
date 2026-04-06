@@ -25,6 +25,7 @@ import HorseDetails from './pages/user/HorseDetails'
 import Matrix from './pages/user/Matrix'
 import SupporterRiders from './pages/user/SupporterRiders'
 import ClubRiders from './pages/user/ClubRiders'
+import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
 function ProtectedRoute({ children }) {
   const { user, profile, loading, profileLoaded, signOut } = useAuth()
@@ -85,6 +86,10 @@ export default function App() {
       <Route path="/pending" element={
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center p-8 bg-white rounded-lg shadow max-w-md">
+            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
+              <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
+            </div>
+            <p className="text-sm font-semibold text-green-900 mb-1">{APP_NAME}</p>
             <h2 className="text-2xl font-bold text-gray-800 mb-4">
               Account Pending Approval
             </h2>
@@ -98,6 +103,10 @@ export default function App() {
       <Route path="/suspended" element={
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center p-8 bg-white rounded-lg shadow max-w-md">
+            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
+              <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
+            </div>
+            <p className="text-sm font-semibold text-green-900 mb-1">{APP_NAME}</p>
             <h2 className="text-2xl font-bold text-gray-800 mb-4">
               Account Suspended
             </h2>

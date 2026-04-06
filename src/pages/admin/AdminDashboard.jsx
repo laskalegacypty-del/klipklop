@@ -85,7 +85,7 @@ export default function AdminDashboard() {
       await supabase.from('notifications').insert({
         user_id: userId,
         type: 'account_approved',
-        message: 'Your account has been approved! You can now log in to Klipklop.',
+        message: 'Your account has been approved! You can now log in to KlipKlop.',
         link: '/dashboard'
       })
 

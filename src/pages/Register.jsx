@@ -3,10 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { PROVINCES, AGE_CATEGORIES } from '../lib/constants'
 import toast from 'react-hot-toast'
-import { Button, Input, Select } from '../components/ui'
-
-const APP_NAME = 'Klipklop'
-const APP_LOGO_SRC = '/icons/icon.svg'
+import { Button, Input, PasswordInput, Select } from '../components/ui'
+import { APP_NAME, APP_LOGO_SRC } from '../constants/branding'
 
 export default function Register() {
   const [role, setRole] = useState('user') // 'user' | 'supporter' | 'club_head'
@@ -89,7 +87,7 @@ export default function Register() {
         {/* Title */}
         <div className="text-center mb-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
-            <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10" />
+            <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-green-900">{APP_NAME}</h1>
           <p className="text-gray-500 mt-2">Create your account</p>
@@ -219,13 +217,13 @@ export default function Register() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
-            <Input
-              type="password"
+            <PasswordInput
               name="password"
               value={formData.password}
               onChange={handleChange}
               required
               placeholder="Minimum 6 characters"
+              autoComplete="new-password"
             />
           </div>
 
@@ -233,13 +231,13 @@ export default function Register() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Confirm Password
             </label>
-            <Input
-              type="password"
+            <PasswordInput
               name="confirm_password"
               value={formData.confirm_password}
               onChange={handleChange}
               required
               placeholder="Repeat your password"
+              autoComplete="new-password"
             />
           </div>
 
