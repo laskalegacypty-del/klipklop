@@ -79,8 +79,22 @@ create table if not exists public.horse_medical_entries (
   title text not null,
   date date not null,
   notes text,
+  vital_type text,
+  vital_value numeric(8,2),
+  vital_text_value text,
+  recorded_at timestamptz,
+  is_abnormal boolean not null default false,
+  abnormal_reason text,
   created_at timestamptz not null default now()
 );
+
+alter table public.horse_medical_entries
+  add column if not exists vital_type text,
+  add column if not exists vital_value numeric(8,2),
+  add column if not exists vital_text_value text,
+  add column if not exists recorded_at timestamptz,
+  add column if not exists is_abnormal boolean not null default false,
+  add column if not exists abnormal_reason text;
 
 create index if not exists horse_medical_entries_horse_id_idx on public.horse_medical_entries (horse_id);
 create index if not exists horse_medical_entries_user_id_idx on public.horse_medical_entries (user_id);

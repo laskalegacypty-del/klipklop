@@ -23,8 +23,136 @@ const MEDICAL_TYPES = [
   { value: 'other', label: 'Other' },
 ]
 
+const VITAL_TYPES = [
+  { value: 'temperature', label: 'Temperature', unit: '°C' },
+  { value: 'heart_rate', label: 'Heart Rate', unit: 'bpm' },
+  { value: 'respiration_rate', label: 'Respiration Rate', unit: 'breaths/min' },
+  { value: 'gut_sounds', label: 'Gut Sounds', unit: '' },
+]
+
+const GUT_SOUND_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'reduced', label: 'Reduced' },
+  { value: 'absent', label: 'Absent' },
+  { value: 'hyperactive', label: 'Hyperactive' },
+]
+
+const VITAL_THRESHOLDS = {
+  temperature: { min: 37.2, max: 38.6, unit: '°C' },
+  heart_rate: { min: 28, max: 44, unit: 'bpm' },
+  respiration_rate: { min: 8, max: 16, unit: 'breaths/min' },
+}
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function nowISO() {
+  return new Date().toISOString()
+}
+
+function formatDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-ZA', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function formatDateTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-ZA', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function evaluateVital(vitalType, value) {
+  if (vitalType === 'gut_sounds') {
+    return { numericValue: null, isAbnormal: false, abnormalReason: null }
+  }
+
+  const numericValue = Number.parseFloat(value)
+  if (Number.isNaN(numericValue)) {
+    return { numericValue: null, isAbnormal: false, abnormalReason: null }
+  }
+
+  const threshold = VITAL_THRESHOLDS[vitalType]
+  if (!threshold) {
+    return { numericValue, isAbnormal: false, abnormalReason: null }
+  }
+
+  if (numericValue < threshold.min || numericValue > threshold.max) {
+    return {
+      numericValue,
+      isAbnormal: true,
+      abnormalReason: `Outside normal range (${threshold.min}-${threshold.max} ${threshold.unit})`,
+    }
+  }
+
+  return { numericValue, isAbnormal: false, abnormalReason: null }
+}
+
+/** PostgREST / Supabase when DB is missing new vitals columns */
+function isMissingVitalsColumnsError(error) {
+  const msg = String(error?.message || error?.details || '')
+  const lower = msg.toLowerCase()
+  return (
+    lower.includes('schema cache') ||
+    lower.includes('does not exist') ||
+    (lower.includes('column') && (lower.includes('not found') || lower.includes('unknown'))) ||
+    lower.includes('vital_type') ||
+    lower.includes('recorded_at') ||
+    lower.includes('is_abnormal') ||
+    lower.includes('abnormal_reason') ||
+    lower.includes('vital_value') ||
+    lower.includes('vital_text_value')
+  )
+}
+
+function buildLegacyVitalNotes(userNotes, vitalCheck) {
+  const trimmed = userNotes.trim()
+  if (vitalCheck.isAbnormal && vitalCheck.abnormalReason) {
+    return trimmed ? `${trimmed}\n\n${vitalCheck.abnormalReason}` : vitalCheck.abnormalReason
+  }
+  return trimmed || null
+}
+
+function vitalsEntryShowsFlagged(entry) {
+  if (entry.type !== 'vitals') return false
+  if (entry.is_abnormal) return true
+  if (entry.title?.startsWith?.('Flagged —')) return true
+  if (entry.notes?.includes?.('Outside normal range')) return true
+  return false
+}
+
+function vitalsAbnormalReasonForDisplay(entry) {
+  if (entry.abnormal_reason) return entry.abnormal_reason
+  if (entry.notes?.includes?.('Outside normal range')) {
+    const part = entry.notes.split('\n\n').find(p => p.includes('Outside normal range'))
+    return part || null
+  }
+  return null
+}
+
+/** Avoid showing the same abnormal line twice (legacy rows store it in notes). */
+function vitalsNotesBody(entry, vitalReason) {
+  if (entry.type !== 'vitals' || !entry.notes?.trim()) return entry.notes
+  if (!vitalReason || !entry.notes.includes(vitalReason)) return entry.notes
+  const rest = entry.notes
+    .split('\n\n')
+    .filter(p => p.trim() && p.trim() !== vitalReason.trim())
+    .join('\n\n')
+    .trim()
+  return rest || null
 }
 
 export default function HorseDetails() {
@@ -60,6 +188,14 @@ export default function HorseDetails() {
     type: 'vaccination',
     title: '',
     date: todayISO(),
+    notes: '',
+  })
+  const [showVitalsModal, setShowVitalsModal] = useState(false)
+  const [addingVital, setAddingVital] = useState(false)
+  const [vitalForm, setVitalForm] = useState({
+    vital_type: 'temperature',
+    value: '',
+    gut_sounds: 'normal',
     notes: '',
   })
 
@@ -267,6 +403,90 @@ export default function HorseDetails() {
     } catch (e) {
       console.error(e)
       toast.error('Error deleting entry')
+    }
+  }
+
+  async function handleAddVital() {
+    const selectedType = vitalForm.vital_type
+    const selectedVital = VITAL_TYPES.find(v => v.value === selectedType)
+    if (!selectedVital) {
+      toast.error('Please choose a vital')
+      return
+    }
+
+    if (selectedType !== 'gut_sounds' && !vitalForm.value.trim()) {
+      toast.error('Please enter a vital value')
+      return
+    }
+
+    const vitalCheck = evaluateVital(selectedType, vitalForm.value.trim())
+    if (selectedType !== 'gut_sounds' && vitalCheck.numericValue === null) {
+      toast.error('Please enter a valid number')
+      return
+    }
+
+    const recordedAt = nowISO()
+    const entryDate = recordedAt.slice(0, 10)
+    const displayValue = selectedType === 'gut_sounds'
+      ? vitalForm.gut_sounds
+      : `${vitalCheck.numericValue} ${selectedVital.unit}`.trim()
+
+    const baseTitle = `${selectedVital.label}: ${displayValue}`
+    const legacyTitle = vitalCheck.isAbnormal ? `Flagged — ${baseTitle}` : baseTitle
+
+    setAddingVital(true)
+    try {
+      const fullRow = {
+        horse_id: horseId,
+        user_id: profile.id,
+        type: 'vitals',
+        title: baseTitle,
+        date: entryDate,
+        notes: vitalForm.notes.trim() || null,
+        vital_type: selectedType,
+        vital_value: selectedType === 'gut_sounds' ? null : vitalCheck.numericValue,
+        vital_text_value: selectedType === 'gut_sounds' ? vitalForm.gut_sounds : null,
+        recorded_at: recordedAt,
+        is_abnormal: vitalCheck.isAbnormal,
+        abnormal_reason: vitalCheck.abnormalReason,
+      }
+
+      let { error } = await supabase.from('horse_medical_entries').insert(fullRow)
+
+      if (error && isMissingVitalsColumnsError(error)) {
+        const legacyRow = {
+          horse_id: horseId,
+          user_id: profile.id,
+          type: 'vitals',
+          title: legacyTitle,
+          date: entryDate,
+          notes: buildLegacyVitalNotes(vitalForm.notes, vitalCheck),
+        }
+        const retry = await supabase.from('horse_medical_entries').insert(legacyRow)
+        error = retry.error
+      }
+
+      if (error) {
+        console.error(error)
+        toast.error(error.message || 'Error adding vitals entry')
+        return
+      }
+
+      toast.success('Vitals entry added')
+      setShowVitalsModal(false)
+      setVitalForm({
+        vital_type: 'temperature',
+        value: '',
+        gut_sounds: 'normal',
+        notes: '',
+      })
+      await fetchAll()
+      setActiveTab('medical')
+    } catch (e) {
+      console.error(e)
+      toast.error(e?.message || 'Error adding vitals entry')
+    } finally {
+      setAddingVital(false)
     }
   }
 
@@ -661,7 +881,11 @@ export default function HorseDetails() {
       {/* MEDICAL */}
       {activeTab === 'medical' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2 flex-wrap">
+            <Button variant="secondary" onClick={() => setShowVitalsModal(true)}>
+              <Plus size={16} />
+              Vitals entry
+            </Button>
             <Button onClick={() => setShowMedicalModal(true)}>
               <Plus size={16} />
               Add entry
@@ -675,26 +899,43 @@ export default function HorseDetails() {
             />
           ) : (
             <div className="space-y-3">
-              {medical.map(entry => (
+              {medical.map(entry => {
+                const vitalFlagged = vitalsEntryShowsFlagged(entry)
+                const vitalReason = vitalsAbnormalReasonForDisplay(entry)
+                const vitalNotesBody = vitalsNotesBody(entry, vitalReason)
+                return (
                 <Card key={entry.id}>
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                            {MEDICAL_TYPES.find(t => t.value === entry.type)?.label || 'Other'}
+                            {entry.type === 'vitals'
+                              ? 'Vitals'
+                              : (MEDICAL_TYPES.find(t => t.value === entry.type)?.label || 'Other')}
                           </span>
                           <span className="text-xs text-gray-400 flex items-center gap-1">
                             <Calendar size={12} />
-                            {new Date(entry.date).toLocaleDateString('en-ZA', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
+                            {formatDate(entry.recorded_at || entry.date)}
                           </span>
+                          {entry.type === 'vitals' && vitalFlagged ? (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                              Flagged
+                            </span>
+                          ) : null}
                         </div>
                         <p className="mt-2 font-semibold text-gray-900 break-words">{entry.title}</p>
-                        {entry.notes ? (
+                        {entry.type === 'vitals' ? (
+                          <div className="mt-1 text-sm text-gray-600 space-y-1">
+                            <p>Recorded: {formatDateTime(entry.recorded_at || entry.created_at)}</p>
+                            {vitalFlagged && vitalReason ? (
+                              <p className="text-red-700">{vitalReason}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        {entry.type === 'vitals' && vitalNotesBody ? (
+                          <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap break-words">{vitalNotesBody}</p>
+                        ) : entry.type !== 'vitals' && entry.notes ? (
                           <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap break-words">{entry.notes}</p>
                         ) : null}
                       </div>
@@ -708,7 +949,8 @@ export default function HorseDetails() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -934,7 +1176,104 @@ export default function HorseDetails() {
           </div>
         </div>
       )}
+
+      {showVitalsModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Vitals entry</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Save a vital with automatic date and time.
+                </p>
+              </div>
+              <Button variant="secondary" onClick={() => setShowVitalsModal(false)} disabled={addingVital}>
+                Close
+              </Button>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Normal ranges</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-gray-700">
+                <p><span className="font-semibold">Temp:</span> 37.2-38.6 °C</p>
+                <p><span className="font-semibold">HR:</span> 28-44 bpm</p>
+                <p><span className="font-semibold">Resp:</span> 8-16 breaths/min</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-gray-200 bg-white p-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Vital <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={vitalForm.vital_type}
+                  onChange={e => setVitalForm(f => ({ ...f, vital_type: e.target.value, value: '' }))}
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  {VITAL_TYPES.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {vitalForm.vital_type === 'gut_sounds' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Value <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={vitalForm.gut_sounds}
+                    onChange={e => setVitalForm(f => ({ ...f, gut_sounds: e.target.value }))}
+                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    {GUT_SOUND_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Value <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={vitalForm.value}
+                    onChange={e => setVitalForm(f => ({ ...f, value: e.target.value }))}
+                    placeholder={`Enter value in ${VITAL_TYPES.find(t => t.value === vitalForm.vital_type)?.unit || ''}`}
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <Textarea
+                  value={vitalForm.notes}
+                  onChange={e => setVitalForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Optional observations"
+                />
+              </div>
+            </div>
+
+            <p className="mt-3 text-xs text-gray-500">
+              Date and time are added automatically when this entry is saved.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setShowVitalsModal(false)} disabled={addingVital}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddVital} disabled={addingVital}>
+                <Plus size={16} />
+                {addingVital ? 'Saving…' : 'Save vitals'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
