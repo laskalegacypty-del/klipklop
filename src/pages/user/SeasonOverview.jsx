@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { GAMES, QUALIFIER_GAMES, PROVINCES } from '../../lib/constants'
+import { GAMES, QUALIFIER_GAMES, PROVINCES, normalizeGameName } from '../../lib/constants'
 import { getLevel, getNationalsLevel } from '../../lib/matrix'
 import {
   CheckCircle,
@@ -32,6 +32,19 @@ function getSeasonDates(year) {
     // Nationals typically end last week of September / first week of October
     end: new Date(`${year}-10-05`)
   }
+}
+
+function buildCarryForwardPbTimeMap(rows) {
+  const map = {}
+  rows?.forEach(row => {
+    const game = normalizeGameName(row.game)
+    if (!game) return
+    const current = map[game]
+    if (current === undefined || row.best_time < current) {
+      map[game] = row.best_time
+    }
+  })
+  return map
 }
 
 export default function SeasonOverview() {
@@ -163,7 +176,7 @@ export default function SeasonOverview() {
         .from('personal_bests')
         .select('*')
         .eq('combo_id', selectedCombo.id)
-        .eq('season_year', selectedYear)
+        .lte('season_year', selectedYear)
     ])
 
     // Get unique attended events
@@ -171,8 +184,7 @@ export default function SeasonOverview() {
     setAttendedEvents(uniqueEventIds)
 
     // Build PB map
-    const pbMap = {}
-    pbsRes.data?.forEach(pb => { pbMap[pb.game] = pb.best_time })
+    const pbMap = buildCarryForwardPbTimeMap(pbsRes.data)
     setPersonalBests(pbMap)
   }
 

@@ -1,16 +1,13 @@
 import { useState, useEffect, createElement } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
-import toast from 'react-hot-toast'
 import {
   Home,
   Calendar,
   Clock,
   BarChart2,
-  User,
   Bell,
-  LogOut,
   Menu,
   Shield,
   Users,
@@ -27,12 +24,11 @@ const APP_TAGLINE_ADMIN = 'Admin Panel'
 const userNavItems = [
   { path: '/dashboard', label: 'Home', icon: Home },
   { path: '/qualifiers', label: 'Qualifiers', icon: Calendar },
+  { path: '/matrix', label: 'Matrix', icon: Table2 },
   { path: '/my-times', label: 'My Times', icon: Clock },
   { path: '/tracker', label: 'Qualifier Tracker', icon: BarChart2 },
   { path: '/season', label: 'Season Overview', icon: BarChart2 },
   { path: '/horses', label: 'Horses', icon: HeartPulse },
-  { path: '/matrix', label: 'Matrix', icon: Table2 },
-  { path: '/profile', label: 'Profile', icon: User },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -41,7 +37,6 @@ const supporterNavItems = [
   { path: '/qualifiers', label: 'Qualifiers', icon: Calendar },
   { path: '/matrix', label: 'Matrix', icon: Table2 },
   { path: '/my-riders', label: 'My Riders', icon: UserSearch },
-  { path: '/profile', label: 'Profile', icon: User },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -49,12 +44,11 @@ const supporterNavItems = [
 const clubHeadNavItems = [
   { path: '/dashboard', label: 'Home', icon: Home },
   { path: '/qualifiers', label: 'Qualifiers', icon: Calendar },
+  { path: '/matrix', label: 'Matrix', icon: Table2 },
   { path: '/my-club-riders', label: 'My Riders', icon: UsersRound },
   { path: '/tracker', label: 'Qualifier Tracker', icon: BarChart2 },
   { path: '/season', label: 'Season Overview', icon: BarChart2 },
   { path: '/horses', label: 'Horses', icon: HeartPulse },
-  { path: '/matrix', label: 'Matrix', icon: Table2 },
-  { path: '/profile', label: 'Profile', icon: User },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -62,9 +56,8 @@ const clubHeadNavItems = [
 const clubMemberNavItems = [
   { path: '/dashboard', label: 'Home', icon: Home },
   { path: '/qualifiers', label: 'Qualifiers', icon: Calendar },
-  { path: '/my-times', label: 'My Times', icon: Clock },
   { path: '/matrix', label: 'Matrix', icon: Table2 },
-  { path: '/profile', label: 'Profile', icon: User },
+  { path: '/my-times', label: 'My Times', icon: Clock },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -78,9 +71,8 @@ const adminNavItems = [
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const { profile, signOut, isAdmin, isSupporter, isClubHead, isClubMember } = useAuth()
+  const { profile, isAdmin, isSupporter, isClubHead, isClubMember } = useAuth()
   const location = useLocation()
-  const navigate = useNavigate()
 
   const navItems = isAdmin
     ? adminNavItems
@@ -109,12 +101,6 @@ export default function Layout({ children }) {
     if (profile?.id && !isAdmin) fetchUnreadCount()
     if (isAdmin) setUnreadCount(0)
   }, [profile, isAdmin, isSupporter, isClubHead, isClubMember])
-
-  async function handleSignOut() {
-    await signOut()
-    navigate('/login')
-    toast.success('Signed out successfully')
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -158,28 +144,52 @@ export default function Layout({ children }) {
 
         {/* User info */}
         <div className="p-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center overflow-hidden">
-              {profile?.profile_photo_url ? (
-                <img
-                  src={profile.profile_photo_url}
-                  alt="Profile"
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-              ) : (
-                <span className="text-lg font-bold">
-                  {profile?.rider_name?.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm truncate">{profile?.rider_name}</p>
-              <p className="text-white/70 text-xs truncate">{profile?.province}</p>
-            </div>
-            {isAdmin && (
+          {isAdmin ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center overflow-hidden">
+                {profile?.profile_photo_url ? (
+                  <img
+                    src={profile.profile_photo_url}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="text-lg font-bold">
+                    {profile?.rider_name?.charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{profile?.rider_name}</p>
+                <p className="text-white/70 text-xs truncate">{profile?.province}</p>
+              </div>
               <Shield size={16} className="text-yellow-400 flex-shrink-0" />
-            )}
-          </div>
+            </div>
+          ) : (
+            <Link
+              to="/profile"
+              onClick={() => setSidebarOpen(false)}
+              className="flex items-center gap-3 rounded-lg p-1 -m-1 transition hover:bg-white/10"
+            >
+              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center overflow-hidden">
+                {profile?.profile_photo_url ? (
+                  <img
+                    src={profile.profile_photo_url}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="text-lg font-bold">
+                    {profile?.rider_name?.charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{profile?.rider_name}</p>
+                <p className="text-white/70 text-xs truncate">{profile?.province}</p>
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* Nav items */}
@@ -216,16 +226,6 @@ export default function Layout({ children }) {
           </ul>
         </nav>
 
-        {/* Sign out */}
-        <div className="p-4 border-t border-white/10">
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition w-full"
-          >
-            <LogOut size={20} />
-            <span className="text-sm font-medium">Sign Out</span>
-          </button>
-        </div>
       </aside>
 
       {/* Main content */}

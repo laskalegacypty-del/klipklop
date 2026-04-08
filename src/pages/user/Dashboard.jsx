@@ -22,6 +22,10 @@ import {
 
 const CURRENT_YEAR = new Date().getFullYear()
 
+function countUniquePbGames(rows) {
+  return new Set((rows || []).map(row => row.game)).size
+}
+
 // ─── Mini Calendar Helpers ────────────────────────────────────────────────────
 
 const MINI_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -828,9 +832,9 @@ export default function Dashboard() {
           : Promise.resolve({ data: [] }),
         supabase
           .from('personal_bests')
-          .select('game, best_time')
+          .select('game')
           .eq('combo_id', combo.id)
-          .eq('season_year', CURRENT_YEAR)
+          .lte('season_year', CURRENT_YEAR)
       ])
 
       const results = resultsRes.data || []
@@ -849,7 +853,7 @@ export default function Dashboard() {
       return {
         ...combo,
         qualifiersAttended: uniqueEventIds.length,
-        gamesCovered: pbs.length,
+        gamesCovered: countUniquePbGames(pbs),
         provinceQualifiers,
         horse_photo_url: linkedHorse?.photo_url || null
       }
@@ -920,17 +924,17 @@ export default function Dashboard() {
 
       const { data: pbs } = await supabase
         .from('personal_bests')
-        .select('best_time')
+        .select('game')
         .eq('combo_id', pinnedCombo.id)
-        .eq('season_year', CURRENT_YEAR)
+        .lte('season_year', CURRENT_YEAR)
 
-      const nationalsLevel = pbs ? pbs.length : 0
+      const gamesCovered = countUniquePbGames(pbs)
 
       return {
         ...rider,
         horsesCount: combos.length,
         qualifiersAttended,
-        gamesCovered: nationalsLevel,
+        gamesCovered,
         currentLevel: pinnedCombo.current_level ?? 0
       }
     }))
@@ -996,15 +1000,15 @@ export default function Dashboard() {
 
       const { data: pbs } = await supabase
         .from('personal_bests')
-        .select('best_time')
+        .select('game')
         .eq('combo_id', pinnedCombo.id)
-        .eq('season_year', CURRENT_YEAR)
+        .lte('season_year', CURRENT_YEAR)
 
       return {
         ...rider,
         horsesCount: combos.length,
         qualifiersAttended,
-        gamesCovered: pbs?.length || 0,
+        gamesCovered: countUniquePbGames(pbs),
         currentLevel: pinnedCombo.current_level ?? 0
       }
     }))

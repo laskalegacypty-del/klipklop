@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { GAMES } from '../../lib/constants'
+import { GAMES, normalizeGameName } from '../../lib/constants'
 import { MATRIX, getLevel, getNationalsLevel, getTimeToNextLevel } from '../../lib/matrix'
 import { EmptyState, PageHeader, Skeleton } from '../../components/ui'
 import {
@@ -39,11 +39,35 @@ function buildYearOptions() {
   return years
 }
 
+function buildCarryForwardPbMap(rows) {
+  const map = {}
+  rows?.forEach(row => {
+    const game = normalizeGameName(row.game)
+    if (!game) return
+    const current = map[game]
+    if (!current || row.best_time < current.best_time) {
+      map[game] = { ...row, game }
+    }
+  })
+  return map
+}
+
+function formatPbDate(pb) {
+  if (pb?.season_year) return String(pb.season_year)
+  const fallback = pb?.achieved_at || pb?.updated_at || null
+  return fallback ? String(new Date(fallback).getFullYear()) : '—'
+}
+
+function isCurrentYearPb(pb) {
+  return Number(pb?.season_year) === CURRENT_YEAR
+}
+
 // ─────────────────────────────────────────────────────────
 // RiderTimesView — read-only version of MyTimes for one combo
 // ─────────────────────────────────────────────────────────
 function RiderTimesView({ combo, selectedYear }) {
   const [personalBests, setPersonalBests] = useState({})
+  const [yearBests, setYearBests] = useState({})
   const [history, setHistory] = useState([])
   const [trendData, setTrendData] = useState([])
   const [trendGame, setTrendGame] = useState(GAMES[0])
@@ -63,7 +87,7 @@ function RiderTimesView({ combo, selectedYear }) {
   async function loadData() {
     setLoading(true)
     try {
-      await Promise.all([loadPersonalBests(), loadHistory()])
+      await Promise.all([loadPersonalBests(), loadYearBests(), loadHistory()])
     } finally {
       setLoading(false)
     }
@@ -74,18 +98,17 @@ function RiderTimesView({ combo, selectedYear }) {
       .from('personal_bests')
       .select('*')
       .eq('combo_id', combo.id)
-      .eq('season_year', selectedYear)
+      .lte('season_year', selectedYear)
 
-    const pbMap = {}
-    data?.forEach(pb => { pbMap[pb.game] = pb })
+    const pbMap = buildCarryForwardPbMap(data)
     setPersonalBests(pbMap)
 
     const timeMap = {}
-    data?.forEach(pb => { timeMap[pb.game] = pb.best_time })
+    Object.values(pbMap).forEach(pb => { timeMap[pb.game] = pb.best_time })
     setNationalsLevel(getNationalsLevel(timeMap))
 
     const breakdown = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
-    data?.forEach(pb => {
+    Object.values(pbMap).forEach(pb => {
       const l = getLevel(pb.game, pb.best_time)
       if (l !== null) breakdown[l]++
     })
@@ -113,9 +136,45 @@ function RiderTimesView({ combo, selectedYear }) {
     data?.forEach(result => {
       const eventId = result.event_id
       if (!grouped[eventId]) grouped[eventId] = { event: result.qualifier_events, results: [] }
-      grouped[eventId].results.push(result)
+      grouped[eventId].results.push({
+        ...result,
+        game: normalizeGameName(result.game),
+      })
     })
     setHistory(Object.values(grouped))
+  }
+
+  async function loadYearBests() {
+    const { data: yearEvents } = await supabase
+      .from('qualifier_events')
+      .select('id')
+      .gte('date', `${selectedYear}-01-01`)
+      .lte('date', `${selectedYear}-12-31`)
+
+    const yearEventIds = yearEvents?.map(e => e.id) || []
+    if (yearEventIds.length === 0) {
+      setYearBests({})
+      return
+    }
+
+    const { data } = await supabase
+      .from('qualifier_results')
+      .select('game, time, is_nt')
+      .eq('combo_id', combo.id)
+      .in('event_id', yearEventIds)
+
+    const map = {}
+    data?.forEach(row => {
+      if (row.is_nt === true) return
+      const game = normalizeGameName(row.game)
+      const bestTime = Number.parseFloat(String(row.time).replace(',', '.'))
+      if (!game || Number.isNaN(bestTime)) return
+      const current = map[game]
+      if (!current || bestTime < current.best_time) {
+        map[game] = { game, best_time: bestTime, season_year: selectedYear }
+      }
+    })
+    setYearBests(map)
   }
 
   async function loadTrend() {
@@ -130,14 +189,15 @@ function RiderTimesView({ combo, selectedYear }) {
 
     const { data } = await supabase
       .from('qualifier_results')
-      .select('time, is_nt, qualifier_events(date)')
+      .select('time, is_nt, game, qualifier_events(date)')
       .eq('combo_id', combo.id)
-      .eq('game', trendGame)
       .eq('is_nt', false)
       .in('event_id', yearEventIds)
       .order('qualifier_events(date)', { ascending: true })
 
-    setTrendData(data?.filter(d => d.time && !d.is_nt) || [])
+    setTrendData(
+      data?.filter(d => d.time && !d.is_nt && normalizeGameName(d.game) === trendGame) || [],
+    )
   }
 
   const gamesCovered = Object.keys(personalBests).length
@@ -159,7 +219,7 @@ function RiderTimesView({ combo, selectedYear }) {
     const eventId = entry.results[0]?.event_id
     if (!eventId) return
     eventGameMap[eventId] = {}
-    entry.results.forEach(r => { eventGameMap[eventId][r.game] = r })
+    entry.results.forEach(r => { eventGameMap[eventId][normalizeGameName(r.game)] = r })
   })
 
   return (
@@ -219,17 +279,19 @@ function RiderTimesView({ combo, selectedYear }) {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Game</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Best Time</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Overall PB</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Year Best</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-700">Level</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-700">To Next</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Date</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Season</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {GAMES.map(game => {
                 const pb = personalBests[game]
-                const level = pb ? getLevel(game, pb.best_time) : null
-                const timeToNext = pb ? getTimeToNextLevel(game, pb.best_time) : null
+                const yearBest = yearBests[game]
+                const level = yearBest ? getLevel(game, yearBest.best_time) : null
+                const timeToNext = yearBest ? getTimeToNextLevel(game, yearBest.best_time) : null
 
                 return (
                   <tr key={game} className={`hover:bg-gray-50 ${pb ? '' : 'opacity-50'}`}>
@@ -242,6 +304,13 @@ function RiderTimesView({ combo, selectedYear }) {
                     <td className="px-4 py-3 text-center">
                       {pb ? (
                         <span className="font-bold text-gray-800">{pb.best_time?.toFixed(3)}s</span>
+                      ) : (
+                        <span className="text-gray-400">No time yet</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {yearBest ? (
+                        <span className="font-bold text-gray-800">{yearBest.best_time?.toFixed(3)}s</span>
                       ) : (
                         <span className="text-gray-400">No time yet</span>
                       )}
@@ -267,7 +336,14 @@ function RiderTimesView({ combo, selectedYear }) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center text-gray-500 text-xs">
-                      {pb ? new Date(pb.updated_at).toLocaleDateString() : '—'}
+                      {isCurrentYearPb(pb) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-800 px-2 py-0.5 font-bold border border-green-200">
+                          {formatPbDate(pb)}
+                          <span className="text-[10px] uppercase tracking-wide">Current</span>
+                        </span>
+                      ) : (
+                        <span>{formatPbDate(pb)}</span>
+                      )}
                     </td>
                   </tr>
                 )

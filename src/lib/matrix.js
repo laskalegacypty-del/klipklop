@@ -1,3 +1,5 @@
+import { normalizeGameName } from './constants'
+
 export const MATRIX = {
     'Barrel Race':    { 0: [28.971, Infinity], 1: [24.361, 28.970], 2: [22.213, 24.360], 3: [21.155, 22.212], 4: [0, 21.154] },
     'Birangle':       { 0: [20.642, Infinity], 1: [18.088, 20.641], 2: [16.756, 18.087], 3: [15.589, 16.755], 4: [0, 15.588] },
@@ -16,7 +18,7 @@ export const MATRIX = {
   
   export function getLevel(game, time) {
     if (!time || time === 'NT') return null
-    const thresholds = MATRIX[game]
+  const thresholds = MATRIX[normalizeGameName(game)]
     if (!thresholds) return null
     for (let level = 4; level >= 0; level--) {
       const [min, max] = thresholds[level]
@@ -34,7 +36,7 @@ export const MATRIX = {
     const currentLevel = getLevel(game, bestTime)
     if (currentLevel === null || currentLevel >= 4) return null
     const nextLevel = currentLevel + 1
-    const thresholds = MATRIX[game]
+  const thresholds = MATRIX[normalizeGameName(game)]
     if (!thresholds || !thresholds[nextLevel]) return null
     // Upper bound of next level is the max time allowed at that level
     const nextLevelMax = thresholds[nextLevel][1]

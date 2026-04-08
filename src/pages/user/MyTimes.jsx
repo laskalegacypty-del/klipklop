@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { GAMES } from '../../lib/constants'
+import { GAMES, normalizeGameName } from '../../lib/constants'
 import { MATRIX, getLevel, getNationalsLevel, getTimeToNextLevel } from '../../lib/matrix'
 import { Button, EmptyState, PageHeader, Skeleton } from '../../components/ui'
 import {
@@ -57,6 +57,33 @@ function buildYearOptions() {
     years.push(y)
   }
   return years
+}
+
+function buildCarryForwardPbMap(rows) {
+  const map = {}
+  rows?.forEach(row => {
+    const game = normalizeGameName(row.game)
+    if (!game) return
+    const current = map[game]
+    if (!current || row.best_time < current.best_time) {
+      map[game] = { ...row, game }
+    }
+  })
+  return map
+}
+
+function getPbDateValue(pb) {
+  if (pb?.season_year) return String(pb.season_year)
+  const fallback = pb?.achieved_at || pb?.updated_at || null
+  return fallback ? String(new Date(fallback).getFullYear()) : null
+}
+
+function formatPbDate(pb) {
+  return getPbDateValue(pb) || '—'
+}
+
+function isCurrentYearPb(pb) {
+  return Number(getPbDateValue(pb)) === CURRENT_YEAR
 }
 
 // ─── Helper Components ────────────────────────────────────────────────────────
@@ -263,6 +290,7 @@ export default function MyTimes() {
   const [selectedCombo, setSelectedCombo] = useState(null)
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR)
   const [personalBests, setPersonalBests] = useState({})
+  const [yearBests, setYearBests] = useState({})
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('times')
@@ -301,6 +329,7 @@ export default function MyTimes() {
   useEffect(() => {
     if (selectedCombo) {
       fetchPersonalBests()
+      fetchYearBests()
       fetchHistory()
     }
   }, [selectedCombo, selectedYear])
@@ -362,23 +391,10 @@ export default function MyTimes() {
       .from('personal_bests')
       .select('*')
       .eq('combo_id', selectedCombo.id)
-      .eq('season_year', selectedYear)
+      .lte('season_year', selectedYear)
 
-    const pbMap = {}
-    data?.forEach(pb => { pbMap[pb.game] = pb })
+    const pbMap = buildCarryForwardPbMap(data)
     setPersonalBests(pbMap)
-
-    const timeMap = {}
-    data?.forEach(pb => { timeMap[pb.game] = pb.best_time })
-    const level = getNationalsLevel(timeMap)
-    setNationalsLevel(level)
-
-    const breakdown = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
-    data?.forEach(pb => {
-      const l = getLevel(pb.game, pb.best_time)
-      if (l !== null) breakdown[l]++
-    })
-    setLevelBreakdown(breakdown)
   }
 
   async function fetchHistory() {
@@ -417,10 +433,59 @@ export default function MyTimes() {
       if (!grouped[eventId]) {
         grouped[eventId] = { event: result.qualifier_events, results: [] }
       }
-      grouped[eventId].results.push(result)
+      grouped[eventId].results.push({
+        ...result,
+        game: normalizeGameName(result.game),
+      })
     })
 
     setHistory(Object.values(grouped))
+  }
+
+  async function fetchYearBests() {
+    const { data: yearEvents } = await supabase
+      .from('qualifier_events')
+      .select('id')
+      .gte('date', `${selectedYear}-01-01`)
+      .lte('date', `${selectedYear}-12-31`)
+
+    const yearEventIds = yearEvents?.map(e => e.id) || []
+    if (yearEventIds.length === 0) {
+      setYearBests({})
+      setNationalsLevel(null)
+      setLevelBreakdown({ 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 })
+      return
+    }
+
+    const { data } = await supabase
+      .from('qualifier_results')
+      .select('game, time, is_nt')
+      .eq('combo_id', selectedCombo.id)
+      .in('event_id', yearEventIds)
+
+    const map = {}
+    data?.forEach(row => {
+      if (row.is_nt === true) return
+      const game = normalizeGameName(row.game)
+      const bestTime = Number.parseFloat(String(row.time).replace(',', '.'))
+      if (!game || Number.isNaN(bestTime)) return
+      const current = map[game]
+      if (!current || bestTime < current.best_time) {
+        map[game] = { game, best_time: bestTime, season_year: selectedYear }
+      }
+    })
+
+    const timeMap = {}
+    Object.values(map).forEach(pb => { timeMap[pb.game] = pb.best_time })
+    setNationalsLevel(getNationalsLevel(timeMap))
+
+    const breakdown = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
+    Object.values(map).forEach(pb => {
+      const l = getLevel(pb.game, pb.best_time)
+      if (l !== null) breakdown[l]++
+    })
+    setLevelBreakdown(breakdown)
+    setYearBests(map)
   }
 
   async function fetchTrendData() {
@@ -439,21 +504,23 @@ export default function MyTimes() {
 
     const { data } = await supabase
       .from('qualifier_results')
-      .select(`time, is_nt, qualifier_events (date)`)
+      .select(`time, is_nt, game, qualifier_events (date)`)
       .eq('combo_id', selectedCombo.id)
-      .eq('game', trendGame)
       .eq('is_nt', false)
       .in('event_id', yearEventIds)
       .order('qualifier_events(date)', { ascending: true })
 
-    setTrendData(data?.filter(d => d.time && !d.is_nt) || [])
+    setTrendData(
+      data?.filter(d => d.time && !d.is_nt && normalizeGameName(d.game) === trendGame) || [],
+    )
   }
 
   // ── Computed values ──────────────────────────────────────────────────────────
 
-  const gamesCovered = Object.keys(personalBests).length
+  const gamesCovered = Object.keys(yearBests).length
+  const gamesCoveredThisSeason = gamesCovered
   const gamesAtOrAboveLevel = nationalsLevel !== null
-    ? Object.entries(personalBests).filter(([game, pb]) =>
+    ? Object.entries(yearBests).filter(([game, pb]) =>
         getLevel(game, pb.best_time) >= nationalsLevel
       ).length
     : 0
@@ -465,12 +532,10 @@ export default function MyTimes() {
     0
   )
 
-  const pbsThisYear = Object.values(personalBests).filter(
-    pb => new Date(pb.updated_at).getFullYear() === selectedYear
-  ).length
+  const pbsThisYear = Object.values(personalBests).filter(pb => Number(pb?.season_year) === selectedYear).length
 
   // Games closest to reaching their next level (for nationals card helper)
-  const closestToNextLevel = Object.entries(personalBests)
+  const closestToNextLevel = Object.entries(yearBests)
     .map(([game, pb]) => {
       const level = getLevel(game, pb.best_time)
       if (level === null || level >= 4) return null
@@ -494,7 +559,7 @@ export default function MyTimes() {
     const eventId = entry.results[0]?.event_id
     if (!eventId) return
     eventGameMap[eventId] = {}
-    entry.results.forEach(r => { eventGameMap[eventId][r.game] = r })
+    entry.results.forEach(r => { eventGameMap[eventId][normalizeGameName(r.game)] = r })
   })
 
   // ── Export ───────────────────────────────────────────────────────────────────
@@ -515,18 +580,20 @@ export default function MyTimes() {
         ['Exported', new Date().toLocaleDateString('en-ZA')],
         [],
         // Column headers
-        ['Game', 'Best Time (s)', 'Current Level', 'To Next Level (s)', 'Date Achieved'],
+        ['Game', 'Overall PB (s)', 'Year Best (s)', 'Current Level', 'To Next Level (s)', 'Season'],
         // One row per game
         ...GAMES.map(game => {
-          const pb = personalBests[game]
-          const level = pb ? getLevel(game, pb.best_time) : null
-          const timeToNext = pb ? getTimeToNextLevel(game, pb.best_time) : null
+          const overallPb = personalBests[game]
+          const yearBest = yearBests[game]
+          const level = overallPb ? getLevel(game, overallPb.best_time) : null
+          const timeToNext = overallPb ? getTimeToNextLevel(game, overallPb.best_time) : null
           return [
             game,
-            pb ? pb.best_time?.toFixed(3) : 'No time',
             level !== null ? `L${level}` : '—',
+            overallPb ? overallPb.best_time?.toFixed(3) : 'No time',
+            yearBest ? yearBest.best_time?.toFixed(3) : 'No time',
             level === 4 ? 'Top Level' : timeToNext !== null ? `-${timeToNext.toFixed(3)}` : '—',
-            pb ? new Date(pb.updated_at).toLocaleDateString('en-ZA') : '—'
+            formatPbDate(overallPb)
           ]
         }),
         [],
@@ -781,7 +848,7 @@ export default function MyTimes() {
               )}
             </div>
             <p className="text-green-200 text-xs mt-2">
-              Based on 8-out-of-13 rule · {gamesCovered}/13 games covered
+              Based on 8-out-of-13 rule · {gamesCoveredThisSeason}/13 games covered in {selectedYear}
             </p>
 
             {/* Level breakdown */}
@@ -829,8 +896,8 @@ export default function MyTimes() {
         />
         <StatCard
           label="Games Covered"
-          value={`${gamesCovered}/13`}
-          sub="with a recorded time"
+          value={`${gamesCoveredThisSeason}/13`}
+          sub={`with recorded times in ${selectedYear}`}
           iconBg="bg-blue-500"
           icon={Award}
         />
@@ -880,34 +947,27 @@ export default function MyTimes() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Game</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Best Time</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-700">Level</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Overall PB</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Year Best</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-700">Time to Next Level</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Date</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Season</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {GAMES.map(game => {
-                const pb = personalBests[game]
-                const level = pb ? getLevel(game, pb.best_time) : null
-                const timeToNext = pb ? getTimeToNextLevel(game, pb.best_time) : null
+                const overallPb = personalBests[game]
+                const yearBest = yearBests[game]
+                const level = overallPb ? getLevel(game, overallPb.best_time) : null
+                const timeToNext = overallPb ? getTimeToNextLevel(game, overallPb.best_time) : null
 
                 return (
-                  <tr key={game} className={`hover:bg-gray-50 ${pb ? '' : 'opacity-50'}`}>
+                  <tr key={game} className={`hover:bg-gray-50 ${overallPb || yearBest ? '' : 'opacity-50'}`}>
                     <td className="px-4 py-3 font-medium text-gray-800">
                       <div className="flex items-center gap-2">
-                        {pb && <Star size={14} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />}
+                        {overallPb && <Star size={14} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />}
                         {game}
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {pb ? (
-                        <span className="font-bold text-gray-800">
-                          {pb.best_time?.toFixed(3)}s
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">No time yet</span>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {level !== null ? (
@@ -919,7 +979,25 @@ export default function MyTimes() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {!pb ? (
+                      {overallPb ? (
+                        <span className="font-bold text-gray-800">
+                          {overallPb.best_time?.toFixed(3)}s
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">No time yet</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {yearBest ? (
+                        <span className="font-bold text-gray-800">
+                          {yearBest.best_time?.toFixed(3)}s
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">No time yet</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {!overallPb ? (
                         <span className="text-gray-300">—</span>
                       ) : level === 4 ? (
                         <span className="text-xs px-2 py-1 rounded-full font-medium bg-red-100 text-red-700">
@@ -934,7 +1012,14 @@ export default function MyTimes() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center text-gray-500 text-xs">
-                      {pb ? new Date(pb.updated_at).toLocaleDateString('en-ZA') : '—'}
+                      {isCurrentYearPb(overallPb) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 text-green-800 px-2 py-0.5 font-bold border border-green-200">
+                          {formatPbDate(overallPb)}
+                          <span className="text-[10px] uppercase tracking-wide">Current</span>
+                        </span>
+                      ) : (
+                        <span>{formatPbDate(overallPb)}</span>
+                      )}
                     </td>
                   </tr>
                 )
@@ -1377,7 +1462,7 @@ export default function MyTimes() {
                     <th style={{ textAlign: 'center', padding: '7px 10px', fontWeight: '700', color: '#374151', borderRight: '1px solid #e5e7eb' }}>Best Time</th>
                     <th style={{ textAlign: 'center', padding: '7px 10px', fontWeight: '700', color: '#374151', borderRight: '1px solid #e5e7eb' }}>Level</th>
                     <th style={{ textAlign: 'center', padding: '7px 10px', fontWeight: '700', color: '#374151', borderRight: '1px solid #e5e7eb' }}>To Next Level</th>
-                    <th style={{ textAlign: 'center', padding: '7px 10px', fontWeight: '700', color: '#374151' }}>Date Achieved</th>
+                    <th style={{ textAlign: 'center', padding: '7px 10px', fontWeight: '700', color: '#374151' }}>Season</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1406,7 +1491,9 @@ export default function MyTimes() {
                           ) : timeToNext !== null ? `-${timeToNext.toFixed(3)}s to L${level + 1}` : '—'}
                         </td>
                         <td style={{ padding: '6px 10px', textAlign: 'center', color: '#6b7280' }}>
-                          {pb ? new Date(pb.updated_at).toLocaleDateString('en-ZA') : '—'}
+                          <span style={{ fontWeight: isCurrentYearPb(pb) ? 700 : 400, color: isCurrentYearPb(pb) ? '#15803d' : '#6b7280' }}>
+                            {formatPbDate(pb)}
+                          </span>
                         </td>
                       </tr>
                     )

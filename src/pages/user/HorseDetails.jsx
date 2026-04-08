@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import { uploadImageToBucket } from '../../lib/storageUploads'
 import { ArrowLeft, Calendar, CheckCircle2, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
 import { Button, Card, CardContent, EmptyState, Input, PageHeader, Skeleton, Textarea } from '../../components/ui'
+import VitalsTrendCard from '../../components/horses/VitalsTrendCard'
 
 const SEX_OPTIONS = [
   { value: 'unknown', label: 'Unknown' },
@@ -165,7 +166,7 @@ export default function HorseDetails() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   const [horse, setHorse] = useState(null)
-  const [activeTab, setActiveTab] = useState('details') // details | medical | reminders
+  const [activeTab, setActiveTab] = useState('details') // details | medical | vitals | reminders
   const [isEditingDetails, setIsEditingDetails] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
@@ -272,6 +273,43 @@ export default function HorseDetails() {
 
   const upcomingReminders = useMemo(() => reminders.filter(r => !r.is_done), [reminders])
   const doneReminders = useMemo(() => reminders.filter(r => r.is_done), [reminders])
+  const vitalsEntries = useMemo(() => {
+    const validTypes = new Set(['temperature', 'heart_rate'])
+    const labels = {
+      temperature: { label: 'Temperature', unit: '°C' },
+      heart_rate: { label: 'Heart rate', unit: 'bpm' },
+    }
+
+    return medical
+      .filter(entry => entry?.type === 'vitals' && validTypes.has(entry.vital_type))
+      .map(entry => {
+        const value = Number.parseFloat(entry.vital_value)
+        const timestamp = entry.recorded_at || entry.date || entry.created_at || null
+        if (Number.isNaN(value) || !timestamp) return null
+
+        const config = labels[entry.vital_type]
+        return {
+          id: entry.id,
+          type: entry.vital_type,
+          typeLabel: config.label,
+          value,
+          valueLabel: `${value.toFixed(1)} ${config.unit}`,
+          timestamp,
+          notes: entry.notes || null,
+        }
+      })
+      .filter(Boolean)
+  }, [medical])
+
+  const vitalTrendSeries = useMemo(() => {
+    const points = [...vitalsEntries]
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+    return {
+      temperaturePoints: points.filter(point => point.type === 'temperature'),
+      heartRatePoints: points.filter(point => point.type === 'heart_rate'),
+    }
+  }, [vitalsEntries])
 
   async function handleSaveHorse() {
     const name = horseForm.name.trim()
@@ -617,6 +655,10 @@ export default function HorseDetails() {
         {[
           { key: 'details', label: 'Details' },
           { key: 'medical', label: `Medical log (${medical.length})` },
+          {
+            key: 'vitals',
+            label: `Vitals (${vitalTrendSeries.temperaturePoints.length + vitalTrendSeries.heartRatePoints.length})`,
+          },
           { key: 'reminders', label: `Reminders (${upcomingReminders.length})` },
         ].map(t => (
           <button
@@ -953,6 +995,23 @@ export default function HorseDetails() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* VITALS */}
+      {activeTab === 'vitals' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setShowVitalsModal(true)}>
+              <Plus size={16} />
+              Vitals entry
+            </Button>
+          </div>
+          <VitalsTrendCard
+            temperaturePoints={vitalTrendSeries.temperaturePoints}
+            heartRatePoints={vitalTrendSeries.heartRatePoints}
+            vitalsEntries={vitalsEntries}
+          />
         </div>
       )}
 

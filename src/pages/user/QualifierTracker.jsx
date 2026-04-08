@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { QUALIFIER_GAMES } from '../../lib/constants'
+import { QUALIFIER_GAMES, normalizeGameName } from '../../lib/constants'
 import { getLevel } from '../../lib/matrix'
 import {
   ChevronDown,
@@ -535,15 +535,19 @@ export default function QualifierTracker() {
       const eventYear = selectedEvent?.date
         ? new Date(selectedEvent.date).getFullYear()
         : CURRENT_YEAR
+      const achievedAt = selectedEvent?.date
+        ? `${selectedEvent.date}T00:00:00.000Z`
+        : new Date().toISOString()
 
       for (const [game, entry] of Object.entries(gameEntries)) {
+        const normalizedGame = normalizeGameName(game)
         const finalTime = getFinalTime(game)
         const levelAchieved = getLiveLevel(game)
 
         resultsToInsert.push({
           combo_id: selectedCombo.id,
           event_id: selectedEvent.id,
-          game,
+          game: normalizedGame,
           time: finalTime,
           is_nt: entry.is_nt,
           level_entered: parseInt(entry.level_entered) || 0,
@@ -557,17 +561,17 @@ export default function QualifierTracker() {
             .from('personal_bests')
             .select('*')
             .eq('combo_id', selectedCombo.id)
-            .eq('game', game)
+            .eq('game', normalizedGame)
             .eq('season_year', eventYear)
             .maybeSingle()
 
           if (!existingPB || finalTime < existingPB.best_time) {
             pbUpdates.push({
               combo_id: selectedCombo.id,
-              game,
+              game: normalizedGame,
               best_time: finalTime,
               season_year: eventYear,
-              achieved_at: new Date().toISOString(),
+              achieved_at: achievedAt,
               updated_at: new Date().toISOString()
             })
           }

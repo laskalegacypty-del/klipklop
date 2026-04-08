@@ -47,3 +47,14 @@ export const PROVINCES = [
     11: ['Barrel Race', 'Speedball', 'Keyhole', 'Poles I', 'Fig 8 Stake'],
     12: ['Speed Barrels', 'Hurry Scurry', 'Poles II', 'Fig 8 Flags', 'Big T']
   }
+
+const GAME_ALIASES = {
+  'speed ball': 'Speedball',
+}
+
+export function normalizeGameName(game) {
+  const trimmed = String(game || '').trim()
+  if (!trimmed) return ''
+  const alias = GAME_ALIASES[trimmed.toLowerCase()]
+  return alias || trimmed
+}

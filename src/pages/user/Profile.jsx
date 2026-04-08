@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { PROVINCES, AGE_CATEGORIES } from '../../lib/constants'
@@ -39,7 +39,8 @@ const EMPTY_COMBO = {
 }
 
 export default function Profile() {
-  const { profile, refreshProfile, isSupporter, isClubHead, isClubMember } = useAuth()
+  const { profile, refreshProfile, signOut, isSupporter, isClubHead, isClubMember } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [horses, setHorses] = useState([])
   const [combos, setCombos] = useState([])
@@ -527,6 +528,12 @@ export default function Profile() {
     }
   }
 
+  async function handleSignOut() {
+    await signOut()
+    navigate('/login')
+    toast.success('Signed out successfully')
+  }
+
   function openAddCombo() {
     setEditingCombo(null)
     setComboForm(EMPTY_COMBO)
@@ -846,6 +853,21 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Account actions */}
+      <Card>
+        <CardContent className="p-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">Account</h2>
+          <p className="text-sm text-gray-500 mb-4">Sign out of your account on this device.</p>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={handleSignOut}
+          >
+            Sign Out
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Horse/rider combos — regular riders and club_member (hidden for supporter and club_head) */}
       {!isSupporter && !isClubHead && <div className="bg-white rounded-xl border border-gray-200 p-6">
