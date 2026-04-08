@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
+import { normalizeGameName } from '../../lib/constants'
 import { Badge, Card, CardContent, EmptyState, PageHeader, Skeleton } from '../../components/ui'
 import {
   Calendar,
@@ -22,8 +23,12 @@ import {
 
 const CURRENT_YEAR = new Date().getFullYear()
 
-function countUniquePbGames(rows) {
-  return new Set((rows || []).map(row => row.game)).size
+function countUniqueResultGames(rows) {
+  return new Set(
+    (rows || [])
+      .filter(row => row?.game && row?.is_nt !== true)
+      .map(row => normalizeGameName(row.game)),
+  ).size
 }
 
 // ─── Mini Calendar Helpers ────────────────────────────────────────────────────
@@ -822,23 +827,17 @@ export default function Dashboard() {
     currentYearEvents?.forEach(e => { eventProvinceMap[e.id] = e.province })
 
     const statsPromises = combos.map(async (combo) => {
-      const [resultsRes, pbsRes] = await Promise.all([
+      const resultsRes = await (
         currentYearEventIds.length > 0
           ? supabase
               .from('qualifier_results')
-              .select('event_id')
+              .select('event_id, game, is_nt')
               .eq('combo_id', combo.id)
               .in('event_id', currentYearEventIds)
-          : Promise.resolve({ data: [] }),
-        supabase
-          .from('personal_bests')
-          .select('game')
-          .eq('combo_id', combo.id)
-          .lte('season_year', CURRENT_YEAR)
-      ])
+          : Promise.resolve({ data: [] })
+      )
 
       const results = resultsRes.data || []
-      const pbs = pbsRes.data || []
 
       const uniqueEventIds = [...new Set(results.map(r => r.event_id))]
 
@@ -853,7 +852,7 @@ export default function Dashboard() {
       return {
         ...combo,
         qualifiersAttended: uniqueEventIds.length,
-        gamesCovered: countUniquePbGames(pbs),
+        gamesCovered: countUniqueResultGames(results),
         provinceQualifiers,
         horse_photo_url: linkedHorse?.photo_url || null
       }
@@ -916,25 +915,25 @@ export default function Dashboard() {
       if (currentYearEventIds.length > 0) {
         const { data: results } = await supabase
           .from('qualifier_results')
-          .select('event_id')
+          .select('event_id, game, is_nt')
           .in('combo_id', comboIds)
           .in('event_id', currentYearEventIds)
         qualifiersAttended = new Set(results?.map(r => r.event_id) || []).size
+        const gamesCovered = countUniqueResultGames(results)
+        return {
+          ...rider,
+          horsesCount: combos.length,
+          qualifiersAttended,
+          gamesCovered,
+          currentLevel: pinnedCombo.current_level ?? 0
+        }
       }
-
-      const { data: pbs } = await supabase
-        .from('personal_bests')
-        .select('game')
-        .eq('combo_id', pinnedCombo.id)
-        .lte('season_year', CURRENT_YEAR)
-
-      const gamesCovered = countUniquePbGames(pbs)
 
       return {
         ...rider,
         horsesCount: combos.length,
         qualifiersAttended,
-        gamesCovered,
+        gamesCovered: 0,
         currentLevel: pinnedCombo.current_level ?? 0
       }
     }))
@@ -992,23 +991,24 @@ export default function Dashboard() {
       if (currentYearEventIds.length > 0) {
         const { data: results } = await supabase
           .from('qualifier_results')
-          .select('event_id')
+          .select('event_id, game, is_nt')
           .in('combo_id', comboIds)
           .in('event_id', currentYearEventIds)
         qualifiersAttended = new Set(results?.map(r => r.event_id) || []).size
+        return {
+          ...rider,
+          horsesCount: combos.length,
+          qualifiersAttended,
+          gamesCovered: countUniqueResultGames(results),
+          currentLevel: pinnedCombo.current_level ?? 0
+        }
       }
-
-      const { data: pbs } = await supabase
-        .from('personal_bests')
-        .select('game')
-        .eq('combo_id', pinnedCombo.id)
-        .lte('season_year', CURRENT_YEAR)
 
       return {
         ...rider,
         horsesCount: combos.length,
         qualifiersAttended,
-        gamesCovered: countUniquePbGames(pbs),
+        gamesCovered: 0,
         currentLevel: pinnedCombo.current_level ?? 0
       }
     }))
