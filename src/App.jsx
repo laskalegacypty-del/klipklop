@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout'
 // Auth pages
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Landing from './pages/Landing'
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -174,7 +175,7 @@ export default function App() {
       } />
 
       {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/login" />} />
+      <Route path="/" element={<Landing />} />
       {/* Unknown routes (important on static hosting / SPA refresh) */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
