@@ -12,7 +12,7 @@ export function TableWrap({ className, ...props }) {
 export function Table({ className, ...props }) {
   return (
     <table
-      className={cn('w-full border-collapse text-left text-sm', className)}
+      className={cn('min-w-[640px] w-full border-collapse text-left text-sm', className)}
       {...props}
     />
   )
@@ -21,13 +21,13 @@ export function Table({ className, ...props }) {
 export function Th({ className, ...props }) {
   return (
     <th
-      className={cn('whitespace-nowrap border-b border-gray-200 px-4 py-3 font-semibold text-gray-700', className)}
+      className={cn('whitespace-nowrap border-b border-gray-200 px-3 py-3 font-semibold text-gray-700 sm:px-4', className)}
       {...props}
     />
   )
 }
 
 export function Td({ className, ...props }) {
-  return <td className={cn('border-b border-gray-100 px-4 py-3 text-gray-900', className)} {...props} />
+  return <td className={cn('border-b border-gray-100 px-3 py-3 text-gray-900 sm:px-4', className)} {...props} />
 }
 

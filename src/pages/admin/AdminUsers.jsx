@@ -266,7 +266,7 @@ export default function AdminUsers() {
           </div>
         ) : (
           filtered.map(user => (
-            <div key={user.id} className="p-4 flex items-center justify-between gap-4">
+            <div key={user.id} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                   {user.profile_photo_url ? (
@@ -308,7 +308,7 @@ export default function AdminUsers() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={user.status} />
 
                 {user.status === 'pending' && (

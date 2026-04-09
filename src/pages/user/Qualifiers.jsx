@@ -307,12 +307,15 @@ function EventCard({ event, bookmarks, onSelect, onToggleBookmark }) {
 
 export default function Qualifiers() {
   const { profile } = useAuth()
+  const currentYear = new Date().getFullYear()
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [bookmarks, setBookmarks] = useState([])
   const [viewMode, setViewMode] = useState('calendar')
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [listYearFilter, setListYearFilter] = useState(String(currentYear))
+  const [listTimingFilter, setListTimingFilter] = useState('upcoming')
 
   // Calendar navigation state — start at current month
   const today = new Date()
@@ -430,7 +433,25 @@ export default function Qualifiers() {
   })
 
   const filteredEvents = events.filter(matchesSearch)
-  const groupedEvents = groupByMonth(filteredEvents)
+  const availableListYears = Array.from(
+    new Set([
+      currentYear,
+      ...events.map(event => new Date(event.date).getFullYear())
+    ])
+  ).sort((a, b) => b - a)
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const listEvents = filteredEvents.filter(event => {
+    const eventDate = new Date(event.date)
+    eventDate.setHours(0, 0, 0, 0)
+    const matchesYear = eventDate.getFullYear() === Number(listYearFilter)
+    const matchesTiming =
+      listTimingFilter === 'both' ||
+      (listTimingFilter === 'upcoming' && eventDate >= todayStart) ||
+      (listTimingFilter === 'past' && eventDate < todayStart)
+    return matchesYear && matchesTiming
+  })
+  const groupedListEvents = groupByMonth(listEvents)
 
   return (
     <div className="space-y-5">
@@ -543,7 +564,7 @@ export default function Qualifiers() {
           )}
 
           {/* Month navigation */}
-          <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3">
+          <div className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-3 sm:px-4 py-3">
             <button
               onClick={prevMonth}
               className="p-2 rounded-lg hover:bg-gray-100 transition text-gray-600"
@@ -560,7 +581,7 @@ export default function Qualifiers() {
           </div>
 
           {/* Calendar grid */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
 
             {/* Day-of-week header */}
             <div className="grid grid-cols-7 border-b border-gray-100">
@@ -682,15 +703,46 @@ export default function Qualifiers() {
       {/* ── LIST VIEW ─────────────────────────────────────────────── */}
       {viewMode === 'list' && (
         <div className="space-y-8">
-          {Object.keys(groupedEvents).length === 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm text-gray-500">
+              Showing <span className="font-semibold text-gray-700">{listTimingFilter}</span> qualifiers for <span className="font-semibold text-gray-700">{listYearFilter}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <select
+                  value={listTimingFilter}
+                  onChange={e => setListTimingFilter(e.target.value)}
+                  className="appearance-none pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
+                >
+                  <option value="upcoming">Upcoming</option>
+                  <option value="past">Past</option>
+                  <option value="both">Both</option>
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+              <div className="relative">
+                <select
+                  value={listYearFilter}
+                  onChange={e => setListYearFilter(e.target.value)}
+                  className="appearance-none pl-3 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
+                >
+                  {availableListYears.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+          {Object.keys(groupedListEvents).length === 0 && (
             <div className="text-center py-10 text-gray-400 text-sm bg-white rounded-xl border border-gray-200">
               {searchQuery.trim()
                 ? <>No events match <strong>"{searchQuery}"</strong>. Try a different keyword.</>
-                : 'No events found'
+                : `No events found for ${listYearFilter}`
               }
             </div>
           )}
-          {Object.entries(groupedEvents).map(([month, monthEvents]) => (
+          {Object.entries(groupedListEvents).map(([month, monthEvents]) => (
             <div key={month}>
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-200">
                 {month}

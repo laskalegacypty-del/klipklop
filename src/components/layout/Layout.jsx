@@ -15,7 +15,8 @@ import {
   HeartPulse,
   Table2,
   UserSearch,
-  UsersRound
+  UsersRound,
+  Trophy
 } from 'lucide-react'
 import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE_SIDEBAR } from '../../constants/branding'
 
@@ -29,6 +30,7 @@ const userNavItems = [
   { path: '/tracker', label: 'Qualifier Tracker', icon: BarChart2 },
   { path: '/season', label: 'Season Overview', icon: BarChart2 },
   { path: '/horses', label: 'Horses', icon: HeartPulse },
+  { path: '/friends-leaderboard', label: 'Rankings', icon: Trophy },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -102,23 +104,34 @@ export default function Layout({ children }) {
     if (isAdmin) setUnreadCount(0)
   }, [profile, isAdmin, isSupporter, isClubHead, isClubMember])
 
+  useEffect(() => {
+    if (!sidebarOpen) return
+
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [sidebarOpen])
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 h-full w-64 bg-green-900 text-white z-30
+        fixed top-0 left-0 h-full w-72 max-w-[85vw] bg-green-900 text-white z-30
         transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:z-auto
+        lg:w-64 lg:translate-x-0 lg:static lg:z-auto
       `}>
 
         {/* Logo */}
@@ -232,10 +245,11 @@ export default function Layout({ children }) {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Top bar (mobile) */}
-        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 lg:hidden">
+        <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-200 px-4 py-3 flex items-center gap-3 lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-600 hover:text-gray-900"
+            aria-label="Open navigation menu"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           >
             <Menu size={24} />
           </button>
@@ -250,18 +264,18 @@ export default function Layout({ children }) {
             />
             <h1 className="text-base font-bold text-green-900 truncate">{APP_NAME}</h1>
           </Link>
-          {unreadCount > 0 && (
-            <Link to="/notifications" className="ml-auto relative">
-              <Bell size={22} className="text-gray-600" />
-              <span className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center">
+          <Link to="/notifications" className="ml-auto relative inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100">
+            <Bell size={22} className="text-gray-600" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 bg-yellow-400 text-yellow-900 text-[10px] font-bold min-w-4 h-4 px-1 rounded-full flex items-center justify-center">
                 {unreadCount}
               </span>
-            </Link>
-          )}
+            )}
+          </Link>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-4 sm:p-6">
+        <main className="flex-1 overflow-auto p-3 sm:p-6">
           <div className="container-page">
             {children}
           </div>

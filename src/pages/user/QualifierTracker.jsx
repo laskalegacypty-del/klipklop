@@ -701,7 +701,7 @@ export default function QualifierTracker() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab('enter')}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${
@@ -1022,7 +1022,7 @@ export default function QualifierTracker() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         {/* Time input */}
                         <div>
                           <label className="block text-xs text-gray-500 mb-1">

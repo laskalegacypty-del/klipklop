@@ -846,7 +846,7 @@ export default function SupporterRiders() {
   const rejectedLinks = links.filter(l => l.status === 'rejected')
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <PageHeader
         title="My Riders"
         description="Follow riders and view their times and progress"

@@ -89,6 +89,11 @@ const NOTIFICATION_TYPES = {
     icon: X,
     color: 'text-red-600',
     bg: 'bg-red-100'
+  },
+  horse_reminder_due: {
+    icon: Calendar,
+    color: 'text-orange-600',
+    bg: 'bg-orange-100'
   }
 }
 
@@ -131,7 +136,7 @@ export default function Notifications() {
 
       if (error) throw error
       setNotifications(data || [])
-    } catch (error) {
+    } catch {
       toast.error('Error loading notifications')
     } finally {
       setLoading(false)
@@ -179,7 +184,7 @@ export default function Notifications() {
 
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
       toast.success('All marked as read')
-    } catch (error) {
+    } catch {
       toast.error('Error marking all as read')
     }
   }
@@ -192,7 +197,7 @@ export default function Notifications() {
         .eq('id', notificationId)
 
       setNotifications(prev => prev.filter(n => n.id !== notificationId))
-    } catch (error) {
+    } catch {
       toast.error('Error deleting notification')
     }
   }
@@ -217,7 +222,7 @@ export default function Notifications() {
   )
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
 
       {/* Header */}
       <PageHeader
@@ -228,7 +233,7 @@ export default function Notifications() {
             : 'All caught up!'
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {unreadCount > 0 ? (
               <Button variant="secondary" onClick={markAllAsRead}>
                 <CheckCheck size={16} />

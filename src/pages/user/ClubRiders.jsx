@@ -829,7 +829,7 @@ export default function ClubRiders() {
   const rejectedLinks = links.filter(l => l.status === 'rejected')
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       <PageHeader
         title="My Club Riders"
         description="Manage riders in your club or family and view their times"

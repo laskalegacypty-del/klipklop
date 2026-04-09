@@ -142,7 +142,7 @@ export default function AdminDashboard() {
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           icon={<Users className="text-blue-500" size={24} />}
           label="Total Users"
@@ -286,7 +286,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <QuickLink to="/admin/users" label="Manage Users" icon={<Users size={20} />} color="blue" />
         <QuickLink to="/admin/events" label="Manage Events" icon={<Calendar size={20} />} color="green" />
         <QuickLink to="/admin/matrix" label="Announcements" icon={<Megaphone size={20} />} color="purple" />

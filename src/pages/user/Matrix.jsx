@@ -106,7 +106,7 @@ export default function Matrix() {
           <button
             onClick={handleCalculate}
             disabled={!calcGame || !calcTime}
-            className="px-5 py-2 bg-green-800 text-white rounded-lg text-sm font-medium hover:bg-green-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-5 py-2 bg-green-800 text-white rounded-lg text-sm font-medium hover:bg-green-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Calculate
           </button>
@@ -173,7 +173,7 @@ export default function Matrix() {
       {/* Matrix Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[720px] w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="px-4 py-3 text-left font-semibold text-gray-700 bg-gray-50 sticky left-0 z-10 min-w-36">

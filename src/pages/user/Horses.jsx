@@ -12,6 +12,20 @@ function startOfTodayISO() {
   return d.toISOString().slice(0, 10)
 }
 
+function reminderLabel(reminder) {
+  if (reminder.reminder_type === 'custom') return reminder.custom_label || reminder.label || 'Custom'
+  return reminder.label || String(reminder.reminder_type || '').replaceAll('_', ' ')
+}
+
+function isMissingNextDueDateError(error) {
+  const msg = String(error?.message || error?.details || '').toLowerCase()
+  return (
+    msg.includes('next_due_date') ||
+    msg.includes('schema cache') ||
+    (msg.includes('column') && (msg.includes('not found') || msg.includes('does not exist')))
+  )
+}
+
 export default function Horses() {
   const { profile, isClubHead } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -39,7 +53,7 @@ export default function Horses() {
       fetchData(profile.id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id])
+  }, [profile?.id, isClubHead])
 
   // Reload horses when club_head selects a different rider
   useEffect(() => {
@@ -49,7 +63,7 @@ export default function Horses() {
       setHorses([])
       setReminders([])
     }
-  }, [selectedRider])
+  }, [selectedRider, isClubHead])
 
   async function fetchLinkedRiders() {
     setLoadingRiders(true)
@@ -84,26 +98,49 @@ export default function Horses() {
     setLoading(true)
     try {
       const today = startOfTodayISO()
-      const [horsesRes, remindersRes] = await Promise.all([
-        supabase
-          .from('horses')
-          .select('*')
-          .eq('user_id', userId)
-          .order('name', { ascending: true }),
-        supabase
+      const horsesPromise = supabase
+        .from('horses')
+        .select('*')
+        .eq('user_id', userId)
+        .order('name', { ascending: true })
+
+      const remindersByNextDuePromise = supabase
+        .from('horse_reminders')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_done', false)
+        .gte('next_due_date', today)
+        .order('next_due_date', { ascending: true })
+
+      const [horsesRes, remindersByNextDueRes] = await Promise.all([
+        horsesPromise,
+        remindersByNextDuePromise
+      ])
+
+      let remindersRes = remindersByNextDueRes
+      if (remindersByNextDueRes.error && isMissingNextDueDateError(remindersByNextDueRes.error)) {
+        // Backward-compatible fallback for environments that still use legacy due_date.
+        const fallback = await supabase
           .from('horse_reminders')
           .select('*')
           .eq('user_id', userId)
           .eq('is_done', false)
           .gte('due_date', today)
           .order('due_date', { ascending: true })
-      ])
+        remindersRes = fallback
+      }
+
+      // Normalize legacy reminders so downstream UI can always use next_due_date.
+      const normalizedReminders = (remindersRes.data || []).map(r => ({
+        ...r,
+        next_due_date: r.next_due_date || r.due_date || null
+      }))
 
       if (horsesRes.error) throw horsesRes.error
       if (remindersRes.error) throw remindersRes.error
 
       setHorses(horsesRes.data || [])
-      setReminders(remindersRes.data || [])
+      setReminders(normalizedReminders)
     } catch (e) {
       console.error(e)
       toast.error('Error loading horses')
@@ -292,8 +329,8 @@ export default function Horses() {
                       <Calendar size={14} className="text-gray-400" />
                       {next ? (
                         <span className="truncate">
-                          Next reminder: <span className="font-medium text-gray-800">{next.label}</span> ·{' '}
-                          {new Date(next.due_date).toLocaleDateString('en-ZA', {
+                          Next reminder: <span className="font-medium text-gray-800">{reminderLabel(next)}</span> ·{' '}
+                          {new Date(next.next_due_date || next.due_date).toLocaleDateString('en-ZA', {
                             day: 'numeric',
                             month: 'short',
                             year: 'numeric'
@@ -313,8 +350,8 @@ export default function Horses() {
 
       {/* Add horse modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6">
             <h3 className="text-lg font-bold text-gray-900">Add horse</h3>
             <p className="text-sm text-gray-600 mt-1">You can fill in full details after creating.</p>
 

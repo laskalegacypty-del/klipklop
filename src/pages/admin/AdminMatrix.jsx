@@ -226,7 +226,7 @@ export default function AdminMatrix() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab('announcements')}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${
@@ -418,7 +418,7 @@ export default function AdminMatrix() {
       {/* Announcement Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-gray-800">
                 {editingAnnouncement ? 'Edit Announcement' : 'New Announcement'}

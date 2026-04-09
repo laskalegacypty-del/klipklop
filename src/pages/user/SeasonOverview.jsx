@@ -47,6 +47,15 @@ function buildCarryForwardPbTimeMap(rows) {
   return map
 }
 
+function buildSeasonCoveredGameSet(rows) {
+  const covered = new Set()
+  rows?.forEach(row => {
+    if (row?.is_nt === true || !row?.game) return
+    covered.add(normalizeGameName(row.game))
+  })
+  return covered
+}
+
 export default function SeasonOverview() {
   const { profile, isClubHead } = useAuth()
   const [combos, setCombos] = useState([])
@@ -56,6 +65,7 @@ export default function SeasonOverview() {
   const [events, setEvents] = useState([])
   const [attendedEvents, setAttendedEvents] = useState([])
   const [personalBests, setPersonalBests] = useState({})
+  const [seasonCoveredGames, setSeasonCoveredGames] = useState(new Set())
   const [bookmarks, setBookmarks] = useState([])
 
   // Club head: linked riders
@@ -186,11 +196,12 @@ export default function SeasonOverview() {
     // Build PB map
     const pbMap = buildCarryForwardPbTimeMap(pbsRes.data)
     setPersonalBests(pbMap)
+    setSeasonCoveredGames(buildSeasonCoveredGameSet(resultsRes.data))
   }
 
   // Which games have been covered
-  const gamesCovered = GAMES.filter(game => personalBests[game] !== undefined)
-  const gamesMissing = GAMES.filter(game => personalBests[game] === undefined)
+  const gamesCovered = GAMES.filter(game => seasonCoveredGames.has(game))
+  const gamesMissing = GAMES.filter(game => !seasonCoveredGames.has(game))
 
   // For each missing game, which upcoming events cover it
   function getUpcomingEventsForGame(game) {
@@ -432,7 +443,7 @@ export default function SeasonOverview() {
           {GAMES.map(game => {
             const pb = personalBests[game]
             const level = pb !== undefined ? getLevel(game, pb) : null
-            const covered = pb !== undefined
+            const covered = seasonCoveredGames.has(game)
             const upcomingForGame = !covered ? getUpcomingEventsForGame(game) : []
 
             return (

@@ -1044,7 +1044,7 @@ export default function Dashboard() {
     <div className="space-y-6">
 
       {/* Welcome header + Announcements toggle button */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <PageHeader
           title={`Welcome back, ${profile?.rider_name?.split(' ')[0] || getRoleLabel()}!`}
           description={new Date().toLocaleDateString('en-ZA', {
@@ -1147,7 +1147,7 @@ export default function Dashboard() {
           ) : (
             <Card>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="min-w-[680px] w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/60">
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rider</th>
@@ -1227,7 +1227,7 @@ export default function Dashboard() {
           ) : (
             <Card>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="min-w-[680px] w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/60">
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rider</th>

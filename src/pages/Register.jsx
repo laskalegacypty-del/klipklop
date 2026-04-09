@@ -81,16 +81,16 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-green-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-green-600 flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-5 sm:p-8">
 
         {/* Title */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6 sm:mb-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
             <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-green-900">{APP_NAME}</h1>
-          <p className="text-gray-500 mt-2">Create your account</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-green-900">{APP_NAME}</h1>
+          <p className="text-sm sm:text-base text-gray-500 mt-2">Create your account</p>
         </div>
 
         {/* Role selector */}
@@ -98,7 +98,7 @@ export default function Register() {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             I am registering as a…
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => setRole('user')}
