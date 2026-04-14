@@ -175,6 +175,21 @@ export function AuthProvider({ children }) {
     return { error }
   }
 
+  async function setHasSeenTutorial(hasSeen = true) {
+    if (!user?.id) return { error: new Error('No signed in user') }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ has_seen_tutorial: hasSeen })
+      .eq('id', user.id)
+
+    if (!error) {
+      setProfile(prev => (prev ? { ...prev, has_seen_tutorial: hasSeen } : prev))
+    }
+
+    return { error }
+  }
+
   const value = {
     user,
     profile,
@@ -183,6 +198,7 @@ export function AuthProvider({ children }) {
     signIn,
     signUp,
     signOut,
+    setHasSeenTutorial,
     isAdmin: profile?.role === 'admin',
     isSupporter: profile?.role === 'supporter',
     isClubHead: profile?.role === 'club_head',
@@ -200,6 +216,7 @@ export function AuthProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext)
 }

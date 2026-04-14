@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/layout/Layout'
 
@@ -79,105 +80,129 @@ function AdminRoute({ children }) {
   return <Layout>{children}</Layout>
 }
 
+function WindowScrollMemory() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const scrollKey = `window_scroll:${location.pathname}${location.search}`
+    const savedOffset = sessionStorage.getItem(scrollKey)
+    if (savedOffset) {
+      window.scrollTo({ top: Number(savedOffset), left: 0, behavior: 'auto' })
+    }
+
+    const handleScroll = () => {
+      sessionStorage.setItem(scrollKey, String(window.scrollY))
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [location.pathname, location.search])
+
+  return null
+}
+
 export default function App() {
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/pending" element={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-          <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">
-            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
-              <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
+    <>
+      <WindowScrollMemory />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/pending" element={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+            <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">
+              <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
+                <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
+              </div>
+              <p className="text-sm font-semibold text-green-900 mb-1">{APP_NAME}</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">
+                Account Pending Approval
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600 leading-6">
+                Your account is awaiting admin approval. You will be
+                notified by email once approved.
+              </p>
             </div>
-            <p className="text-sm font-semibold text-green-900 mb-1">{APP_NAME}</p>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">
-              Account Pending Approval
-            </h2>
-            <p className="text-sm sm:text-base text-gray-600 leading-6">
-              Your account is awaiting admin approval. You will be
-              notified by email once approved.
-            </p>
           </div>
-        </div>
-      } />
-      <Route path="/suspended" element={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-          <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">
-            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
-              <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
+        } />
+        <Route path="/suspended" element={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+            <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">
+              <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
+                <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
+              </div>
+              <p className="text-sm font-semibold text-green-900 mb-1">{APP_NAME}</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">
+                Account Suspended
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600 leading-6">
+                Your account has been suspended. Please contact the administrator.
+              </p>
             </div>
-            <p className="text-sm font-semibold text-green-900 mb-1">{APP_NAME}</p>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">
-              Account Suspended
-            </h2>
-            <p className="text-sm sm:text-base text-gray-600 leading-6">
-              Your account has been suspended. Please contact the administrator.
-            </p>
           </div>
-        </div>
-      } />
+        } />
 
-      {/* User routes */}
-      <Route path="/dashboard" element={
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
-      } />
-      <Route path="/qualifiers" element={
-        <ProtectedRoute><Qualifiers /></ProtectedRoute>
-      } />
-      <Route path="/my-times" element={
-        <ProtectedRoute><MyTimes /></ProtectedRoute>
-      } />
-      <Route path="/tracker" element={
-        <ProtectedRoute><QualifierTracker /></ProtectedRoute>
-      } />
-      <Route path="/season" element={
-        <ProtectedRoute><SeasonOverview /></ProtectedRoute>
-      } />
-      <Route path="/profile" element={
-        <ProtectedRoute><Profile /></ProtectedRoute>
-      } />
-      <Route path="/notifications" element={
-        <ProtectedRoute><Notifications /></ProtectedRoute>
-      } />
-      <Route path="/horses" element={
-        <ProtectedRoute><Horses /></ProtectedRoute>
-      } />
-      <Route path="/horses/:horseId" element={
-        <ProtectedRoute><HorseDetails /></ProtectedRoute>
-      } />
-      <Route path="/matrix" element={
-        <ProtectedRoute><Matrix /></ProtectedRoute>
-      } />
-      <Route path="/my-riders" element={
-        <ProtectedRoute><SupporterRiders /></ProtectedRoute>
-      } />
-      <Route path="/my-club-riders" element={
-        <ProtectedRoute><ClubRiders /></ProtectedRoute>
-      } />
-      <Route path="/friends-leaderboard" element={
-        <ProtectedRoute><FriendsLeaderboard /></ProtectedRoute>
-      } />
+        {/* User routes */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute><Dashboard /></ProtectedRoute>
+        } />
+        <Route path="/qualifiers" element={
+          <ProtectedRoute><Qualifiers /></ProtectedRoute>
+        } />
+        <Route path="/my-times" element={
+          <ProtectedRoute><MyTimes /></ProtectedRoute>
+        } />
+        <Route path="/tracker" element={
+          <ProtectedRoute><QualifierTracker /></ProtectedRoute>
+        } />
+        <Route path="/season" element={
+          <ProtectedRoute><SeasonOverview /></ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute><Profile /></ProtectedRoute>
+        } />
+        <Route path="/notifications" element={
+          <ProtectedRoute><Notifications /></ProtectedRoute>
+        } />
+        <Route path="/horses" element={
+          <ProtectedRoute><Horses /></ProtectedRoute>
+        } />
+        <Route path="/horses/:horseId" element={
+          <ProtectedRoute><HorseDetails /></ProtectedRoute>
+        } />
+        <Route path="/matrix" element={
+          <ProtectedRoute><Matrix /></ProtectedRoute>
+        } />
+        <Route path="/my-riders" element={
+          <ProtectedRoute><SupporterRiders /></ProtectedRoute>
+        } />
+        <Route path="/my-club-riders" element={
+          <ProtectedRoute><ClubRiders /></ProtectedRoute>
+        } />
+        <Route path="/friends-leaderboard" element={
+          <ProtectedRoute><FriendsLeaderboard /></ProtectedRoute>
+        } />
 
-      {/* Admin routes */}
-      <Route path="/admin/dashboard" element={
-        <AdminRoute><AdminDashboard /></AdminRoute>
-      } />
-      <Route path="/admin/users" element={
-        <AdminRoute><AdminUsers /></AdminRoute>
-      } />
-      <Route path="/admin/events" element={
-        <AdminRoute><AdminEvents /></AdminRoute>
-      } />
-      <Route path="/admin/matrix" element={
-        <AdminRoute><AdminMatrix /></AdminRoute>
-      } />
+        {/* Admin routes */}
+        <Route path="/admin/dashboard" element={
+          <AdminRoute><AdminDashboard /></AdminRoute>
+        } />
+        <Route path="/admin/users" element={
+          <AdminRoute><AdminUsers /></AdminRoute>
+        } />
+        <Route path="/admin/events" element={
+          <AdminRoute><AdminEvents /></AdminRoute>
+        } />
+        <Route path="/admin/matrix" element={
+          <AdminRoute><AdminMatrix /></AdminRoute>
+        } />
 
-      {/* Default redirect */}
-      <Route path="/" element={<Landing />} />
-      {/* Unknown routes (important on static hosting / SPA refresh) */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+        {/* Default redirect */}
+        <Route path="/" element={<Landing />} />
+        {/* Unknown routes (important on static hosting / SPA refresh) */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </>
   )
 }

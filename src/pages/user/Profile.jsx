@@ -31,6 +31,7 @@ import {
   PWA_APP_INSTALLED_EVENT,
   PWA_INSTALL_PROMPT_EVENT
 } from '../../lib/pwaInstall'
+import { START_TUTORIAL_EVENT } from '../../components/onboarding/OnboardingTour'
 
 const EMPTY_COMBO = {
   horse_id: '',
@@ -534,6 +535,10 @@ export default function Profile() {
     toast.success('Signed out successfully')
   }
 
+  function handleReplayTutorial() {
+    window.dispatchEvent(new CustomEvent(START_TUTORIAL_EVENT))
+  }
+
   function openAddCombo() {
     setEditingCombo(null)
     setComboForm(EMPTY_COMBO)
@@ -858,14 +863,23 @@ export default function Profile() {
       <Card>
         <CardContent className="p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-2">Account</h2>
-          <p className="text-sm text-gray-500 mb-4">Sign out of your account on this device.</p>
-          <Button
-            type="button"
-            variant="danger"
-            onClick={handleSignOut}
-          >
-            Sign Out
-          </Button>
+          <p className="text-sm text-gray-500 mb-4">Sign out, or replay the getting-started walkthrough.</p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleReplayTutorial}
+            >
+              Replay tutorial
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleSignOut}
+            >
+              Sign Out
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

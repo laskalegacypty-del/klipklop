@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/ui'
+import { useTabQueryParam } from '../../lib/useTabQueryParam'
 
 const EMPTY_ANNOUNCEMENT = {
   title: '',
@@ -20,9 +21,15 @@ const EMPTY_ANNOUNCEMENT = {
   is_pinned: false,
   expires_at: ''
 }
+const ADMIN_MATRIX_TABS = ['announcements', 'matrix']
 
 export default function AdminMatrix() {
   const [activeTab, setActiveTab] = useState('announcements')
+  useTabQueryParam({
+    activeTab,
+    setActiveTab,
+    allowedTabs: ADMIN_MATRIX_TABS,
+  })
   const [announcements, setAnnouncements] = useState([])
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true)
   const [showModal, setShowModal] = useState(false)

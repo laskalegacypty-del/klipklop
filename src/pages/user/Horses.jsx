@@ -13,8 +13,29 @@ function startOfTodayISO() {
 }
 
 function reminderLabel(reminder) {
-  if (reminder.reminder_type === 'custom') return reminder.custom_label || reminder.label || 'Custom'
-  return reminder.label || String(reminder.reminder_type || '').replaceAll('_', ' ')
+  const byType = {
+    flu_vaccination: 'Flu Vaccination (Equine Influenza)',
+    ahs_vaccination: 'AHS Vaccination (African Horse Sickness)',
+    farrier: 'Farrier (Trimming / Shoeing)',
+    deworming: 'Deworming',
+    dental: 'Dental (Teeth floating)',
+    coggins_test: 'Coggins Test (EIA)',
+    passport_renewal: 'Passport Renewal',
+    custom: 'Custom',
+  }
+  if (reminder.reminder_type && reminder.reminder_type !== 'custom') {
+    return byType[reminder.reminder_type] || reminder.label || 'Reminder'
+  }
+
+  const normalizedLabel = String(reminder.label || reminder.custom_label || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+
+  const inferred = Object.entries(byType).find(([, header]) => (
+    header.trim().toLowerCase() === normalizedLabel
+  ))
+  return (inferred?.[1]) || byType[reminder.reminder_type] || reminder.label || 'Reminder'
 }
 
 function isMissingNextDueDateError(error) {
@@ -223,7 +244,7 @@ export default function Horses() {
         }
         actions={
           (!isClubHead || selectedRider) && (
-            <Button onClick={() => setShowAddModal(true)}>
+            <Button data-tour="horses-add" onClick={() => setShowAddModal(true)}>
               <Plus size={16} />
               Add horse
             </Button>
@@ -283,6 +304,7 @@ export default function Horses() {
           description="Add your first horse to start tracking health and reminders."
           action={
             <button
+              data-tour="horses-add"
               onClick={() => setShowAddModal(true)}
               className="text-sm font-semibold text-green-800 hover:underline"
             >

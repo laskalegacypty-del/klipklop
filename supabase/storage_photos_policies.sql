@@ -2,6 +2,7 @@
 -- Buckets used by the app:
 --  - avatars (profiles.profile_photo_url)
 --  - horse-photos (horses.photo_url)
+--  - videos (horse_videos.video_url)
 --
 -- This config:
 --  - Ensures buckets exist
@@ -22,7 +23,8 @@
 insert into storage.buckets (id, name, public)
 values
   ('avatars', 'avatars', true),
-  ('horse-photos', 'horse-photos', true)
+  ('horse-photos', 'horse-photos', true),
+  ('videos', 'videos', true)
 on conflict (id) do update
 set public = excluded.public;
 
@@ -38,6 +40,9 @@ set public = excluded.public;
 --   - INSERT/UPDATE/DELETE: allow authenticated where object name starts with auth.uid() + "/"
 -- - Bucket: horse-photos
 --   - SELECT: allow (bucket_id = 'horse-photos') [bucket is public anyway]
+--   - INSERT/UPDATE/DELETE: allow authenticated where object name starts with auth.uid() + "/"
+-- - Bucket: videos
+--   - SELECT: allow (bucket_id = 'videos') [bucket is public anyway]
 --   - INSERT/UPDATE/DELETE: allow authenticated where object name starts with auth.uid() + "/"
 
 -- ===========

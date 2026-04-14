@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { QUALIFIER_GAMES, PROVINCES } from '../../lib/constants'
+import { uploadVideoToBucket, UploadValidationError } from '../../lib/storageUploads'
 import { Card, CardContent, PageHeader, Skeleton } from '../../components/ui'
 import {
   Calendar,
@@ -17,7 +18,8 @@ import {
   Tag,
   StickyNote,
   CalendarDays,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -70,12 +72,105 @@ const EVENT_TYPE_COLORS = {
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
-function QualifierDetailModal({ event, bookmarks, onToggleBookmark, onClose }) {
+function QualifierDetailModal({ event, bookmarks, onToggleBookmark, onClose, profileId }) {
+  const [videos, setVideos] = useState([])
+  const [videoTitle, setVideoTitle] = useState('')
+  const [videoFile, setVideoFile] = useState(null)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [videoProgress, setVideoProgress] = useState(0)
+  const [videoError, setVideoError] = useState('')
+  const videoInputRef = useRef(null)
   if (!event) return null
   const isBookmarked = bookmarks.includes(event.id)
   const games = event.qualifier_number ? QUALIFIER_GAMES[event.qualifier_number] : null
   const status = getEventStatus(event.date)
   const typeColor = EVENT_TYPE_COLORS[event.event_type] || 'bg-gray-600'
+
+  useEffect(() => {
+    if (!event?.id || !profileId) return
+    fetchVideos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.id, profileId])
+
+  async function fetchVideos() {
+    const { data, error } = await supabase
+      .from('horse_videos')
+      .select('*')
+      .eq('qualifier_id', event.id)
+      .eq('user_id', profileId)
+      .order('created_at', { ascending: false })
+    if (error) {
+      setVideoError('Could not load videos for this qualifier.')
+      return
+    }
+    setVideos(data || [])
+  }
+
+  async function handleUploadVideo() {
+    if (!videoFile) {
+      setVideoError('Please choose a video file first.')
+      return
+    }
+    if (!videoTitle.trim()) {
+      setVideoError('Please enter a video title.')
+      return
+    }
+
+    setVideoError('')
+    setUploadingVideo(true)
+    setVideoProgress(0)
+
+    try {
+      const extension = videoFile.type === 'video/quicktime' ? 'mov' : 'mp4'
+      const path = `${profileId}/qualifiers/${event.id}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`
+      const { publicUrl } = await uploadVideoToBucket({
+        bucket: 'videos',
+        path,
+        file: videoFile,
+        onProgress: setVideoProgress,
+      })
+
+      const { error } = await supabase.from('horse_videos').insert({
+        user_id: profileId,
+        horse_id: null,
+        qualifier_id: event.id,
+        video_url: publicUrl,
+        title: videoTitle.trim(),
+      })
+      if (error) throw error
+
+      setVideoTitle('')
+      setVideoFile(null)
+      if (videoInputRef.current) videoInputRef.current.value = ''
+      setVideoProgress(0)
+      toast.success('Video uploaded')
+      await fetchVideos()
+    } catch (error) {
+      const message =
+        error instanceof UploadValidationError
+          ? error.message
+          : error?.message || 'Could not upload video.'
+      setVideoError(message)
+      toast.error(message)
+    } finally {
+      setUploadingVideo(false)
+    }
+  }
+
+  async function handleDeleteVideo(videoId) {
+    if (!confirm('Delete this video?')) return
+    const { error } = await supabase
+      .from('horse_videos')
+      .delete()
+      .eq('id', videoId)
+      .eq('user_id', profileId)
+    if (error) {
+      toast.error('Could not delete video')
+      return
+    }
+    toast.success('Video deleted')
+    await fetchVideos()
+  }
 
   return (
     <div
@@ -202,12 +297,76 @@ function QualifierDetailModal({ event, bookmarks, onToggleBookmark, onClose }) {
             </div>
           )}
 
+          <div className="space-y-3">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Videos</p>
+            <div className="grid grid-cols-1 gap-2">
+              <input
+                type="text"
+                value={videoTitle}
+                onChange={e => setVideoTitle(e.target.value)}
+                placeholder="Video title"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
+                disabled={uploadingVideo}
+              />
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/mp4,video/quicktime,.mp4,.mov"
+                onChange={e => {
+                  const file = e.target.files?.[0] || null
+                  setVideoFile(file)
+                  if (file && !videoTitle.trim()) setVideoTitle(file.name.replace(/\.[^.]+$/, ''))
+                }}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600"
+                disabled={uploadingVideo}
+              />
+              <button
+                onClick={handleUploadVideo}
+                disabled={uploadingVideo}
+                className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 disabled:opacity-60"
+              >
+                {uploadingVideo ? 'Uploading video…' : 'Attach video'}
+              </button>
+            </div>
+            {uploadingVideo && (
+              <div className="space-y-1">
+                <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full bg-green-600" style={{ width: `${videoProgress}%` }} />
+                </div>
+                <p className="text-xs text-gray-500">{videoProgress}% uploaded</p>
+              </div>
+            )}
+            {videoError && <p className="text-sm text-red-600">{videoError}</p>}
+            {videoFile && <p className="text-xs text-gray-500">Selected file: {videoFile.name}</p>}
+            {videos.length > 0 ? (
+              <div className="space-y-3">
+                {videos.map(video => (
+                  <div key={video.id} className="rounded-lg border border-gray-200 p-2">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-800">{video.title}</p>
+                      <button
+                        onClick={() => handleDeleteVideo(video.id)}
+                        className="p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                        title="Delete video"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <video src={video.video_url} controls preload="metadata" className="w-full rounded-md bg-black" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No videos attached to this qualifier yet.</p>
+            )}
+          </div>
+
           {/* Divider */}
           <div className="border-t border-gray-100" />
 
           {/* Bookmark action */}
           <button
-            onClick={() => onToggleBookmark(event.id)}
+            onClick={() => onToggleBookmark(event)}
             className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition ${
               isBookmarked
                 ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
@@ -287,7 +446,8 @@ function EventCard({ event, bookmarks, onSelect, onToggleBookmark }) {
       {/* Right actions: bookmark + chevron */}
       <div className="flex-shrink-0 flex flex-col items-center justify-center gap-1.5">
         <button
-          onClick={e => { e.stopPropagation(); onToggleBookmark(event.id) }}
+          data-tour="qualifier-bookmark"
+          onClick={e => { e.stopPropagation(); onToggleBookmark(event) }}
           title={isBookmarked ? 'Remove bookmark' : 'Bookmark this event'}
           className={`p-1.5 rounded-lg transition ${
             isBookmarked
@@ -311,6 +471,10 @@ export default function Qualifiers() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [bookmarks, setBookmarks] = useState([])
+  const [combos, setCombos] = useState([])
+  const [selectedBookmarkEvent, setSelectedBookmarkEvent] = useState(null)
+  const [selectedBookmarkComboId, setSelectedBookmarkComboId] = useState('')
+  const [bookmarkComboByEvent, setBookmarkComboByEvent] = useState({})
   const [viewMode, setViewMode] = useState('calendar')
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -325,7 +489,20 @@ export default function Qualifiers() {
   useEffect(() => {
     fetchEvents()
     fetchBookmarks()
+    fetchCombos()
   }, [])
+
+  useEffect(() => {
+    if (!profile?.id) return
+    const storageKey = `qualifier-bookmark-combos:${profile.id}`
+    try {
+      const stored = localStorage.getItem(storageKey)
+      const parsed = stored ? JSON.parse(stored) : {}
+      setBookmarkComboByEvent(parsed && typeof parsed === 'object' ? parsed : {})
+    } catch {
+      setBookmarkComboByEvent({})
+    }
+  }, [profile?.id])
 
   async function fetchEvents() {
     try {
@@ -354,7 +531,23 @@ export default function Qualifiers() {
     }
   }
 
-  async function toggleBookmark(eventId) {
+  async function fetchCombos() {
+    try {
+      if (!profile?.id) return
+      const { data, error } = await supabase
+        .from('horse_rider_combos')
+        .select('id, horse_name')
+        .eq('user_id', profile.id)
+        .eq('is_archived', false)
+        .order('horse_name', { ascending: true })
+      if (error) throw error
+      setCombos(data || [])
+    } catch {
+      toast.error('Could not load horse/rider combos')
+    }
+  }
+
+  async function toggleBookmark(eventId, comboId = null) {
     const isBookmarked = bookmarks.includes(eventId)
     try {
       if (isBookmarked) {
@@ -364,17 +557,59 @@ export default function Qualifiers() {
           .eq('user_id', profile.id)
           .eq('event_id', eventId)
         setBookmarks(prev => prev.filter(id => id !== eventId))
+        if (profile?.id) {
+          const storageKey = `qualifier-bookmark-combos:${profile.id}`
+          setBookmarkComboByEvent(prev => {
+            const next = { ...prev }
+            delete next[eventId]
+            localStorage.setItem(storageKey, JSON.stringify(next))
+            return next
+          })
+        }
         toast.success('Bookmark removed')
       } else {
         await supabase
           .from('bookmarked_events')
           .insert({ user_id: profile.id, event_id: eventId })
         setBookmarks(prev => [...prev, eventId])
+        if (profile?.id && comboId) {
+          const storageKey = `qualifier-bookmark-combos:${profile.id}`
+          setBookmarkComboByEvent(prev => {
+            const next = { ...prev, [eventId]: comboId }
+            localStorage.setItem(storageKey, JSON.stringify(next))
+            return next
+          })
+        }
         toast.success('Event bookmarked!')
       }
     } catch {
       toast.error('Error updating bookmark')
     }
+  }
+
+  function handleBookmarkAction(event) {
+    const isBookmarked = bookmarks.includes(event.id)
+    if (isBookmarked) {
+      toggleBookmark(event.id)
+      return
+    }
+    if (combos.length === 0) {
+      toast.error('Add a horse/rider combo first in Profile')
+      return
+    }
+    setSelectedBookmarkEvent(event)
+    setSelectedBookmarkComboId(combos[0]?.id || '')
+  }
+
+  function confirmBookmarkWithCombo() {
+    if (!selectedBookmarkEvent?.id) return
+    if (!selectedBookmarkComboId) {
+      toast.error('Please choose a horse/rider combo')
+      return
+    }
+    toggleBookmark(selectedBookmarkEvent.id, selectedBookmarkComboId)
+    setSelectedBookmarkEvent(null)
+    setSelectedBookmarkComboId('')
   }
 
   // ── Month navigation ──
@@ -454,7 +689,7 @@ export default function Qualifiers() {
   const groupedListEvents = groupByMonth(listEvents)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-tour="qualifiers-view">
 
       {/* Page header */}
       <PageHeader
@@ -551,7 +786,7 @@ export default function Qualifiers() {
                     event={event}
                     bookmarks={bookmarks}
                     onSelect={setSelectedEvent}
-                    onToggleBookmark={toggleBookmark}
+                    onToggleBookmark={handleBookmarkAction}
                   />
                 ))
               )}
@@ -691,7 +926,7 @@ export default function Qualifiers() {
                     event={event}
                     bookmarks={bookmarks}
                     onSelect={setSelectedEvent}
-                    onToggleBookmark={toggleBookmark}
+                    onToggleBookmark={handleBookmarkAction}
                   />
                 ))}
               </div>
@@ -754,7 +989,7 @@ export default function Qualifiers() {
                     event={event}
                     bookmarks={bookmarks}
                     onSelect={setSelectedEvent}
-                    onToggleBookmark={toggleBookmark}
+                    onToggleBookmark={handleBookmarkAction}
                   />
                 ))}
               </div>
@@ -787,11 +1022,21 @@ export default function Qualifiers() {
           </div>
         )
 
-        const grouped = {}
-        bookmarkedEvents.forEach(e => {
-          const key = new Date(e.date).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })
-          if (!grouped[key]) grouped[key] = []
-          grouped[key].push(e)
+        const comboNameById = combos.reduce((acc, combo) => {
+          acc[combo.id] = combo.horse_name
+          return acc
+        }, {})
+        const groupedByHorse = {}
+        bookmarkedEvents.forEach(event => {
+          const comboId = bookmarkComboByEvent[event.id]
+          const horseName = comboId ? (comboNameById[comboId] || 'Unknown horse') : 'No horse selected'
+          if (!groupedByHorse[horseName]) groupedByHorse[horseName] = []
+          groupedByHorse[horseName].push(event)
+        })
+
+        const sortedHorseNames = Object.keys(groupedByHorse).sort((a, b) => a.localeCompare(b))
+        sortedHorseNames.forEach(horseName => {
+          groupedByHorse[horseName].sort((a, b) => new Date(a.date) - new Date(b.date))
         })
 
         return (
@@ -802,19 +1047,19 @@ export default function Qualifiers() {
                 {bookmarkedEvents.length} saved qualifier{bookmarkedEvents.length !== 1 ? 's' : ''}
               </span>
             </div>
-            {Object.entries(grouped).map(([month, evts]) => (
-              <div key={month}>
+            {sortedHorseNames.map(horseName => (
+              <div key={horseName}>
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-200">
-                  {month}
+                  {horseName}
                 </h2>
                 <div className="space-y-2">
-                  {evts.map(event => (
+                  {groupedByHorse[horseName].map(event => (
                     <EventCard
                       key={event.id}
                       event={event}
                       bookmarks={bookmarks}
                       onSelect={setSelectedEvent}
-                      onToggleBookmark={toggleBookmark}
+                    onToggleBookmark={handleBookmarkAction}
                     />
                   ))}
                 </div>
@@ -829,9 +1074,57 @@ export default function Qualifiers() {
         <QualifierDetailModal
           event={selectedEvent}
           bookmarks={bookmarks}
-          onToggleBookmark={toggleBookmark}
+          onToggleBookmark={handleBookmarkAction}
           onClose={() => setSelectedEvent(null)}
+          profileId={profile?.id}
         />
+      )}
+      {selectedBookmarkEvent && (
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-5 space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Bookmark event</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Choose the horse/rider combo for this qualifier bookmark.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedBookmarkEvent.venue}, {selectedBookmarkEvent.province}
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Horse/rider combo</label>
+              <select
+                value={selectedBookmarkComboId}
+                onChange={e => setSelectedBookmarkComboId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+              >
+                <option value="">Select combo</option>
+                {combos.map(combo => (
+                  <option key={combo.id} value={combo.id}>
+                    {combo.horse_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setSelectedBookmarkEvent(null)
+                  setSelectedBookmarkComboId('')
+                }}
+                className="px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBookmarkWithCombo}
+                className="px-3 py-2 rounded-lg text-sm font-semibold bg-green-700 text-white hover:bg-green-800 transition"
+              >
+                Save bookmark
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

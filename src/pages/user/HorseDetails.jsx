@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import Cropper from 'react-easy-crop'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { uploadImageToBucket } from '../../lib/storageUploads'
+import { createCroppedImageFile } from '../../lib/imageCrop'
+import { uploadImageToBucket, uploadVideoToBucket, UploadValidationError } from '../../lib/storageUploads'
+import { useTabQueryParam } from '../../lib/useTabQueryParam'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -17,6 +20,7 @@ import {
   ShieldAlert,
   Syringe,
   Trash2,
+  Video,
   Wrench,
   X
 } from 'lucide-react'
@@ -71,6 +75,7 @@ const REMINDER_TYPES = [
 ]
 
 const REMINDER_GROUP_ORDER = ['Vaccinations', 'Routine Care', 'Administrative', 'Other']
+const HORSE_DETAILS_TABS = ['details', 'medical', 'vitals', 'reminders']
 
 function parseISODate(value) {
   if (!value) return null
@@ -129,11 +134,26 @@ function reminderTypeConfig(type) {
   return REMINDER_TYPES.find(t => t.value === type) || REMINDER_TYPES[REMINDER_TYPES.length - 1]
 }
 
+function normalizeReminderText(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+function resolvedReminderType(reminder) {
+  const currentType = reminder?.reminder_type
+  if (currentType && currentType !== 'custom') return currentType
+
+  const normalizedLabel = normalizeReminderText(reminder?.label || reminder?.custom_label)
+  if (!normalizedLabel) return currentType || 'custom'
+
+  const inferred = REMINDER_TYPES.find(type => normalizeReminderText(type.label) === normalizedLabel)
+  return inferred?.value || currentType || 'custom'
+}
+
 function reminderDisplayLabel(reminder) {
-  if (reminder.reminder_type === 'custom') {
-    return reminder.custom_label || reminder.label || 'Custom reminder'
-  }
-  return reminderTypeConfig(reminder.reminder_type).label
+  return reminderTypeConfig(resolvedReminderType(reminder)).label
 }
 
 function reminderUrgency(nextDueDate) {
@@ -231,6 +251,26 @@ function isMissingColumnOrTableError(error, token) {
   )
 }
 
+function isReminderInsertCompatibilityError(error) {
+  const msg = String(error?.message || error?.details || '').toLowerCase()
+  return (
+    msg.includes('schema cache') ||
+    (msg.includes('column') && (msg.includes('not found') || msg.includes('does not exist'))) ||
+    (msg.includes('relation') && msg.includes('does not exist')) ||
+    msg.includes('horse_reminder_type') ||
+    msg.includes('reminder_type') ||
+    msg.includes('custom_label') ||
+    msg.includes('last_done_date') ||
+    msg.includes('next_due_date') ||
+    msg.includes('vet_name') ||
+    msg.includes('notification_days_before') ||
+    msg.includes('interval_value') ||
+    msg.includes('interval_unit') ||
+    msg.includes('metadata') ||
+    msg.includes('updated_at')
+  )
+}
+
 function buildLegacyVitalNotes(userNotes, vitalCheck) {
   const trimmed = userNotes.trim()
   if (vitalCheck.isAbnormal && vitalCheck.abnormalReason) {
@@ -277,6 +317,14 @@ export default function HorseDetails() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [showPhotoCropModal, setShowPhotoCropModal] = useState(false)
+  const [photoCropSource, setPhotoCropSource] = useState('')
+  const [photoCropFilename, setPhotoCropFilename] = useState('photo.jpg')
+  const [photoCrop, setPhotoCrop] = useState({ x: 0, y: 0 })
+  const [photoZoom, setPhotoZoom] = useState(1)
+  const [photoCroppedAreaPixels, setPhotoCroppedAreaPixels] = useState(null)
+  const photoInputRef = useRef(null)
+  const horseVideoInputRef = useRef(null)
 
   const [horse, setHorse] = useState(null)
   const [activeTab, setActiveTab] = useState('details') // details | medical | vitals | reminders
@@ -286,6 +334,12 @@ export default function HorseDetails() {
   const [medical, setMedical] = useState([])
   const [reminders, setReminders] = useState([])
   const [vaccinationLog, setVaccinationLog] = useState([])
+  const [horseVideos, setHorseVideos] = useState([])
+  const [videoTitle, setVideoTitle] = useState('')
+  const [videoFile, setVideoFile] = useState(null)
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [videoUploadError, setVideoUploadError] = useState('')
 
   const [horseForm, setHorseForm] = useState({
     name: '',
@@ -336,6 +390,12 @@ export default function HorseDetails() {
     annual_last_date: '',
   })
 
+  useTabQueryParam({
+    activeTab,
+    setActiveTab,
+    allowedTabs: HORSE_DETAILS_TABS,
+  })
+
   useEffect(() => {
     if (!profile?.id || !horseId) return
     fetchAll()
@@ -344,14 +404,22 @@ export default function HorseDetails() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
-    const tab = params.get('tab')
-    if (tab === 'reminders') setActiveTab('reminders')
+    if (params.get('tutorial') === 'photo') {
+      setActiveTab('details')
+      setIsEditingDetails(true)
+    }
   }, [location.search])
+
+  useEffect(() => {
+    return () => {
+      if (photoCropSource) URL.revokeObjectURL(photoCropSource)
+    }
+  }, [photoCropSource])
 
   async function fetchAll() {
     setLoading(true)
     try {
-      const [horseRes, medicalRes] = await Promise.all([
+      const [horseRes, medicalRes, rawVideosRes] = await Promise.all([
         supabase
           .from('horses')
           .select('*')
@@ -365,7 +433,18 @@ export default function HorseDetails() {
           .eq('user_id', profile.id)
           .order('date', { ascending: false })
           .order('created_at', { ascending: false }),
+        supabase
+          .from('horse_videos')
+          .select('*')
+          .eq('horse_id', horseId)
+          .eq('user_id', profile.id)
+          .order('created_at', { ascending: false }),
       ])
+
+      let videosRes = rawVideosRes
+      if (videosRes.error && isMissingColumnOrTableError(videosRes.error, 'horse_videos')) {
+        videosRes = { data: [], error: null }
+      }
 
       let remindersRes = await supabase
         .from('horse_reminders')
@@ -399,18 +478,21 @@ export default function HorseDetails() {
 
       if (horseRes.error) throw horseRes.error
       if (medicalRes.error) throw medicalRes.error
+      if (videosRes.error) throw videosRes.error
       if (remindersRes.error) throw remindersRes.error
       if (vaccinationLogRes.error) throw vaccinationLogRes.error
 
       if (!horseRes.data) {
         setHorse(null)
         setMedical([])
+        setHorseVideos([])
         setReminders([])
         return
       }
 
       setHorse(horseRes.data)
       setMedical(medicalRes.data || [])
+      setHorseVideos(videosRes.data || [])
       setReminders((remindersRes.data || []).map(r => ({
         ...r,
         next_due_date: r.next_due_date || r.due_date || null
@@ -548,20 +630,56 @@ export default function HorseDetails() {
     }
   }
 
-  async function handleHorsePhotoUpload(e) {
+  const closePhotoCropModal = useCallback(() => {
+    setShowPhotoCropModal(false)
+    setPhotoCrop({ x: 0, y: 0 })
+    setPhotoZoom(1)
+    setPhotoCroppedAreaPixels(null)
+    setPhotoCropFilename('photo.jpg')
+    setPhotoCropSource(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return ''
+    })
+    if (photoInputRef.current) photoInputRef.current.value = ''
+  }, [])
+
+  function handleHorsePhotoFileSelect(e) {
     const file = e.target.files?.[0]
     if (!file) return
+
+    const source = URL.createObjectURL(file)
+    setPhotoCropFilename(file.name || 'photo.jpg')
+    setPhotoCrop({ x: 0, y: 0 })
+    setPhotoZoom(1)
+    setPhotoCroppedAreaPixels(null)
+    setPhotoCropSource(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return source
+    })
+    setShowPhotoCropModal(true)
+  }
+
+  async function handleHorsePhotoUpload() {
+    if (!photoCropSource || !photoCroppedAreaPixels) {
+      toast.error('Please position the crop area first')
+      return
+    }
 
     try {
       setUploadingPhoto(true)
 
       if (!profile?.id) throw new Error('Not signed in')
+      const croppedFile = await createCroppedImageFile({
+        imageSrc: photoCropSource,
+        cropPixels: photoCroppedAreaPixels,
+        fileName: photoCropFilename.replace(/\.[^.]+$/, '') + '.jpg',
+      })
 
       const filePath = `${profile.id}/${horseId}/photo.jpg`
       const { publicUrl } = await uploadImageToBucket({
         bucket: 'horse-photos',
         path: filePath,
-        file,
+        file: croppedFile,
       })
 
       const { error: updateError } = await supabase
@@ -572,14 +690,92 @@ export default function HorseDetails() {
       if (updateError) throw updateError
 
       toast.success('Photo updated')
+      closePhotoCropModal()
       await fetchAll()
     } catch (err) {
       console.error(err)
       toast.error(err?.message || 'Error uploading photo')
     } finally {
       setUploadingPhoto(false)
-      // allow uploading same file again
-      e.target.value = ''
+    }
+  }
+
+  function handleHorseVideoFileSelect(event) {
+    const file = event.target.files?.[0] || null
+    setVideoUploadError('')
+    setVideoFile(file)
+    if (file && !videoTitle.trim()) {
+      setVideoTitle(file.name.replace(/\.[^.]+$/, ''))
+    }
+  }
+
+  async function handleHorseVideoUpload() {
+    if (!videoFile) {
+      setVideoUploadError('Please choose a video file first.')
+      return
+    }
+    const title = videoTitle.trim()
+    if (!title) {
+      setVideoUploadError('Please enter a video title.')
+      return
+    }
+
+    setUploadingVideo(true)
+    setVideoUploadError('')
+    setVideoUploadProgress(0)
+
+    try {
+      const extension = videoFile.type === 'video/quicktime' ? 'mov' : 'mp4'
+      const path = `${profile.id}/${horseId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`
+      const { publicUrl } = await uploadVideoToBucket({
+        bucket: 'videos',
+        path,
+        file: videoFile,
+        onProgress: setVideoUploadProgress,
+      })
+
+      const { error } = await supabase.from('horse_videos').insert({
+        user_id: profile.id,
+        horse_id: horseId,
+        qualifier_id: null,
+        video_url: publicUrl,
+        title,
+      })
+      if (error) throw error
+
+      toast.success('Video uploaded')
+      setVideoTitle('')
+      setVideoFile(null)
+      if (horseVideoInputRef.current) horseVideoInputRef.current.value = ''
+      setVideoUploadProgress(0)
+      await fetchAll()
+    } catch (error) {
+      console.error(error)
+      const message =
+        error instanceof UploadValidationError
+          ? error.message
+          : error?.message || 'Could not upload video.'
+      setVideoUploadError(message)
+      toast.error(message)
+    } finally {
+      setUploadingVideo(false)
+    }
+  }
+
+  async function handleDeleteHorseVideo(videoId) {
+    if (!confirm('Delete this video?')) return
+    try {
+      const { error } = await supabase
+        .from('horse_videos')
+        .delete()
+        .eq('id', videoId)
+        .eq('user_id', profile.id)
+      if (error) throw error
+      toast.success('Video deleted')
+      await fetchAll()
+    } catch (error) {
+      console.error(error)
+      toast.error('Could not delete video')
     }
   }
 
@@ -810,26 +1006,76 @@ export default function HorseDetails() {
         return
       }
 
-      const { error } = await supabase
-        .from('horse_reminders')
-        .insert({
-          horse_id: horseId,
-          user_id: profile.id,
-          reminder_type: reminderForm.reminder_type,
-          label,
-          custom_label: isCustom ? reminderForm.custom_label.trim() : null,
-          last_done_date: lastDoneDate || null,
-          next_due_date: nextDueDate,
-          due_date: nextDueDate,
-          vet_name: reminderForm.vet_name.trim() || null,
-          notes: reminderForm.notes.trim() || null,
-          is_primary_course_complete: primaryCourseComplete,
-          notification_days_before: reminderForm.notification_days_before,
-          interval_value: reminderForm.interval_value || null,
-          interval_unit: reminderForm.interval_unit || null,
-          metadata,
-          is_done: false
-        })
+      const fullReminderPayload = {
+        horse_id: horseId,
+        user_id: profile.id,
+        reminder_type: reminderForm.reminder_type,
+        label,
+        custom_label: isCustom ? reminderForm.custom_label.trim() : null,
+        last_done_date: lastDoneDate || null,
+        next_due_date: nextDueDate,
+        due_date: nextDueDate,
+        vet_name: reminderForm.vet_name.trim() || null,
+        notes: reminderForm.notes.trim() || null,
+        is_primary_course_complete: primaryCourseComplete,
+        notification_days_before: reminderForm.notification_days_before,
+        interval_value: reminderForm.interval_value || null,
+        interval_unit: reminderForm.interval_unit || null,
+        metadata,
+        is_done: false
+      }
+
+      const compactReminderPayload = {
+        horse_id: horseId,
+        user_id: profile.id,
+        reminder_type: reminderForm.reminder_type,
+        label,
+        last_done_date: lastDoneDate || null,
+        next_due_date: nextDueDate,
+        due_date: nextDueDate,
+        is_done: false
+      }
+
+      const typePreservingLegacyPayload = {
+        horse_id: horseId,
+        user_id: profile.id,
+        reminder_type: reminderForm.reminder_type,
+        label,
+        due_date: nextDueDate,
+        is_done: false
+      }
+
+      const legacyReminderPayload = {
+        horse_id: horseId,
+        user_id: profile.id,
+        label,
+        due_date: nextDueDate,
+        is_done: false
+      }
+
+      const insertAttempts = [
+        fullReminderPayload,
+        compactReminderPayload,
+        typePreservingLegacyPayload,
+        legacyReminderPayload,
+      ]
+
+      let error = null
+      for (let i = 0; i < insertAttempts.length; i += 1) {
+        const attempt = await supabase
+          .from('horse_reminders')
+          .insert(insertAttempts[i])
+        if (!attempt.error) {
+          error = null
+          break
+        }
+        if (!isReminderInsertCompatibilityError(attempt.error)) {
+          error = attempt.error
+          break
+        }
+        error = attempt.error
+      }
+
       if (error) throw error
 
       if (isVaccination) {
@@ -868,7 +1114,9 @@ export default function HorseDetails() {
 
         if (logRows.length > 0) {
           const { error: logError } = await supabase.from('vaccination_log').insert(logRows)
-          if (logError) throw logError
+          if (logError && !isMissingColumnOrTableError(logError, 'vaccination_log')) {
+            throw logError
+          }
         }
       }
 
@@ -1190,11 +1438,12 @@ export default function HorseDetails() {
                     <p className="text-sm font-semibold text-gray-800">Photo</p>
                     <p className="text-xs text-gray-500 mt-0.5">Upload a photo for this horse.</p>
                     <div className="mt-3">
-                      <label className="inline-flex">
+                      <label className="inline-flex" data-tour="horse-photo-upload">
                         <input
+                          ref={photoInputRef}
                           type="file"
                           accept="image/*"
-                          onChange={handleHorsePhotoUpload}
+                          onChange={handleHorsePhotoFileSelect}
                           className="hidden"
                           disabled={uploadingPhoto}
                         />
@@ -1296,6 +1545,81 @@ export default function HorseDetails() {
               </CardContent>
             </Card>
           )}
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Video size={18} className="text-green-700" />
+                <h3 className="text-base font-semibold text-gray-900">Videos</h3>
+              </div>
+              <p className="text-xs text-gray-500">Upload MP4 or MOV files up to 100MB.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Input
+                  value={videoTitle}
+                  onChange={e => setVideoTitle(e.target.value)}
+                  placeholder="Video title"
+                  disabled={uploadingVideo}
+                />
+                <input
+                  ref={horseVideoInputRef}
+                  type="file"
+                  accept="video/mp4,video/quicktime,.mp4,.mov"
+                  onChange={handleHorseVideoFileSelect}
+                  disabled={uploadingVideo}
+                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900"
+                />
+                <Button onClick={handleHorseVideoUpload} disabled={uploadingVideo}>
+                  {uploadingVideo ? 'Uploading video…' : 'Attach video'}
+                </Button>
+              </div>
+              {uploadingVideo && (
+                <div className="space-y-1">
+                  <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className="h-full bg-green-600 transition-all"
+                      style={{ width: `${videoUploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">{videoUploadProgress}% uploaded</p>
+                </div>
+              )}
+              {videoUploadError && (
+                <p className="text-sm text-red-600">{videoUploadError}</p>
+              )}
+              {videoFile && (
+                <p className="text-xs text-gray-500">Selected file: {videoFile.name}</p>
+              )}
+              {horseVideos.length === 0 ? (
+                <EmptyState
+                  title="No videos yet"
+                  description="Upload your horse's run videos to view and play them here."
+                />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {horseVideos.map(video => (
+                    <div key={video.id} className="rounded-xl border border-gray-200 p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-800">{video.title}</p>
+                        <button
+                          onClick={() => handleDeleteHorseVideo(video.id)}
+                          className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                          title="Delete video"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">{formatDateTime(video.created_at)}</p>
+                      <video
+                        src={video.video_url}
+                        controls
+                        preload="metadata"
+                        className="w-full rounded-lg bg-black"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1728,6 +2052,50 @@ export default function HorseDetails() {
                 <Trash2 size={15} />
                 Delete permanently
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPhotoCropModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-5 sm:p-6">
+            <h3 className="text-lg font-bold text-gray-900">Crop horse photo</h3>
+            <p className="text-sm text-gray-600 mt-1">Drag to move and zoom until the horse is centered.</p>
+
+            <div className="mt-4 relative h-72 sm:h-96 rounded-xl overflow-hidden bg-gray-900">
+              <Cropper
+                image={photoCropSource}
+                crop={photoCrop}
+                zoom={photoZoom}
+                aspect={1}
+                objectFit="contain"
+                onCropChange={setPhotoCrop}
+                onZoomChange={setPhotoZoom}
+                onCropComplete={(_, croppedAreaPixels) => setPhotoCroppedAreaPixels(croppedAreaPixels)}
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Zoom</label>
+              <input
+                type="range"
+                min="1"
+                max="3"
+                step="0.1"
+                value={photoZoom}
+                onChange={e => setPhotoZoom(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="secondary" onClick={closePhotoCropModal} disabled={uploadingPhoto}>
+                Cancel
+              </Button>
+              <Button onClick={handleHorsePhotoUpload} disabled={uploadingPhoto}>
+                {uploadingPhoto ? 'Uploading…' : 'Crop and upload'}
+              </Button>
             </div>
           </div>
         </div>

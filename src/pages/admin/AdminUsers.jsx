@@ -107,18 +107,23 @@ export default function AdminUsers() {
     try {
       let newStatus = ''
       let notificationMessage = ''
+      let notificationType = ''
 
       if (actionType === 'approve') {
         newStatus = 'approved'
+        notificationType = 'account_approved'
         notificationMessage = 'Your account has been approved! You can now log in to KlipKlop.'
       } else if (actionType === 'reject') {
         newStatus = 'rejected'
+        notificationType = 'account_rejected'
         notificationMessage = `Your account registration was not approved. Reason: ${reason}`
       } else if (actionType === 'suspend') {
         newStatus = 'suspended'
+        notificationType = 'account_suspended'
         notificationMessage = `Your account has been suspended. Reason: ${reason}`
       } else if (actionType === 'unsuspend') {
         newStatus = 'approved'
+        notificationType = 'account_unsuspended'
         notificationMessage = 'Your account suspension has been lifted. You can now log in.'
       }
 
@@ -134,7 +139,7 @@ export default function AdminUsers() {
 
       await supabase.from('notifications').insert({
         user_id: selectedUser.id,
-        type: `account_${actionType}`,
+        type: notificationType,
         message: notificationMessage,
         link: '/dashboard'
       })

@@ -20,8 +20,10 @@ import {
   Hourglass
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useTabQueryParam } from '../../lib/useTabQueryParam'
 
 const CURRENT_YEAR = new Date().getFullYear()
+const SUPPORTER_RIDER_TABS = ['times', 'grid', 'history', 'trends']
 
 const LEVEL_STYLES = {
   0: 'bg-gray-100 text-gray-600',
@@ -72,6 +74,11 @@ function RiderTimesView({ combo, selectedYear }) {
   const [trendData, setTrendData] = useState([])
   const [trendGame, setTrendGame] = useState(GAMES[0])
   const [activeTab, setActiveTab] = useState('times')
+  useTabQueryParam({
+    activeTab,
+    setActiveTab,
+    allowedTabs: SUPPORTER_RIDER_TABS,
+  })
   const [nationalsLevel, setNationalsLevel] = useState(null)
   const [levelBreakdown, setLevelBreakdown] = useState({})
   const [loading, setLoading] = useState(true)

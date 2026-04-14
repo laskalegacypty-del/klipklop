@@ -50,11 +50,22 @@ export const PROVINCES = [
 
 const GAME_ALIASES = {
   'speed ball': 'Speedball',
+  'bi rangle': 'Birangle',
+}
+
+export function canonicalizeGameLabel(game) {
+  return String(game || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function normalizeGameName(game) {
   const trimmed = String(game || '').trim()
   if (!trimmed) return ''
-  const alias = GAME_ALIASES[trimmed.toLowerCase()]
+  const alias = GAME_ALIASES[canonicalizeGameLabel(trimmed)]
   return alias || trimmed
 }

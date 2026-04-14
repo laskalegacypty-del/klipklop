@@ -1,4 +1,4 @@
-import { useState, useEffect, createElement } from 'react'
+import { useState, useEffect, useRef, createElement } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
@@ -19,6 +19,8 @@ import {
   Trophy
 } from 'lucide-react'
 import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE_SIDEBAR } from '../../constants/branding'
+import OnboardingTour from '../onboarding/OnboardingTour'
+import { START_TUTORIAL_EVENT } from '../onboarding/OnboardingTour'
 
 const APP_TAGLINE_ADMIN = 'Admin Panel'
 
@@ -75,6 +77,7 @@ export default function Layout({ children }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const { profile, isAdmin, isSupporter, isClubHead, isClubMember } = useAuth()
   const location = useLocation()
+  const mainRef = useRef(null)
 
   const navItems = isAdmin
     ? adminNavItems
@@ -114,6 +117,29 @@ export default function Layout({ children }) {
       document.body.style.overflow = prevOverflow
     }
   }, [sidebarOpen])
+
+  useEffect(() => {
+    const scrollEl = mainRef.current
+    if (!scrollEl) return
+
+    const scrollKey = `layout_scroll:${location.pathname}${location.search}`
+    const savedOffset = sessionStorage.getItem(scrollKey)
+    if (savedOffset) {
+      scrollEl.scrollTop = Number(savedOffset)
+    }
+
+    const handleScroll = () => {
+      sessionStorage.setItem(scrollKey, String(scrollEl.scrollTop))
+    }
+
+    scrollEl.addEventListener('scroll', handleScroll, { passive: true })
+    return () => scrollEl.removeEventListener('scroll', handleScroll)
+  }, [location.pathname, location.search])
+
+  function handleReplayTutorial() {
+    window.dispatchEvent(new CustomEvent(START_TUTORIAL_EVENT))
+    setSidebarOpen(false)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -237,6 +263,17 @@ export default function Layout({ children }) {
               )
             })}
           </ul>
+
+          {!isAdmin && (
+            <button
+              type="button"
+              onClick={handleReplayTutorial}
+              className="mt-4 w-full flex items-center gap-3 px-4 py-3 rounded-lg transition text-white/80 hover:bg-white/10 hover:text-white"
+            >
+              <Settings size={20} />
+              <span className="text-sm font-medium">How to start</span>
+            </button>
+          )}
         </nav>
 
       </aside>
@@ -275,12 +312,13 @@ export default function Layout({ children }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-3 sm:p-6">
+        <main ref={mainRef} className="flex-1 overflow-auto p-3 sm:p-6">
           <div className="container-page">
             {children}
           </div>
         </main>
       </div>
+      <OnboardingTour />
     </div>
   )
 }

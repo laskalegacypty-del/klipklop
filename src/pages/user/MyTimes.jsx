@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { GAMES, normalizeGameName } from '../../lib/constants'
 import { MATRIX, getLevel, getNationalsLevel, getTimeToNextLevel } from '../../lib/matrix'
 import { Button, EmptyState, PageHeader, Skeleton } from '../../components/ui'
+import { uploadVideoToBucket, UploadValidationError } from '../../lib/storageUploads'
 import {
   Trophy,
   Star,
@@ -15,10 +16,13 @@ import {
   Target,
   Award,
   Calendar,
+  Trash2,
+  Video,
   X
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { APP_NAME } from '../../constants/branding'
+import { useTabQueryParam } from '../../lib/useTabQueryParam'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -50,6 +54,7 @@ const LEVEL_DOT_COLORS = {
 const LEVEL_DASH_COLORS = ['#bfdbfe', '#bbf7d0', '#fed7aa', '#fecaca']
 
 const CURRENT_YEAR = new Date().getFullYear()
+const MY_TIMES_TABS = ['times', 'grid', 'history', 'videos', 'trends']
 
 function buildYearOptions() {
   const years = []
@@ -298,6 +303,16 @@ export default function MyTimes() {
   const [levelBreakdown, setLevelBreakdown] = useState({})
   const [trendGame, setTrendGame] = useState(GAMES[0])
   const [trendData, setTrendData] = useState([])
+  const [videos, setVideos] = useState([])
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0)
+  const [uploadingVideoKey, setUploadingVideoKey] = useState('')
+  const [videoError, setVideoError] = useState('')
+
+  useTabQueryParam({
+    activeTab,
+    setActiveTab,
+    allowedTabs: MY_TIMES_TABS,
+  })
 
   // Club head: linked riders selector
   const [linkedRiders, setLinkedRiders] = useState([])
@@ -331,6 +346,7 @@ export default function MyTimes() {
       fetchPersonalBests()
       fetchYearBests()
       fetchHistory()
+      fetchVideos()
     }
   }, [selectedCombo, selectedYear])
 
@@ -388,12 +404,38 @@ export default function MyTimes() {
 
   async function fetchPersonalBests() {
     const { data } = await supabase
-      .from('personal_bests')
-      .select('*')
+      .from('qualifier_results')
+      .select(`
+        game,
+        time,
+        is_nt,
+        qualifier_events (date)
+      `)
       .eq('combo_id', selectedCombo.id)
-      .lte('season_year', selectedYear)
+      .eq('is_nt', false)
+      .lte('qualifier_events.date', `${selectedYear}-12-31`)
 
-    const pbMap = buildCarryForwardPbMap(data)
+    const pbMap = {}
+    ;(data || []).forEach(row => {
+      if (row.time == null) return
+      const game = normalizeGameName(row.game)
+      if (!game) return
+      const bestTime = Number(row.time)
+      if (Number.isNaN(bestTime)) return
+      const eventDate = row.qualifier_events?.date
+      const seasonYear = eventDate ? new Date(eventDate).getFullYear() : null
+
+      const current = pbMap[game]
+      if (!current || bestTime < current.best_time) {
+        pbMap[game] = {
+          game,
+          best_time: bestTime,
+          season_year: seasonYear,
+          achieved_at: eventDate ? `${eventDate}T00:00:00.000Z` : null
+        }
+      }
+    })
+
     setPersonalBests(pbMap)
   }
 
@@ -440,6 +482,98 @@ export default function MyTimes() {
     })
 
     setHistory(Object.values(grouped))
+  }
+
+  async function fetchVideos() {
+    if (!effectiveUserId) return
+    const { data, error } = await supabase
+      .from('horse_videos')
+      .select(`
+        id,
+        title,
+        video_url,
+        qualifier_id,
+        created_at,
+        qualifier_events (
+          id,
+          qualifier_number,
+          venue,
+          date
+        )
+      `)
+      .eq('user_id', effectiveUserId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setVideos([])
+      return
+    }
+
+    const currentYearVideos = (data || []).filter(video => {
+      const date = video.qualifier_events?.date
+      return date && new Date(date).getFullYear() === selectedYear
+    })
+    setVideos(currentYearVideos)
+  }
+
+  async function handleAttachVideo(entry, result, file) {
+    if (!file || !effectiveUserId) return
+    const uploadKey = result.id || `${entry.event?.id || 'event'}-${result.game}`
+    setUploadingVideoKey(uploadKey)
+    setVideoUploadProgress(0)
+    setVideoError('')
+
+    const qualifierLabel = entry.event?.qualifier_number ? `Q${entry.event.qualifier_number}` : 'Qualifier'
+    const runTime = result.is_nt ? 'NT' : `${result.time?.toFixed(3)}s`
+    const title = `${runTime} • ${qualifierLabel} • ${entry.event?.venue || 'Venue'} • Run ${entry.event?.qualifier_number || '-'}`
+
+    try {
+      const extension = file.type === 'video/quicktime' ? 'mov' : 'mp4'
+      const path = `${effectiveUserId}/my-times/${entry.results?.[0]?.event_id || 'event'}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`
+      const { publicUrl } = await uploadVideoToBucket({
+        bucket: 'videos',
+        path,
+        file,
+        onProgress: setVideoUploadProgress,
+      })
+
+      const { error } = await supabase.from('horse_videos').insert({
+        user_id: effectiveUserId,
+        horse_id: selectedCombo?.horse_id || null,
+        qualifier_id: entry.results?.[0]?.event_id || null,
+        video_url: publicUrl,
+        title,
+      })
+      if (error) throw error
+      toast.success('Run video attached')
+      await fetchVideos()
+    } catch (error) {
+      const message =
+        error instanceof UploadValidationError
+          ? error.message
+          : error?.message || 'Could not attach video.'
+      setVideoError(message)
+      toast.error(message)
+    } finally {
+      setUploadingVideoKey('')
+      setVideoUploadProgress(0)
+    }
+  }
+
+  async function handleDeleteVideo(videoId) {
+    if (!effectiveUserId) return
+    if (!confirm('Delete this video?')) return
+    const { error } = await supabase
+      .from('horse_videos')
+      .delete()
+      .eq('id', videoId)
+      .eq('user_id', effectiveUserId)
+    if (error) {
+      toast.error('Could not delete video')
+      return
+    }
+    toast.success('Video deleted')
+    await fetchVideos()
   }
 
   async function fetchYearBests() {
@@ -919,7 +1053,7 @@ export default function MyTimes() {
 
       {/* ── Tabs ───────────────────────────────────────────────────────────── */}
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
-        {['times', 'grid', 'history', 'trends'].map(tab => (
+        {['times', 'grid', 'history', 'videos', 'trends'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -935,6 +1069,8 @@ export default function MyTimes() {
               ? 'Qualifier Grid'
               : tab === 'history'
               ? 'Qualifier History'
+              : tab === 'videos'
+              ? 'Videos'
               : 'Time Trends'}
           </button>
         ))}
@@ -1236,11 +1372,9 @@ export default function MyTimes() {
                         !result.is_nt
 
                       return (
-                        <div
-                          key={result.id}
-                          className="px-4 py-3 flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-2">
+                        <div key={result.id} className="px-4 py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                             {isPB && (
                               <Star
                                 size={14}
@@ -1248,8 +1382,8 @@ export default function MyTimes() {
                               />
                             )}
                             <span className="text-sm text-gray-700">{result.game}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
+                            </div>
+                            <div className="flex items-center gap-3">
                             {result.is_nt ? (
                               <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
                                 NT
@@ -1273,7 +1407,28 @@ export default function MyTimes() {
                                 PB!
                               </span>
                             )}
+                              <label className="text-xs rounded-full border border-gray-200 px-2 py-1 text-gray-600 hover:bg-gray-50 cursor-pointer">
+                              Attach video
+                              <input
+                                type="file"
+                                accept="video/mp4,video/quicktime,.mp4,.mov"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0]
+                                  if (file) handleAttachVideo(entry, result, file)
+                                  e.target.value = ''
+                                }}
+                                disabled={Boolean(uploadingVideoKey)}
+                              />
+                              </label>
+                            </div>
                           </div>
+                          {uploadingVideoKey === result.id && (
+                            <p className="mt-2 text-xs text-gray-500">{videoUploadProgress}% uploaded</p>
+                          )}
+                          {videoError && uploadingVideoKey === result.id && (
+                            <p className="mt-1 text-xs text-red-600">{videoError}</p>
+                          )}
                         </div>
                       )
                     })}
@@ -1281,6 +1436,48 @@ export default function MyTimes() {
                 </div>
               )
             })
+          )}
+        </div>
+      )}
+
+      {activeTab === 'videos' && (
+        <div className="space-y-4">
+          {videoError && <p className="text-sm text-red-600">{videoError}</p>}
+          {videos.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+              No videos attached for {selectedYear} yet. Use the Attach video action in Qualifier History.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {videos.map(video => (
+                <div key={video.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <Video size={16} className="mt-0.5 text-green-700" />
+                      <div>
+                      <p className="text-sm font-semibold text-gray-800">{video.title}</p>
+                      <p className="text-xs text-gray-500">
+                        {video.qualifier_events?.date
+                          ? new Date(video.qualifier_events.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : 'Date unavailable'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {video.qualifier_events?.qualifier_number ? `Q${video.qualifier_events.qualifier_number}` : 'Qualifier'} · {video.qualifier_events?.venue || 'Venue unavailable'}
+                      </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteVideo(video.id)}
+                      className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                      title="Delete video"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <video src={video.video_url} controls preload="metadata" className="w-full rounded-lg bg-black" />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
