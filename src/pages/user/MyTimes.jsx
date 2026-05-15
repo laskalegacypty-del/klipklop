@@ -23,6 +23,7 @@ import {
 import toast from 'react-hot-toast'
 import { APP_NAME } from '../../constants/branding'
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
+import { fetchClubHeadRoster, fetchCombosForRider } from '../../lib/clubRiderRoster'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -90,6 +91,12 @@ function formatPbDate(pb) {
 function isCurrentYearPb(pb) {
   return Number(getPbDateValue(pb)) === CURRENT_YEAR
 }
+
+function isMissingCurrentYearTime(game, yearBests, selectedYear) {
+  return selectedYear === CURRENT_YEAR && !yearBests[game]
+}
+
+const MISSING_YEAR_ROW_CLASS = 'bg-red-50 hover:bg-red-100'
 
 // ─── Helper Components ────────────────────────────────────────────────────────
 
@@ -319,22 +326,20 @@ export default function MyTimes() {
   const [selectedRider, setSelectedRider] = useState(null)
   const [loadingRiders, setLoadingRiders] = useState(false)
 
-  const effectiveUserId = isClubHead
-    ? (selectedRider?.id || null)
-    : profile?.id
+  const effectiveUserId = profile?.id
 
   useEffect(() => {
     if (!profile) return
     if (isClubHead) {
       fetchLinkedRiders()
     } else {
-      fetchCombos(profile.id)
+      fetchCombosForSelected()
     }
   }, [profile])
 
   useEffect(() => {
     if (isClubHead && selectedRider) {
-      fetchCombos(selectedRider.id)
+      fetchCombosForSelected()
     } else if (isClubHead && !selectedRider) {
       setCombos([])
       setSelectedCombo(null)
@@ -357,48 +362,42 @@ export default function MyTimes() {
   async function fetchLinkedRiders() {
     setLoadingRiders(true)
     try {
-      const { data: links } = await supabase
-        .from('club_member_links')
-        .select('rider_id')
-        .eq('club_head_id', profile.id)
-        .eq('status', 'accepted')
-
-      if (!links || links.length === 0) {
-        setLinkedRiders([])
-        setLoadingRiders(false)
-        setLoading(false)
-        return
-      }
-
-      const riderIds = links.map(l => l.rider_id)
-      const { data: riders } = await supabase
-        .from('profiles')
-        .select('id, rider_name, province, profile_photo_url')
-        .in('id', riderIds)
-
-      const riderList = riders || []
+      const riderList = await fetchClubHeadRoster(profile.id)
       setLinkedRiders(riderList)
       if (riderList.length > 0) setSelectedRider(riderList[0])
-    } finally {
+      else {
+        setLoadingRiders(false)
+        setLoading(false)
+      }
+    } catch {
+      setLinkedRiders([])
       setLoadingRiders(false)
       setLoading(false)
+    } finally {
+      setLoadingRiders(false)
     }
   }
 
-  async function fetchCombos(userId) {
+  async function fetchCombosForSelected() {
+    if (isClubHead) {
+      if (!selectedRider) return
+      const data = await fetchCombosForRider(selectedRider)
+      setCombos(data)
+      setSelectedCombo(data.find(c => c.is_pinned) || data[0] || null)
+      setLoading(false)
+      return
+    }
+    if (!profile?.id) return
     const { data } = await supabase
       .from('horse_rider_combos')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', profile.id)
+      .is('managed_rider_id', null)
       .eq('is_archived', false)
       .order('is_pinned', { ascending: false })
 
     setCombos(data || [])
-    if (data && data.length > 0) {
-      setSelectedCombo(data.find(c => c.is_pinned) || data[0])
-    } else {
-      setSelectedCombo(null)
-    }
+    setSelectedCombo(data?.find(c => c.is_pinned) || data?.[0] || null)
     setLoading(false)
   }
 
@@ -1094,11 +1093,19 @@ export default function MyTimes() {
               {GAMES.map(game => {
                 const overallPb = personalBests[game]
                 const yearBest = yearBests[game]
+                const missingYearTime = isMissingCurrentYearTime(game, yearBests, selectedYear)
                 const level = overallPb ? getLevel(game, overallPb.best_time) : null
                 const timeToNext = overallPb ? getTimeToNextLevel(game, overallPb.best_time) : null
 
                 return (
-                  <tr key={game} className={`hover:bg-gray-50 ${overallPb || yearBest ? '' : 'opacity-50'}`}>
+                  <tr
+                    key={game}
+                    className={
+                      missingYearTime
+                        ? MISSING_YEAR_ROW_CLASS
+                        : `hover:bg-gray-50 ${overallPb || yearBest ? '' : 'opacity-50'}`
+                    }
+                  >
                     <td className="px-4 py-3 font-medium text-gray-800">
                       <div className="flex items-center gap-2">
                         {overallPb && <Star size={14} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />}
@@ -1162,6 +1169,12 @@ export default function MyTimes() {
               })}
             </tbody>
           </table>
+          {selectedYear === CURRENT_YEAR && (
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-3 items-center">
+              <span className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 font-medium">Red row</span>
+              <span className="text-xs text-gray-500">= No time recorded this season</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -1218,10 +1231,18 @@ export default function MyTimes() {
                   {GAMES.map(game => {
                     const pb = personalBests[game]
                     const pbLevel = pb ? getLevel(game, pb.best_time) : null
+                    const missingYearTime = isMissingCurrentYearTime(game, yearBests, selectedYear)
 
                     return (
-                      <tr key={game} className="hover:bg-gray-50">
-                        <td className="px-4 py-2.5 font-medium text-gray-800 sticky left-0 bg-white z-10 border-r border-gray-200 whitespace-nowrap">
+                      <tr
+                        key={game}
+                        className={missingYearTime ? MISSING_YEAR_ROW_CLASS : 'hover:bg-gray-50'}
+                      >
+                        <td
+                          className={`px-4 py-2.5 font-medium text-gray-800 sticky left-0 z-10 border-r border-gray-200 whitespace-nowrap ${
+                            missingYearTime ? 'bg-red-50' : 'bg-white'
+                          }`}
+                        >
                           {game}
                         </td>
                         {/* PB cell */}
@@ -1300,6 +1321,12 @@ export default function MyTimes() {
               </span>
             ))}
             <span className="text-xs px-2 py-1 rounded bg-red-50 text-red-400 italic">NT</span>
+            {selectedYear === CURRENT_YEAR && (
+              <>
+                <span className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 font-medium">Red row</span>
+                <span className="text-xs text-gray-500">= No time this season</span>
+              </>
+            )}
             <span className="text-xs text-gray-400 ml-1">★ = Personal Best</span>
           </div>
         </div>
@@ -1363,6 +1390,8 @@ export default function MyTimes() {
 
                   <div className="divide-y divide-gray-100">
                     {entry.results.map(result => {
+                      const game = normalizeGameName(result.game)
+                      const missingYearTime = isMissingCurrentYearTime(game, yearBests, selectedYear)
                       const level = result.is_nt
                         ? null
                         : getLevel(result.game, result.time)
@@ -1372,7 +1401,10 @@ export default function MyTimes() {
                         !result.is_nt
 
                       return (
-                        <div key={result.id} className="px-4 py-3">
+                        <div
+                          key={result.id}
+                          className={`px-4 py-3 ${missingYearTime ? MISSING_YEAR_ROW_CLASS : ''}`}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                             {isPB && (
@@ -1494,10 +1526,16 @@ export default function MyTimes() {
               <select
                 value={trendGame}
                 onChange={e => setTrendGame(e.target.value)}
-                className="appearance-none pl-4 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
+                className={`appearance-none pl-4 pr-10 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white ${
+                  isMissingCurrentYearTime(trendGame, yearBests, selectedYear)
+                    ? 'border-red-300 bg-red-50 text-red-800'
+                    : 'border-gray-300'
+                }`}
               >
                 {GAMES.map(game => (
-                  <option key={game} value={game}>{game}</option>
+                  <option key={game} value={game}>
+                    {isMissingCurrentYearTime(game, yearBests, selectedYear) ? `⚠ ${game} (no time yet)` : game}
+                  </option>
                 ))}
               </select>
               <ChevronDown
@@ -1508,14 +1546,25 @@ export default function MyTimes() {
           </div>
 
           {/* Trend chart */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div
+            className={`bg-white rounded-xl border p-6 ${
+              isMissingCurrentYearTime(trendGame, yearBests, selectedYear)
+                ? 'border-red-200 bg-red-50/40'
+                : 'border-gray-200'
+            }`}
+          >
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <TrendingUp size={18} className="text-green-600" />
               {trendGame} — {selectedYear} Time Progression
+              {isMissingCurrentYearTime(trendGame, yearBests, selectedYear) && (
+                <span className="text-xs font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                  No time this season
+                </span>
+              )}
             </h3>
 
             {trendData.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
+              <div className="text-center py-8 text-red-600/80">
                 No data for {trendGame} in {selectedYear}
               </div>
             ) : (
@@ -1665,10 +1714,12 @@ export default function MyTimes() {
                 <tbody>
                   {GAMES.map((game, gIdx) => {
                     const pb = personalBests[game]
+                    const yearBest = yearBests[game]
+                    const missingYearTime = isMissingCurrentYearTime(game, yearBests, selectedYear)
                     const level = pb ? getLevel(game, pb.best_time) : null
                     const timeToNext = pb ? getTimeToNextLevel(game, pb.best_time) : null
                     return (
-                      <tr key={game} style={{ borderBottom: '1px solid #f3f4f6', background: gIdx % 2 === 0 ? 'white' : '#fafafa', opacity: pb ? 1 : 0.45 }}>
+                      <tr key={game} style={{ borderBottom: '1px solid #f3f4f6', background: missingYearTime ? '#fef2f2' : (gIdx % 2 === 0 ? 'white' : '#fafafa'), opacity: pb || yearBest || missingYearTime ? 1 : 0.45 }}>
                         <td style={{ padding: '6px 10px', fontWeight: '600', color: '#1f2937', borderRight: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>
                           {pb ? '★ ' : ''}{game}
                         </td>
@@ -1733,8 +1784,9 @@ export default function MyTimes() {
                     {GAMES.map((game, gIdx) => {
                       const pb = personalBests[game]
                       const pbLevel = pb ? getLevel(game, pb.best_time) : null
+                      const missingYearTime = isMissingCurrentYearTime(game, yearBests, selectedYear)
                       return (
-                        <tr key={game} style={{ borderBottom: '1px solid #f3f4f6', background: gIdx % 2 === 0 ? 'white' : '#fafafa' }}>
+                        <tr key={game} style={{ borderBottom: '1px solid #f3f4f6', background: missingYearTime ? '#fef2f2' : (gIdx % 2 === 0 ? 'white' : '#fafafa') }}>
                           <td style={{ padding: '5px 8px', fontWeight: '600', color: '#1f2937', borderRight: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>{game}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'center', borderRight: '1px solid #e5e7eb' }}>
                             {pb ? (

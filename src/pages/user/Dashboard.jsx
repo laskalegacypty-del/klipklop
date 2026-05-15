@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { normalizeGameName } from '../../lib/constants'
+import { fetchManagedRiders, fetchCombosForManagedRider } from '../../lib/clubRiderRoster'
 import { Badge, Card, CardContent, EmptyState, PageHeader, Skeleton } from '../../components/ui'
 import {
   Calendar,
@@ -942,25 +943,18 @@ export default function Dashboard() {
   }
 
   async function fetchClubMemberSummaries() {
-    const { data: links } = await supabase
-      .from('club_member_links')
-      .select('rider_id')
-      .eq('club_head_id', profile.id)
-      .eq('status', 'accepted')
-
-    if (!links || links.length === 0) {
+    let riders = []
+    try {
+      riders = await fetchManagedRiders(profile.id)
+    } catch {
       setLinkedRiderSummaries([])
       return
     }
 
-    const riderIds = links.map(l => l.rider_id)
-
-    const { data: riders } = await supabase
-      .from('profiles')
-      .select('id, rider_name, province, profile_photo_url, age_category')
-      .in('id', riderIds)
-
-    if (!riders) { setLinkedRiderSummaries([]); return }
+    if (!riders.length) {
+      setLinkedRiderSummaries([])
+      return
+    }
 
     const yearStart = `${CURRENT_YEAR}-01-01`
     const yearEnd = `${CURRENT_YEAR}-12-31`
@@ -974,13 +968,9 @@ export default function Dashboard() {
     const currentYearEventIds = currentYearEvents?.map(e => e.id) || []
 
     const summaries = await Promise.all(riders.map(async (rider) => {
-      const { data: combos } = await supabase
-        .from('horse_rider_combos')
-        .select('id, horse_name, horse_id, current_level, is_pinned')
-        .eq('user_id', rider.id)
-        .eq('is_archived', false)
+      const combos = await fetchCombosForManagedRider(rider.id)
 
-      if (!combos || combos.length === 0) {
+      if (!combos.length) {
         return { ...rider, horsesCount: 0, qualifiersAttended: 0, gamesCovered: 0, nationalsLevel: null, currentLevel: 0 }
       }
 
@@ -988,6 +978,7 @@ export default function Dashboard() {
       const pinnedCombo = combos.find(c => c.is_pinned) || combos[0]
 
       let qualifiersAttended = 0
+      let gamesCovered = 0
       if (currentYearEventIds.length > 0) {
         const { data: results } = await supabase
           .from('qualifier_results')
@@ -995,20 +986,14 @@ export default function Dashboard() {
           .in('combo_id', comboIds)
           .in('event_id', currentYearEventIds)
         qualifiersAttended = new Set(results?.map(r => r.event_id) || []).size
-        return {
-          ...rider,
-          horsesCount: combos.length,
-          qualifiersAttended,
-          gamesCovered: countUniqueResultGames(results),
-          currentLevel: pinnedCombo.current_level ?? 0
-        }
+        gamesCovered = countUniqueResultGames(results)
       }
 
       return {
         ...rider,
         horsesCount: combos.length,
         qualifiersAttended,
-        gamesCovered: 0,
+        gamesCovered,
         currentLevel: pinnedCombo.current_level ?? 0
       }
     }))

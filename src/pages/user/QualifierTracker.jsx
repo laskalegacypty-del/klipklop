@@ -19,6 +19,7 @@ import {
 import toast from 'react-hot-toast'
 import { PageHeader, Skeleton } from '../../components/ui'
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
+import { fetchClubHeadRoster, fetchCombosForRider } from '../../lib/clubRiderRoster'
 
 const LEVEL_STYLES = {
   0: 'bg-gray-100 text-gray-600',
@@ -107,9 +108,13 @@ export default function QualifierTracker() {
   const [selectedRider, setSelectedRider] = useState(null)
   const [loadingRiders, setLoadingRiders] = useState(false)
 
-  const effectiveUserId = isClubHead ? (selectedRider?.id || null) : profile?.id
+  const effectiveUserId = profile?.id
   const effectiveProfile = isClubHead && selectedRider ? selectedRider : profile
-  const bookmarkStorageKey = effectiveUserId ? `qualifier-bookmarks:${effectiveUserId}` : null
+  const bookmarkStorageKey = profile?.id
+    ? (isClubHead && selectedRider
+      ? `qualifier-bookmarks:${profile.id}:${selectedRider.id}`
+      : `qualifier-bookmarks:${profile.id}`)
+    : null
 
   useEffect(() => {
     if (!profile) return
@@ -217,27 +222,13 @@ export default function QualifierTracker() {
   async function fetchLinkedRiders() {
     setLoadingRiders(true)
     try {
-      const { data: links } = await supabase
-        .from('club_member_links')
-        .select('rider_id')
-        .eq('club_head_id', profile.id)
-        .eq('status', 'accepted')
-
-      if (!links || links.length === 0) {
-        setLinkedRiders([])
-        setLoading(false)
-        return
-      }
-
-      const riderIds = links.map(l => l.rider_id)
-      const { data: riders } = await supabase
-        .from('profiles')
-        .select('id, rider_name, province, scoresheet_name, profile_photo_url')
-        .in('id', riderIds)
-
-      const riderList = riders || []
+      const riderList = await fetchClubHeadRoster(profile.id)
       setLinkedRiders(riderList)
       if (riderList.length > 0) setSelectedRider(riderList[0])
+      else setLoading(false)
+    } catch {
+      setLinkedRiders([])
+      setLoading(false)
     } finally {
       setLoadingRiders(false)
     }
@@ -261,12 +252,18 @@ export default function QualifierTracker() {
   }
 
   async function fetchCombos() {
-    const uid = isClubHead ? selectedRider?.id : profile?.id
-    if (!uid) return
+    if (isClubHead) {
+      if (!selectedRider) return
+      const data = await fetchCombosForRider(selectedRider)
+      setCombos(data)
+      return
+    }
+    if (!profile?.id) return
     const { data } = await supabase
       .from('horse_rider_combos')
       .select('*')
-      .eq('user_id', uid)
+      .eq('user_id', profile.id)
+      .is('managed_rider_id', null)
       .eq('is_archived', false)
 
     setCombos(data || [])
@@ -290,19 +287,28 @@ export default function QualifierTracker() {
       return
     }
 
-    const uid = isClubHead ? selectedRider?.id : profile?.id
-    if (!uid) { setSavedSessions([]); return }
-
-    const { data } = await supabase
+    let query = supabase
       .from('qualifier_results')
       .select(`
         *,
         qualifier_events (date, venue, province, qualifier_number),
         horse_rider_combos (horse_name)
       `)
-      .eq('horse_rider_combos.user_id', uid)
       .in('event_id', yearEventIds)
       .order('created_at', { ascending: false })
+
+    if (isClubHead) {
+      if (!selectedRider) { setSavedSessions([]); return }
+      const riderCombos = await fetchCombosForRider(selectedRider)
+      const comboIds = riderCombos.map(c => c.id)
+      if (comboIds.length === 0) { setSavedSessions([]); return }
+      query = query.in('combo_id', comboIds)
+    } else {
+      if (!profile?.id) { setSavedSessions([]); return }
+      query = query.eq('horse_rider_combos.user_id', profile.id)
+    }
+
+    const { data } = await query
 
     // Group by event + combo
     const grouped = {}
@@ -965,14 +971,22 @@ export default function QualifierTracker() {
 
     const findGameOnPage = (pageNorm) => {
       const pageCanonical = canonicalizeGameLabel(pageNorm)
+      const pageCanonicalCompacted = pageCanonical.replace(/\s+/g, '')
       for (const game of gameList) {
         const g = normalize(game)
         const gameCanonical = canonicalizeGameLabel(game)
         const normalizedGameCanonical = canonicalizeGameLabel(normalizeGameName(game))
+        const gameCanonicalCompacted = gameCanonical.replace(/\s+/g, '')
+        const normalizedGameCanonicalCompacted = normalizedGameCanonical.replace(/\s+/g, '')
         if (
           (g && pageNorm.includes(g)) ||
           (gameCanonical && pageCanonical.includes(gameCanonical)) ||
-          (normalizedGameCanonical && pageCanonical.includes(normalizedGameCanonical))
+          (normalizedGameCanonical && pageCanonical.includes(normalizedGameCanonical)) ||
+          (gameCanonicalCompacted && pageCanonicalCompacted.includes(gameCanonicalCompacted)) ||
+          (
+            normalizedGameCanonicalCompacted &&
+            pageCanonicalCompacted.includes(normalizedGameCanonicalCompacted)
+          )
         ) {
           return game
         }
@@ -1031,11 +1045,16 @@ export default function QualifierTracker() {
       }
     }
 
-    // Fallback: map extracted times in order to the qualifier's games list
-    if (Object.keys(times).length === 0 && extractedInOrder.length > 0) {
+    // Fallback: map extracted times in order to the qualifier's games list.
+    // This also fills gaps when only some game labels were recognized.
+    if (extractedInOrder.length > 0) {
       const picked = extractedInOrder.map(x => x.time).slice(0, gameList.length)
       picked.forEach((t, idx) => {
-        times[gameList[idx]] = t
+        const targetGame = gameList[idx]
+        if (!targetGame) return
+        if (times[targetGame] == null) {
+          times[targetGame] = t
+        }
       })
     }
 

@@ -58,62 +58,13 @@ export default function Horses() {
   const [creating, setCreating] = useState(false)
   const [newHorseName, setNewHorseName] = useState('')
 
-  // Club head: linked riders
-  const [linkedRiders, setLinkedRiders] = useState([])
-  const [selectedRider, setSelectedRider] = useState(null)
-  const [loadingRiders, setLoadingRiders] = useState(false)
-
-  // The effective user ID whose horses we're managing
-  const effectiveUserId = isClubHead ? (selectedRider?.id || null) : profile?.id
+  const effectiveUserId = profile?.id
 
   useEffect(() => {
     if (!profile?.id) return
-    if (isClubHead) {
-      fetchLinkedRiders()
-    } else {
-      fetchData(profile.id)
-    }
+    fetchData(profile.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, isClubHead])
-
-  // Reload horses when club_head selects a different rider
-  useEffect(() => {
-    if (isClubHead && selectedRider) {
-      fetchData(selectedRider.id)
-    } else if (isClubHead && !selectedRider) {
-      setHorses([])
-      setReminders([])
-    }
-  }, [selectedRider, isClubHead])
-
-  async function fetchLinkedRiders() {
-    setLoadingRiders(true)
-    try {
-      const { data: links } = await supabase
-        .from('club_member_links')
-        .select('rider_id')
-        .eq('club_head_id', profile.id)
-        .eq('status', 'accepted')
-
-      if (!links || links.length === 0) {
-        setLinkedRiders([])
-        setLoading(false)
-        return
-      }
-
-      const riderIds = links.map(l => l.rider_id)
-      const { data: riders } = await supabase
-        .from('profiles')
-        .select('id, rider_name, province, profile_photo_url')
-        .in('id', riderIds)
-
-      const riderList = riders || []
-      setLinkedRiders(riderList)
-      if (riderList.length > 0) setSelectedRider(riderList[0])
-    } finally {
-      setLoadingRiders(false)
-    }
-  }
+  }, [profile?.id])
 
   async function fetchData(userId) {
     setLoading(true)
@@ -140,7 +91,6 @@ export default function Horses() {
 
       let remindersRes = remindersByNextDueRes
       if (remindersByNextDueRes.error && isMissingNextDueDateError(remindersByNextDueRes.error)) {
-        // Backward-compatible fallback for environments that still use legacy due_date.
         const fallback = await supabase
           .from('horse_reminders')
           .select('*')
@@ -151,7 +101,6 @@ export default function Horses() {
         remindersRes = fallback
       }
 
-      // Normalize legacy reminders so downstream UI can always use next_due_date.
       const normalizedReminders = (remindersRes.data || []).map(r => ({
         ...r,
         next_due_date: r.next_due_date || r.due_date || null
@@ -194,10 +143,6 @@ export default function Horses() {
       toast.error('Please enter a horse name')
       return
     }
-    if (isClubHead && !selectedRider) {
-      toast.error('Please select a rider first')
-      return
-    }
     setCreating(true)
     try {
       const { error } = await supabase
@@ -237,54 +182,24 @@ export default function Horses() {
         title="Horses"
         description={
           isClubHead
-            ? selectedRider
-              ? `Managing horses for ${selectedRider.rider_name}`
-              : 'Select a rider to manage their horses'
+            ? 'Your family stable — horses shared across club or family members'
             : 'Manage your horse profiles, medical logs, and reminders'
         }
         actions={
-          (!isClubHead || selectedRider) && (
-            <Button data-tour="horses-add" onClick={() => setShowAddModal(true)}>
-              <Plus size={16} />
-              Add horse
-            </Button>
-          )
+          <Button data-tour="horses-add" onClick={() => setShowAddModal(true)}>
+            <Plus size={16} />
+            Add horse
+          </Button>
         }
       />
 
-      {/* Rider selector — club_head only */}
       {isClubHead && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          {loadingRiders ? (
-            <div className="text-sm text-gray-400">Loading riders…</div>
-          ) : linkedRiders.length === 0 ? (
-            <div className="text-sm text-gray-400">
-              No riders linked yet.{' '}
-              <a href="/my-club-riders" className="text-green-700 font-medium hover:underline">Go to My Riders →</a>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm font-medium text-gray-600">Rider:</span>
-              <div className="flex gap-2 flex-wrap">
-                {linkedRiders.map(rider => (
-                  <button
-                    key={rider.id}
-                    onClick={() => setSelectedRider(rider)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
-                      selectedRider?.id === rider.id
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {rider.rider_name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <p className="text-sm text-gray-500 -mt-2">
+          Link horses to members on{' '}
+          <a href="/my-club-riders" className="text-green-700 font-medium hover:underline">My Riders</a>
+          {' '}when you add a horse/rider combo.
+        </p>
       )}
-
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
@@ -301,7 +216,11 @@ export default function Horses() {
       {horses.length === 0 ? (
         <EmptyState
           title="No horses yet"
-          description="Add your first horse to start tracking health and reminders."
+          description={
+            isClubHead
+              ? 'Add horses to your family stable, then link them to members on My Riders.'
+              : 'Add your first horse to start tracking health and reminders.'
+          }
           action={
             <button
               data-tour="horses-add"
@@ -370,7 +289,6 @@ export default function Horses() {
         </div>
       )}
 
-      {/* Add horse modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6">
@@ -410,4 +328,3 @@ export default function Horses() {
     </div>
   )
 }
-
