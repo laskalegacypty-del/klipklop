@@ -118,37 +118,79 @@ export default function AdminEvents() {
     setSaving(true)
 
     try {
+      // Coerce qualifier_number to integer (the DB column is numeric).
+      // <select> emits strings, and an unconverted string can fail or be
+      // dropped silently by PostgREST for an int column.
+      const parsedQualifierNumber =
+        form.qualifier_number === '' || form.qualifier_number == null
+          ? null
+          : Number.parseInt(form.qualifier_number, 10)
+
+      if (
+        form.event_type === 'qualifier' &&
+        (parsedQualifierNumber == null || Number.isNaN(parsedQualifierNumber))
+      ) {
+        toast.error('Qualifier number must be a valid number')
+        setSaving(false)
+        return
+      }
+
       const payload = {
         date: form.date,
         province: form.province,
         venue: form.venue,
-        qualifier_number: form.qualifier_number || null,
+        qualifier_number: Number.isNaN(parsedQualifierNumber) ? null : parsedQualifierNumber,
         event_type: form.event_type,
         notes: form.notes || null
       }
 
       if (editingEvent) {
-        const { error } = await supabase
+        // .select() forces Supabase to return the rows that were actually
+        // updated. If RLS silently blocks the write, data will be an empty
+        // array and we can surface a real error instead of falsely showing
+        // "Event updated successfully".
+        const { data, error } = await supabase
           .from('qualifier_events')
           .update(payload)
           .eq('id', editingEvent.id)
+          .select()
 
         if (error) throw error
+        if (!data || data.length === 0) {
+          throw new Error(
+            'Update was not applied. This is usually a Row-Level Security issue — your admin user does not have UPDATE permission on qualifier_events. Run supabase/qualifier_events_rls.sql in the Supabase SQL editor.'
+          )
+        }
+
+        const updated = data[0]
+        setEvents(prev => prev.map(e => (e.id === updated.id ? updated : e)))
         toast.success('Event updated successfully')
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('qualifier_events')
           .insert(payload)
+          .select()
 
         if (error) throw error
+        if (!data || data.length === 0) {
+          throw new Error(
+            'Insert was not applied. This is usually a Row-Level Security issue — your admin user does not have INSERT permission on qualifier_events. Run supabase/qualifier_events_rls.sql in the Supabase SQL editor.'
+          )
+        }
+
+        const inserted = data[0]
+        setEvents(prev => [...prev, inserted])
         toast.success('Event added successfully')
       }
 
       setShowModal(false)
+      // Re-fetch from the server to make sure every other view of this
+      // page also sees the canonical, post-write state.
       fetchEvents()
 
     } catch (error) {
-      toast.error('Error saving event')
+      console.error('AdminEvents save failed:', error)
+      toast.error(error?.message ? `Error saving event: ${error.message}` : 'Error saving event')
     } finally {
       setSaving(false)
     }
@@ -156,17 +198,25 @@ export default function AdminEvents() {
 
   async function handleDelete(eventId) {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('qualifier_events')
         .delete()
         .eq('id', eventId)
+        .select()
 
       if (error) throw error
+      if (!data || data.length === 0) {
+        throw new Error(
+          'Delete was not applied. This is usually a Row-Level Security issue — your admin user does not have DELETE permission on qualifier_events. Run supabase/qualifier_events_rls.sql in the Supabase SQL editor.'
+        )
+      }
       toast.success('Event deleted')
       setShowDeleteConfirm(null)
+      setEvents(prev => prev.filter(e => e.id !== eventId))
       fetchEvents()
     } catch (error) {
-      toast.error('Error deleting event')
+      console.error('AdminEvents delete failed:', error)
+      toast.error(error?.message ? `Error deleting event: ${error.message}` : 'Error deleting event')
     }
   }
 

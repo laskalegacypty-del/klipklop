@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { MATRIX, getLevel } from '../../lib/matrix'
+import { QUALIFIER_GAMES } from '../../lib/constants'
 import { PageHeader } from '../../components/ui'
-import { Search, Calculator } from 'lucide-react'
+import { Search, Calculator, ListChecks, X } from 'lucide-react'
 
 const LEVEL_STYLES = {
   0: 'bg-gray-100 text-gray-600',
@@ -32,8 +33,15 @@ export default function Matrix() {
   const [calcGame, setCalcGame] = useState('')
   const [calcTime, setCalcTime] = useState('')
   const [calcResult, setCalcResult] = useState(null)
+  const [selectedQualifier, setSelectedQualifier] = useState(null)
 
   const allGames = Object.keys(MATRIX)
+  const qualifierNumbers = Object.keys(QUALIFIER_GAMES)
+    .map(Number)
+    .sort((a, b) => a - b)
+  const selectedQualifierGames = selectedQualifier
+    ? QUALIFIER_GAMES[selectedQualifier] || []
+    : []
 
   const filteredGames = allGames.filter(game =>
     game.toLowerCase().includes(searchQuery.toLowerCase())
@@ -239,6 +247,100 @@ export default function Matrix() {
             </span>
           ))}
         </div>
+      </div>
+
+      {/* Qualifier Games Selector */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <ListChecks size={18} className="text-green-700" />
+          <h2 className="font-semibold text-gray-800">Qualifier Games</h2>
+          <p className="text-sm text-gray-500 ml-1">— pick a qualifier number to see the games that will be played</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {qualifierNumbers.map(num => {
+            const isActive = selectedQualifier === num
+            return (
+              <button
+                key={num}
+                onClick={() => setSelectedQualifier(isActive ? null : num)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition ${
+                  isActive
+                    ? 'bg-green-700 text-white border-green-700 shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-green-400 hover:bg-green-50'
+                }`}
+              >
+                Q{num}
+              </button>
+            )
+          })}
+        </div>
+
+        {selectedQualifier && (
+          <div
+            key={selectedQualifier}
+            className="mt-4 relative"
+            style={{ animation: 'matrixQualifierPop 200ms ease-out' }}
+          >
+            <style>{`
+              @keyframes matrixQualifierPop {
+                from { opacity: 0; transform: translateY(-6px); }
+                to   { opacity: 1; transform: translateY(0); }
+              }
+            `}</style>
+            <div className="absolute -top-2 left-6 w-3 h-3 bg-green-50 border-l border-t border-green-200 rotate-45" />
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-green-700 font-semibold">
+                    Qualifier {selectedQualifier}
+                  </p>
+                  <p className="text-sm text-green-900 mt-0.5">
+                    {selectedQualifierGames.length} game{selectedQualifierGames.length === 1 ? '' : 's'} in this qualifier
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedQualifier(null)}
+                  className="p-1 rounded-md text-green-700 hover:text-green-900 hover:bg-green-100 transition"
+                  title="Close"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {selectedQualifierGames.map(game => {
+                  const hasMatrix = Boolean(MATRIX[game])
+                  return (
+                    <div
+                      key={game}
+                      className="bg-white rounded-lg border border-green-100 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="font-semibold text-gray-800 text-sm">{game}</p>
+                      </div>
+                      {hasMatrix ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                          {[0, 1, 2, 3, 4].map(level => (
+                            <div
+                              key={level}
+                              className={`rounded-lg p-2 text-center ${LEVEL_STYLES[level]}`}
+                            >
+                              <div className="text-[10px] font-bold mb-0.5">L{level}</div>
+                              <div className="text-[11px] leading-tight">{formatRange(game, level)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400">No matrix data available for this game.</p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
     </div>
