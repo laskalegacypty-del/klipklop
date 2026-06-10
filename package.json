@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "rules:ingest": "node scripts/ingest-rules.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",
@@ -17,12 +18,13 @@
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.5.207",
     "postcss": "^8.5.8",
-    "react": "^19.2.4",
+    "react": "^19.2.7",
     "react-dom": "^19.2.4",
     "react-easy-crop": "^5.5.7",
     "react-hot-toast": "^2.6.0",
     "react-joyride": "^3.0.2",
     "react-router-dom": "^7.13.1",
+    "rules-engine": "github:Geck018/rules-engine",
     "tailwindcss": "^4.2.1"
   },
   "devDependencies": {

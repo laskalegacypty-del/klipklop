@@ -16,7 +16,8 @@ import {
   Table2,
   UserSearch,
   UsersRound,
-  Trophy
+  Trophy,
+  MessageCircle
 } from 'lucide-react'
 import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE_SIDEBAR } from '../../constants/branding'
 import OnboardingTour from '../onboarding/OnboardingTour'
@@ -33,6 +34,7 @@ const userNavItems = [
   { path: '/season', label: 'Season Overview', icon: BarChart2 },
   { path: '/horses', label: 'Horses', icon: HeartPulse },
   { path: '/friends-leaderboard', label: 'Rankings', icon: Trophy },
+  { path: '/assistant', label: 'Assistant', icon: MessageCircle },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -41,6 +43,7 @@ const supporterNavItems = [
   { path: '/qualifiers', label: 'Qualifiers', icon: Calendar },
   { path: '/matrix', label: 'Matrix', icon: Table2 },
   { path: '/my-riders', label: 'My Riders', icon: UserSearch },
+  { path: '/assistant', label: 'Assistant', icon: MessageCircle },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -53,6 +56,7 @@ const clubHeadNavItems = [
   { path: '/tracker', label: 'Qualifier Tracker', icon: BarChart2 },
   { path: '/season', label: 'Season Overview', icon: BarChart2 },
   { path: '/horses', label: 'Horses', icon: HeartPulse },
+  { path: '/assistant', label: 'Assistant', icon: MessageCircle },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -62,6 +66,7 @@ const clubMemberNavItems = [
   { path: '/qualifiers', label: 'Qualifiers', icon: Calendar },
   { path: '/matrix', label: 'Matrix', icon: Table2 },
   { path: '/my-times', label: 'My Times', icon: Clock },
+  { path: '/assistant', label: 'Assistant', icon: MessageCircle },
   { path: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -70,6 +75,7 @@ const adminNavItems = [
   { path: '/admin/users', label: 'Users', icon: Users },
   { path: '/admin/events', label: 'Events', icon: Calendar },
   { path: '/admin/matrix', label: 'Matrix & Announcements', icon: Settings },
+  { path: '/assistant', label: 'Assistant', icon: MessageCircle },
 ]
 
 export default function Layout({ children }) {

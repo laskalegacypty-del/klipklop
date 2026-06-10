@@ -1,0 +1,12 @@
+{
+  "lastCheckedAt": "2026-06-10T00:00:00.000Z",
+  "domains": {
+    "wmg": {
+      "sourceUrl": "https://www.sawmga.co.za",
+      "localVersion": "2026",
+      "localGeneratedAt": "2026-06-10T00:00:00.000Z",
+      "remoteVersion": "2026",
+      "updateAvailable": false
+    }
+  }
+}

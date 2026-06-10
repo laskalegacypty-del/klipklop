@@ -28,6 +28,7 @@ import Matrix from './pages/user/Matrix'
 import SupporterRiders from './pages/user/SupporterRiders'
 import ClubRiders from './pages/user/ClubRiders'
 import FriendsLeaderboard from './pages/user/FriendsLeaderboard'
+import Assistant from './pages/user/Assistant'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
 function ProtectedRoute({ children }) {
@@ -182,6 +183,9 @@ export default function App() {
         } />
         <Route path="/friends-leaderboard" element={
           <ProtectedRoute><FriendsLeaderboard /></ProtectedRoute>
+        } />
+        <Route path="/assistant" element={
+          <ProtectedRoute><Assistant /></ProtectedRoute>
         } />
 
         {/* Admin routes */}
