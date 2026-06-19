@@ -7,17 +7,17 @@ import {
   ChevronDown,
   Save,
   Plus,
-  Star,
-  AlertCircle,
   Check,
   X,
   Pencil,
   Trash2,
   Upload,
-  Search
+  ClipboardList,
+  History,
+  FolderOpen
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { PageHeader, Skeleton } from '../../components/ui'
+import { ConfirmDialog, PageHeader, Skeleton } from '../../components/ui'
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
 import { fetchClubHeadRoster, fetchCombosForRider } from '../../lib/clubRiderRoster'
 
@@ -61,7 +61,6 @@ function isPdfLikeFile(file) {
 
 export default function QualifierTracker() {
   const { profile, isClubHead } = useAuth()
-  const [step, setStep] = useState(1)
   const [events, setEvents] = useState([])
   const [combos, setCombos] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -69,7 +68,7 @@ export default function QualifierTracker() {
   const [gameEntries, setGameEntries] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [showSummary, setShowSummary] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null })
   const [savedSessions, setSavedSessions] = useState([])
   const [editingSession, setEditingSession] = useState(null)
   const [editingSessionEntries, setEditingSessionEntries] = useState({})
@@ -81,11 +80,8 @@ export default function QualifierTracker() {
   })
 
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR)
-  const [eventSearch, setEventSearch] = useState('')
-  const [bookmarkedQualifiers, setBookmarkedQualifiers] = useState({})
-  const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
-  const [bookmarkPickerEvent, setBookmarkPickerEvent] = useState(null)
-  const [bookmarkPickerComboId, setBookmarkPickerComboId] = useState('')
+  const [eventProvinceFilter, setEventProvinceFilter] = useState('')
+  const [historyHorseFilter, setHistoryHorseFilter] = useState('')
   const pdfInputRef = useRef(null)
   const [processingPDF, setProcessingPDF] = useState(false)
   const historicalPdfInputRef = useRef(null)
@@ -110,11 +106,6 @@ export default function QualifierTracker() {
 
   const effectiveUserId = profile?.id
   const effectiveProfile = isClubHead && selectedRider ? selectedRider : profile
-  const bookmarkStorageKey = profile?.id
-    ? (isClubHead && selectedRider
-      ? `qualifier-bookmarks:${profile.id}:${selectedRider.id}`
-      : `qualifier-bookmarks:${profile.id}`)
-    : null
 
   useEffect(() => {
     if (!profile) return
@@ -179,25 +170,7 @@ export default function QualifierTracker() {
     }
   }, [profile, selectedYear, selectedRider])
 
-  useEffect(() => {
-    if (!bookmarkStorageKey) {
-      setBookmarkedQualifiers({})
-      return
-    }
-    try {
-      const stored = localStorage.getItem(bookmarkStorageKey)
-      const parsed = stored ? JSON.parse(stored) : {}
-      setBookmarkedQualifiers(parsed && typeof parsed === 'object' ? parsed : {})
-    } catch {
-      setBookmarkedQualifiers({})
-    }
-  }, [bookmarkStorageKey])
 
-  useEffect(() => {
-    if (!selectedCombo && showBookmarkedOnly) {
-      setShowBookmarkedOnly(false)
-    }
-  }, [selectedCombo, showBookmarkedOnly])
 
   useEffect(() => {
     // Check for extracted times from PDF upload
@@ -340,70 +313,6 @@ export default function QualifierTracker() {
       }
     })
     setGameEntries(entries)
-  }
-
-  function handleEventSelect(event) {
-    setSelectedEvent(event)
-    initGameEntries(event)
-    setStep(2)
-  }
-
-  function handleComboSelect(combo) {
-    setSelectedCombo(combo)
-    setHistoricalComboId(combo.id)
-    setStep(3)
-  }
-
-  function buildBookmarkKey(comboId, eventId) {
-    return `${comboId}:${eventId}`
-  }
-
-  function isQualifierBookmarked(comboId, eventId) {
-    return Boolean(bookmarkedQualifiers[buildBookmarkKey(comboId, eventId)])
-  }
-
-  function toggleQualifierBookmark(combo, event, nativeEvent = null) {
-    nativeEvent?.stopPropagation?.()
-    if (!bookmarkStorageKey || !combo?.id || !event?.id) return
-
-    const bookmarkKey = buildBookmarkKey(combo.id, event.id)
-    const alreadyBookmarked = isQualifierBookmarked(combo.id, event.id)
-
-    setBookmarkedQualifiers(prev => {
-      const next = { ...prev }
-      if (alreadyBookmarked) {
-        delete next[bookmarkKey]
-      } else {
-        next[bookmarkKey] = true
-      }
-      localStorage.setItem(bookmarkStorageKey, JSON.stringify(next))
-      return next
-    })
-
-    if (alreadyBookmarked) {
-      toast.success(`Removed bookmark for ${combo.horse_name}`)
-    } else {
-      toast.success(`Bookmarked qualifier for ${combo.horse_name}`)
-    }
-  }
-
-  function openBookmarkComboPicker(event, nativeEvent = null) {
-    nativeEvent?.stopPropagation?.()
-    if (!event?.id) return
-    setBookmarkPickerEvent(event)
-    setBookmarkPickerComboId(selectedCombo?.id || combos[0]?.id || '')
-  }
-
-  function confirmBookmarkComboSelection() {
-    if (!bookmarkPickerEvent?.id) return
-    const combo = combos.find(c => c.id === bookmarkPickerComboId)
-    if (!combo) {
-      toast.error('Please select a horse/rider combo first')
-      return
-    }
-    toggleQualifierBookmark(combo, bookmarkPickerEvent)
-    setBookmarkPickerEvent(null)
-    setBookmarkPickerComboId('')
   }
 
   async function getOrCreateHistoricalImportEvent({
@@ -1197,11 +1106,10 @@ export default function QualifierTracker() {
       }
 
       toast.success('Times saved successfully!')
-      setShowSummary(false)
-      setStep(1)
       setSelectedEvent(null)
       setSelectedCombo(null)
       setGameEntries({})
+      setEventProvinceFilter('')
       fetchSavedSessions()
 
     } catch (error) {
@@ -1212,22 +1120,27 @@ export default function QualifierTracker() {
     }
   }
 
-  async function handleDeleteSession(session) {
-    if (!confirm('Delete all results for this session?')) return
+  function handleDeleteSession(session) {
+    setConfirmDialog({
+      open: true,
+      title: 'Delete session?',
+      description: 'All results for this session will be permanently deleted.',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('qualifier_results')
+            .delete()
+            .eq('event_id', session.event_id)
+            .eq('combo_id', session.combo_id)
 
-    try {
-      const { error } = await supabase
-        .from('qualifier_results')
-        .delete()
-        .eq('event_id', session.event_id)
-        .eq('combo_id', session.combo_id)
-
-      if (error) throw error
-      toast.success('Session deleted')
-      fetchSavedSessions()
-    } catch (error) {
-      toast.error('Error deleting session')
-    }
+          if (error) throw error
+          toast.success('Session deleted')
+          fetchSavedSessions()
+        } catch (error) {
+          toast.error('Error deleting session')
+        }
+      },
+    })
   }
 
   function handleStartEditingSession(session) {
@@ -1422,10 +1335,10 @@ export default function QualifierTracker() {
                     key={rider.id}
                     onClick={() => {
                       setSelectedRider(rider)
-                      setStep(1)
                       setSelectedEvent(null)
                       setSelectedCombo(null)
                       setGameEntries({})
+                      setEventProvinceFilter('')
                     }}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                       selectedRider?.id === rider.id
@@ -1442,537 +1355,240 @@ export default function QualifierTracker() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
-        <button
-          data-tour="tracker-enter-times"
-          onClick={() => setActiveTab('enter')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-            activeTab === 'enter'
-              ? 'border-green-700 text-green-800'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Enter Times
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-            activeTab === 'history'
-              ? 'border-green-700 text-green-800'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Session History
-        </button>
-        <button
-          onClick={() => setActiveTab('historical')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-            activeTab === 'historical'
-              ? 'border-green-700 text-green-800'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Historical Upload
-        </button>
-      </div>
-
-      {/* Enter times tab */}
-      {activeTab === 'enter' && (
-        <div className="space-y-6">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
-            <p className="text-sm font-semibold text-green-900">Quick flow: Event → Combo → Times</p>
-            <p className="text-xs text-green-800 mt-1">
-              Only past qualifiers from {CURRENT_YEAR} are shown. Use search to find a venue, province, or qualifier number faster.
-            </p>
-          </div>
-
-          {/* Progress steps */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {[
-              { num: 1, label: 'Select event' },
-              { num: 2, label: 'Select combo' },
-              { num: 3, label: 'Enter times' }
-            ].map(({ num, label }) => (
-              <div key={num} className="flex items-center gap-2 min-w-fit">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition ${
-                  step > num
-                    ? 'bg-green-600 text-white'
-                    : step === num
-                    ? 'bg-green-100 text-green-700 ring-2 ring-green-600'
-                    : 'bg-gray-100 text-gray-400'
-                }`}>
-                  {step > num ? <Check size={16} /> : num}
-                </div>
-                <span className={`text-sm ${
-                  step === num ? 'text-green-700 font-semibold' : 'text-gray-500'
-                }`}>
+      {/* Mobile tab grid */}
+      {(() => {
+        const sections = [
+          { id: 'enter',      label: 'Enter Times',       icon: ClipboardList, tourAttr: 'tracker-enter-times' },
+          { id: 'history',    label: 'Session History',   icon: History },
+          { id: 'historical', label: 'Historical Upload', icon: FolderOpen },
+        ]
+        return (
+          <div className="grid grid-cols-3 gap-2 md:hidden">
+            {sections.map(({ id, label, icon: Icon, tourAttr }) => {
+              const active = activeTab === id
+              return (
+                <button
+                  key={id}
+                  data-tour={tourAttr}
+                  onClick={() => setActiveTab(id)}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 px-2 text-xs font-semibold transition ${
+                    active
+                      ? 'bg-green-700 border-green-700 text-white shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-green-300 hover:text-green-700'
+                  }`}
+                >
+                  <Icon size={20} />
                   {label}
-                </span>
-                {num < 3 && (
-                  <div className={`w-8 h-0.5 ${step > num ? 'bg-green-600' : 'bg-gray-200'}`} />
-                )}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })()}
+
+      {/* Desktop sidebar + content */}
+      <div className="flex gap-5 items-start">
+
+        {/* Desktop sidebar */}
+        {(() => {
+          const sections = [
+            { id: 'enter',      label: 'Enter Times',       icon: ClipboardList, tourAttr: 'tracker-enter-times' },
+            { id: 'history',    label: 'Session History',   icon: History },
+            { id: 'historical', label: 'Historical Upload', icon: FolderOpen },
+          ]
+          return (
+            <nav className="hidden md:flex flex-col gap-1 flex-shrink-0 w-44 bg-white rounded-xl border border-gray-200 p-2">
+              {sections.map(({ id, label, icon: Icon, tourAttr }) => {
+                const active = activeTab === id
+                return (
+                  <button
+                    key={id}
+                    data-tour={tourAttr}
+                    onClick={() => setActiveTab(id)}
+                    className={`flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition text-left ${
+                      active
+                        ? 'bg-green-700 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon size={16} className="flex-shrink-0" />
+                    {label}
+                  </button>
+                )
+              })}
+            </nav>
+          )
+        })()}
+
+        {/* Tab panels */}
+        <div className="flex-1 min-w-0">
+
+      {/* Enter times tab — single screen */}
+      {activeTab === 'enter' && (
+        <div className="space-y-4">
+
+          {/* Selection bar */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Province filter */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Province</label>
+                <div className="relative">
+                  <select
+                    value={eventProvinceFilter}
+                    onChange={e => {
+                      setEventProvinceFilter(e.target.value)
+                      setSelectedEvent(null)
+                      setGameEntries({})
+                    }}
+                    className="w-full appearance-none pl-3 pr-8 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+                  >
+                    <option value="">All provinces</option>
+                    {[...new Set(events.map(e => e.province).filter(Boolean))].sort().map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
-            ))}
+
+              {/* Event dropdown */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Event</label>
+                <div className="relative">
+                  <select
+                    value={selectedEvent?.id || ''}
+                    onChange={e => {
+                      const ev = events.find(x => x.id === e.target.value) || null
+                      setSelectedEvent(ev)
+                      if (ev) initGameEntries(ev)
+                      else setGameEntries({})
+                    }}
+                    className="w-full appearance-none pl-3 pr-8 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+                  >
+                    <option value="">Select event…</option>
+                    {(eventProvinceFilter ? events.filter(e => e.province === eventProvinceFilter) : events).map(ev => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.qualifier_number ? `Q${ev.qualifier_number} · ` : ''}{ev.venue} · {new Date(ev.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Combo dropdown */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Horse / Rider</label>
+                <div className="relative">
+                  <select
+                    value={selectedCombo?.id || ''}
+                    onChange={e => {
+                      const combo = combos.find(c => c.id === e.target.value) || null
+                      setSelectedCombo(combo)
+                      if (combo) setHistoricalComboId(combo.id)
+                    }}
+                    className="w-full appearance-none pl-3 pr-8 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white text-gray-700"
+                  >
+                    <option value="">Select horse…</option>
+                    {combos.map(c => (
+                      <option key={c.id} value={c.id}>{c.horse_name} · L{parseInt(c.current_level) || 0}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Event detail hint */}
+            {selectedEvent && (
+              <p className="text-xs text-gray-500">
+                {selectedEvent.venue}, {selectedEvent.province} · {new Date(selectedEvent.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {selectedEvent.qualifier_number && ` · Games: ${QUALIFIER_GAMES[selectedEvent.qualifier_number]?.join(', ')}`}
+              </p>
+            )}
           </div>
 
-          {/* Step 1 — Select event */}
-          {step === 1 && (
+          {/* Scorecard — appears once both are chosen */}
+          {selectedEvent && selectedCombo && Object.keys(gameEntries).length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-lg font-semibold text-gray-800">
-                Select a qualifier event
-              </h2>
-
-              {/* Search box */}
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={eventSearch}
-                  onChange={e => setEventSearch(e.target.value)}
-                  placeholder="Search by Q1, venue, town, province…"
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                />
-                {eventSearch && (
-                  <button
-                    onClick={() => setEventSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-              {selectedCombo && (
-                <div className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-3 py-2">
-                  <p className="text-xs text-gray-600">
-                    Bookmarks for <span className="font-semibold text-gray-800">{selectedCombo.horse_name}</span>
-                  </p>
-                  <button
-                    onClick={() => setShowBookmarkedOnly(prev => !prev)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
-                      showBookmarkedOnly
-                        ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    <Star size={12} className={showBookmarkedOnly ? 'fill-current' : ''} />
-                    {showBookmarkedOnly ? 'Showing bookmarked only' : 'Show bookmarked only'}
-                  </button>
-                </div>
-              )}
-
-              {(() => {
-                const q = eventSearch.trim().toLowerCase()
-                const searched = q
-                  ? events.filter(e => {
-                      const haystack = [
-                        e.qualifier_number != null ? `q${e.qualifier_number}` : '',
-                        e.qualifier_number != null ? `qualifier ${e.qualifier_number}` : '',
-                        e.venue ?? '',
-                        e.province ?? '',
-                        e.event_type ?? '',
-                        e.notes ?? ''
-                      ].join(' ').toLowerCase()
-                      return haystack.includes(q)
-                    })
-                  : events
-                const filtered = showBookmarkedOnly && selectedCombo
-                  ? searched.filter(event => isQualifierBookmarked(selectedCombo.id, event.id))
-                  : searched
-                const resultLabel = `${filtered.length} event${filtered.length === 1 ? '' : 's'} available`
-
-                if (events.length === 0) return (
-                  <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-                    No past events found yet. Events will appear here after they have been added by the admin.
-                  </div>
-                )
-                if (filtered.length === 0) return (
-                  <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-                    No events match <strong>"{eventSearch}"</strong>. Try a different keyword.
-                  </div>
-                )
-                return (
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-500">{resultLabel}</p>
-                  {filtered.map(event => (
-                    <div
-                      key={event.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleEventSelect(event)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          handleEventSelect(event)
-                        }
-                      }}
-                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-green-400 hover:bg-green-50 transition group cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full capitalize">
-                              {event.event_type}
-                            </span>
-                            {event.qualifier_number && (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                Q{event.qualifier_number}
-                              </span>
-                            )}
-                            {selectedCombo && isQualifierBookmarked(selectedCombo.id, event.id) && (
-                              <span className="inline-flex items-center gap-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-                                <Star size={11} className="fill-current" />
-                                Bookmarked
-                              </span>
-                            )}
-                          </div>
-                          <p className="font-medium text-gray-800 mt-1">
-                            {event.venue}, {event.province}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {new Date(event.date).toLocaleDateString('en-ZA', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric'
-                            })}
-                          </p>
-                          {event.qualifier_number && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              Games: {QUALIFIER_GAMES[event.qualifier_number]?.join(', ')}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={e => openBookmarkComboPicker(event, e)}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-400 hover:text-yellow-600 hover:border-yellow-300 transition"
-                            title="Bookmark this qualifier for a horse/rider combo"
-                          >
-                            <Star size={14} />
-                          </button>
-                          <ChevronDown size={20} className="text-gray-300 -rotate-90 group-hover:text-green-500 transition" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                )
-              })()}
-            </div>
-          )}
-
-          {/* Step 2 — Select combo */}
-          {step === 2 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setStep(1)}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                >
-                  ← Back
-                </button>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Select your horse/rider combo
-                </h2>
-              </div>
-
-              {/* Selected event summary */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="text-xs uppercase tracking-wide text-green-700 font-semibold">Selected Event</p>
-                <p className="text-sm text-green-800 mt-1">
-                  {selectedEvent?.venue}, {selectedEvent?.province} ·{' '}
-                  {new Date(selectedEvent?.date).toLocaleDateString()} ·{' '}
-                  Q{selectedEvent?.qualifier_number}
-                </p>
-              </div>
-
-              {combos.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-                  No horse/rider combos found. Add one in your profile first.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {combos.map(combo => (
-                    <div
-                      key={combo.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleComboSelect(combo)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          handleComboSelect(combo)
-                        }
-                      }}
-                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-green-400 hover:bg-green-50 transition group cursor-pointer focus:outline-none focus:ring-2 focus:ring-green-500"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                            <span className="text-green-700 font-bold">
-                              {combo.horse_name?.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{combo.horse_name}</p>
-                            <p className="text-sm text-gray-500">{profile?.rider_name}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              {combo.is_pinned && (
-                                <span className="text-[11px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">Pinned</span>
-                              )}
-                              {selectedEvent && isQualifierBookmarked(combo.id, selectedEvent.id) && (
-                                <span className="text-[11px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-                                  Qualifier bookmarked
-                                </span>
-                              )}
-                              <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                Level L{parseInt(combo.current_level) || 0}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {selectedEvent && (
-                            <button
-                              onClick={e => openBookmarkComboPicker(selectedEvent, e)}
-                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full border transition ${
-                                isQualifierBookmarked(combo.id, selectedEvent.id)
-                                  ? 'text-yellow-600 border-yellow-300 bg-yellow-50 hover:bg-yellow-100'
-                                  : 'text-gray-400 border-gray-200 bg-white hover:text-yellow-600 hover:border-yellow-300'
-                              }`}
-                              title="Choose combo and bookmark qualifier"
-                            >
-                              <Star size={15} className={isQualifierBookmarked(combo.id, selectedEvent.id) ? 'fill-current' : ''} />
-                            </button>
-                          )}
-                          <ChevronDown size={20} className="text-gray-300 -rotate-90 group-hover:text-green-500 transition" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3 — Enter times */}
-          {step === 3 && !showSummary && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setStep(2)}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                >
-                  ← Back
-                </button>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Enter your times
-                </h2>
-              </div>
-
-              {/* Session summary */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700 flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <span className="font-medium">{selectedCombo?.horse_name}</span>
-                  {' · '}
-                  {selectedEvent?.venue}, {selectedEvent?.province}
-                  {' · '}
-                  {new Date(selectedEvent?.date).toLocaleDateString()}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={e => openBookmarkComboPicker(selectedEvent, e)}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
-                      selectedCombo && selectedEvent && isQualifierBookmarked(selectedCombo.id, selectedEvent.id)
-                        ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Star
-                      size={12}
-                      className={selectedCombo && selectedEvent && isQualifierBookmarked(selectedCombo.id, selectedEvent.id) ? 'fill-current' : ''}
-                    />
-                    {selectedCombo && selectedEvent && isQualifierBookmarked(selectedCombo.id, selectedEvent.id)
-                      ? 'Bookmarked'
-                      : 'Bookmark qualifier'}
-                  </button>
-                  <div className="font-bold">
-                    Total overcount: {getTotalOvercount()}
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500">
-                Entered level is locked to this horse&apos;s signed-up level (L{getEnteredLevel()}).
-              </p>
-
               {/* PDF upload */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center justify-between gap-3 bg-white rounded-xl border border-gray-200 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-gray-800">Upload scoresheet (optional)</p>
-                  <p className="text-sm text-gray-500">
-                    Upload your PDF to auto-fill the times, or enter them manually below.
-                  </p>
+                  <p className="text-sm font-semibold text-gray-800">Auto-fill from PDF</p>
+                  <p className="text-xs text-gray-500">Upload your scoresheet to fill times automatically.</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="scoresheet-upload-input"
-                    aria-disabled={processingPDF}
-                    className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-white h-10 px-4 text-sm bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 aria-disabled:opacity-50 aria-disabled:pointer-events-none"
-                  >
-                    <Upload size={16} />
-                    {processingPDF ? 'Processing…' : 'Upload PDF'}
-                  </label>
-                  <input
-                    id="scoresheet-upload-input"
-                    ref={pdfInputRef}
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    onChange={handlePDFUpload}
-                    className="sr-only"
-                  />
-                </div>
-              </div>
-
-              {/* Game entries */}
-              <div className="space-y-3">
-                {Object.entries(gameEntries).map(([game, entry]) => {
-                  const finalTime = getFinalTime(game)
-                  const liveLevel = getLiveLevel(game)
-                  const overcount = getLiveOvercount(game)
-
-                  return (
-                    <div
-                      key={game}
-                      className="bg-white rounded-xl border border-gray-200 p-4"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-gray-800">{game}</h3>
-                        <div className="flex items-center gap-2">
-                          {liveLevel !== null && (
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${LEVEL_STYLES[liveLevel]}`}>
-                              L{liveLevel}
-                            </span>
-                          )}
-                          {overcount > 0 && (
-                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-medium">
-                              +{overcount} overcount
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-3">
-                        {/* Time input */}
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            Time (seconds)
-                          </label>
-                          <input
-                            type="number"
-                            step="0.001"
-                            value={entry.time}
-                            onChange={e => handleTimeChange(game, 'time', e.target.value)}
-                            disabled={entry.is_nt}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400"
-                            placeholder="e.g. 22.724"
-                          />
-                        </div>
-                      </div>
-
-                      {/* NT toggle */}
-                      <div className="mt-3 flex items-center gap-2">
-                        <button
-                          onClick={() => toggleNT(game)}
-                          className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg transition ${
-                            entry.is_nt
-                              ? 'bg-red-100 text-red-700 font-medium'
-                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                          }`}
-                        >
-                          {entry.is_nt ? <X size={12} /> : <AlertCircle size={12} />}
-                          {entry.is_nt ? 'NT (click to remove)' : 'Mark as NT'}
-                        </button>
-
-                        {finalTime !== null && (
-                          <span className="text-xs text-gray-500">
-                            Final time: <strong>{finalTime.toFixed(3)}s</strong>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Review button */}
-              <button
-                onClick={() => setShowSummary(true)}
-                className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 transition flex items-center justify-center gap-2"
-              >
-                <Check size={18} />
-                Review & Save
-              </button>
-            </div>
-          )}
-
-          {/* Summary / Review screen */}
-          {step === 3 && showSummary && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setShowSummary(false)}
-                  className="text-sm text-gray-500 hover:text-gray-700"
+                <label
+                  htmlFor="scoresheet-upload-input"
+                  aria-disabled={processingPDF}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 border border-gray-200 bg-white hover:bg-gray-50 transition aria-disabled:opacity-50 aria-disabled:pointer-events-none flex-shrink-0"
                 >
-                  ← Edit times
-                </button>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  Review your times
-                </h2>
+                  <Upload size={15} />
+                  {processingPDF ? 'Processing…' : 'Upload PDF'}
+                </label>
+                <input
+                  id="scoresheet-upload-input"
+                  ref={pdfInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handlePDFUpload}
+                  className="sr-only"
+                />
               </div>
 
+              {/* Scorecard */}
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                  <p className="font-semibold text-gray-800">
-                    {selectedCombo?.horse_name} · {profile?.rider_name}
+                <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    {selectedCombo.horse_name} · L{getEnteredLevel()} entered · Q{selectedEvent.qualifier_number}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    {selectedEvent?.venue}, {selectedEvent?.province} ·{' '}
-                    {new Date(selectedEvent?.date).toLocaleDateString()} ·{' '}
-                    Q{selectedEvent?.qualifier_number}
-                  </p>
+                </div>
+
+                <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center px-4 py-2 border-b border-gray-100 bg-gray-50/60">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Game</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-28 text-center">Time (s)</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-14 text-center">Level</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-14 text-center">NT</span>
                 </div>
 
                 <div className="divide-y divide-gray-100">
                   {Object.entries(gameEntries).map(([game, entry]) => {
-                    const finalTime = getFinalTime(game)
                     const liveLevel = getLiveLevel(game)
                     const overcount = getLiveOvercount(game)
-
                     return (
-                      <div key={game} className="px-4 py-3 flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">{game}</span>
-                        <div className="flex items-center gap-2">
-                          {entry.is_nt ? (
-                            <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">NT</span>
-                          ) : finalTime !== null ? (
-                            <>
-                              <span className="text-sm font-bold text-gray-800">
-                                {finalTime.toFixed(3)}s
-                              </span>
-                              {liveLevel !== null && (
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[liveLevel]}`}>
-                                  L{liveLevel}
-                                </span>
-                              )}
-                              {overcount > 0 && (
-                                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                                  +{overcount}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-xs text-gray-400">No time entered</span>
+                      <div
+                        key={game}
+                        className={`grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center px-4 py-2.5 transition ${entry.is_nt ? 'bg-red-50' : overcount > 0 ? 'bg-yellow-50' : ''}`}
+                      >
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium text-gray-800">{game}</span>
+                          {overcount > 0 && (
+                            <span className="ml-2 text-[10px] font-bold text-yellow-700 bg-yellow-100 px-1.5 py-0.5 rounded-full">+{overcount}</span>
                           )}
+                        </div>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={entry.time}
+                          onChange={e => handleTimeChange(game, 'time', e.target.value)}
+                          disabled={entry.is_nt}
+                          className="w-28 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
+                          placeholder="22.724"
+                        />
+                        <div className="w-14 flex justify-center">
+                          {liveLevel !== null && !entry.is_nt ? (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${LEVEL_STYLES[liveLevel]}`}>L{liveLevel}</span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </div>
+                        <div className="w-14 flex justify-center">
+                          <button
+                            onClick={() => toggleNT(game)}
+                            className={`w-10 h-7 rounded-lg text-xs font-bold transition ${entry.is_nt ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}
+                          >
+                            NT
+                          </button>
                         </div>
                       </div>
                     )
@@ -1980,10 +1596,8 @@ export default function QualifierTracker() {
                 </div>
 
                 <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700">
-                    Total overcount
-                  </span>
-                  <span className="text-lg font-bold text-green-700">
+                  <span className="text-sm text-gray-600">Total overcount</span>
+                  <span className={`text-lg font-bold ${getTotalOvercount() > 0 ? 'text-yellow-700' : 'text-green-700'}`}>
                     {getTotalOvercount()}
                   </span>
                 </div>
@@ -1995,8 +1609,15 @@ export default function QualifierTracker() {
                 className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Save size={20} />
-                {saving ? 'Saving...' : 'Save Times'}
+                {saving ? 'Saving…' : 'Save Times'}
               </button>
+            </div>
+          )}
+
+          {/* Placeholder when not yet selected */}
+          {(!selectedEvent || !selectedCombo) && (
+            <div className="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center text-gray-400">
+              <p className="text-sm">Select an event and horse above to start entering times.</p>
             </div>
           )}
         </div>
@@ -2006,29 +1627,51 @@ export default function QualifierTracker() {
       {activeTab === 'history' && (
         <div className="space-y-4">
 
-          {/* Year selector */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-600">Season:</span>
-            <div className="relative inline-block">
-              <select
-                value={selectedYear}
-                onChange={e => setSelectedYear(Number(e.target.value))}
-                className="appearance-none pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white font-medium"
-              >
-                {buildYearOptions().map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          {/* Filters row */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-600">Season:</span>
+              <div className="relative inline-block">
+                <select
+                  value={selectedYear}
+                  onChange={e => setSelectedYear(Number(e.target.value))}
+                  className="appearance-none pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white font-medium"
+                >
+                  {buildYearOptions().map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-600">Horse:</span>
+              <div className="relative inline-block">
+                <select
+                  value={historyHorseFilter}
+                  onChange={e => setHistoryHorseFilter(e.target.value)}
+                  className="appearance-none pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white font-medium"
+                >
+                  <option value="">All horses</option>
+                  {combos.map(c => (
+                    <option key={c.id} value={c.id}>{c.horse_name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           </div>
 
-          {savedSessions.length === 0 ? (
+          {(() => {
+            const filteredSessions = historyHorseFilter
+              ? savedSessions.filter(s => s.horse?.id === historyHorseFilter)
+              : savedSessions
+            return filteredSessions.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
               No sessions saved for {selectedYear}. Enter your qualifier times to get started.
             </div>
           ) : (
-            savedSessions.map(session => (
+            filteredSessions.map(session => (
               <div
                 key={session.key}
                 className="bg-white rounded-xl border border-gray-200 overflow-hidden"
@@ -2061,6 +1704,14 @@ export default function QualifierTracker() {
                   </div>
                 </div>
 
+                {editingSession === session.key && (
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center px-4 py-2 border-b border-gray-100 bg-gray-50/60">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Game</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-28 text-center">Time (s)</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-14 text-center">Level</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-14 text-center">NT</span>
+                  </div>
+                )}
                 <div className="divide-y divide-gray-100">
                   {session.results.map(result => {
                     const isEditingCurrentSession = editingSession === session.key
@@ -2070,54 +1721,51 @@ export default function QualifierTracker() {
                       ? (viewIsNt ? null : (editEntry?.time ? Number(editEntry.time) : null))
                       : result.time
                     const level = viewIsNt || viewTime == null || Number.isNaN(viewTime) ? null : getLevel(result.game, viewTime)
-                    return (
+                    return isEditingCurrentSession ? (
+                      <div key={result.id} className={`grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center px-4 py-2.5 transition ${editEntry?.is_nt ? 'bg-red-50' : ''}`}>
+                        <span className="text-sm font-medium text-gray-800">{result.game}</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={editEntry?.time || ''}
+                          onChange={e => handleSessionEditChange(result.id, 'time', e.target.value)}
+                          disabled={Boolean(editEntry?.is_nt)}
+                          className="w-28 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
+                          placeholder="22.724"
+                        />
+                        <div className="w-14 flex justify-center">
+                          {level !== null ? (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${LEVEL_STYLES[level]}`}>L{level}</span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </div>
+                        <div className="w-14 flex justify-center">
+                          <button
+                            onClick={() => toggleSessionEditNT(result.id)}
+                            className={`w-10 h-7 rounded-lg text-xs font-bold transition ${
+                              editEntry?.is_nt ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                            }`}
+                          >
+                            NT
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                       <div key={result.id} className="px-4 py-3 flex items-center justify-between">
                         <span className="text-sm text-gray-700">{result.game}</span>
-                        {isEditingCurrentSession ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              step="0.001"
-                              value={editEntry?.time || ''}
-                              onChange={e => handleSessionEditChange(result.id, 'time', e.target.value)}
-                              disabled={Boolean(editEntry?.is_nt)}
-                              className="w-28 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400"
-                              placeholder="22.724"
-                            />
-                            <button
-                              onClick={() => toggleSessionEditNT(result.id)}
-                              className={`text-xs px-2.5 py-1.5 rounded-lg transition ${
-                                editEntry?.is_nt
-                                  ? 'bg-red-100 text-red-700 font-medium'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
-                            >
-                              {editEntry?.is_nt ? 'NT' : 'Mark NT'}
-                            </button>
-                            {level !== null && (
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[level]}`}>
-                                L{level}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            {result.is_nt ? (
-                              <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">NT</span>
-                            ) : (
-                              <>
-                                <span className="text-sm font-medium text-gray-800">
-                                  {result.time?.toFixed(3)}s
-                                </span>
-                                {level !== null && (
-                                  <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[level]}`}>
-                                    L{level}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {result.is_nt ? (
+                            <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">NT</span>
+                          ) : (
+                            <>
+                              <span className="text-sm font-medium text-gray-800">{result.time?.toFixed(3)}s</span>
+                              {level !== null && (
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${LEVEL_STYLES[level]}`}>L{level}</span>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
@@ -2140,7 +1788,8 @@ export default function QualifierTracker() {
                 )}
               </div>
             ))
-          )}
+          )
+          })()}
         </div>
       )}
 
@@ -2276,33 +1925,38 @@ export default function QualifierTracker() {
                 )}
 
                 {Object.keys(historicalPdfEntries).length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {Object.entries(historicalPdfEntries).map(([game, entry]) => (
-                      <div key={game} className="border border-gray-200 rounded-lg p-3">
-                        <p className="text-sm font-medium text-gray-800 mb-2">{game}</p>
-                        <div className="flex items-center gap-2">
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center px-4 py-2 bg-gray-50 border-b border-gray-100">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Game</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-28 text-center">Time (s)</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-14 text-center">NT</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {Object.entries(historicalPdfEntries).map(([game, entry]) => (
+                        <div key={game} className={`grid grid-cols-[1fr_auto_auto] gap-x-3 items-center px-4 py-2.5 ${entry.is_nt ? 'bg-red-50' : ''}`}>
+                          <span className="text-sm font-medium text-gray-800">{game}</span>
                           <input
-                            type="number"
-                            step="0.001"
+                            type="text"
+                            inputMode="decimal"
                             value={entry.time}
                             onChange={e => handleHistoricalPdfChange(game, 'time', e.target.value)}
                             disabled={entry.is_nt}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-                            placeholder="e.g. 22.724"
+                            className="w-28 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:border-gray-200"
+                            placeholder="22.724"
                           />
-                          <button
-                            onClick={() => toggleHistoricalPdfNT(game)}
-                            className={`text-xs px-2.5 py-2 rounded-lg transition ${
-                              entry.is_nt
-                                ? 'bg-red-100 text-red-700 font-medium'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            }`}
-                          >
-                            {entry.is_nt ? 'NT' : 'Mark NT'}
-                          </button>
+                          <div className="w-14 flex justify-center">
+                            <button
+                              onClick={() => toggleHistoricalPdfNT(game)}
+                              className={`w-10 h-7 rounded-lg text-xs font-bold transition ${
+                                entry.is_nt ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                              }`}
+                            >
+                              NT
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -2369,89 +2023,59 @@ export default function QualifierTracker() {
                   </p>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {Object.entries(historicalManualEntries).map(([game, entry]) => (
-                  <div key={game} className="border border-gray-200 rounded-lg p-3">
-                    <p className="text-sm font-medium text-gray-800 mb-2">{game}</p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="0.001"
-                        value={entry.time}
-                        onChange={e => handleHistoricalManualChange(game, 'time', e.target.value)}
-                        disabled={entry.is_nt}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-                        placeholder="e.g. 22.724"
-                      />
-                      <button
-                        onClick={() => toggleHistoricalManualNT(game)}
-                        className={`text-xs px-2.5 py-2 rounded-lg transition ${
-                          entry.is_nt
-                            ? 'bg-red-100 text-red-700 font-medium'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {entry.is_nt ? 'NT' : 'Mark NT'}
-                      </button>
+                {Object.keys(historicalManualEntries).length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center px-4 py-2 bg-gray-50 border-b border-gray-100">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Game</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-28 text-center">Time (s)</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 w-14 text-center">NT</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {Object.entries(historicalManualEntries).map(([game, entry]) => (
+                        <div key={game} className={`grid grid-cols-[1fr_auto_auto] gap-x-3 items-center px-4 py-2.5 ${entry.is_nt ? 'bg-red-50' : ''}`}>
+                          <span className="text-sm font-medium text-gray-800">{game}</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={entry.time}
+                            onChange={e => handleHistoricalManualChange(game, 'time', e.target.value)}
+                            disabled={entry.is_nt}
+                            className="w-28 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:border-gray-200"
+                            placeholder="22.724"
+                          />
+                          <div className="w-14 flex justify-center">
+                            <button
+                              onClick={() => toggleHistoricalManualNT(game)}
+                              className={`w-10 h-7 rounded-lg text-xs font-bold transition ${
+                                entry.is_nt ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                              }`}
+                            >
+                              NT
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-                </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {bookmarkPickerEvent && (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-xl shadow-xl border border-gray-200 p-5 space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Bookmark qualifier</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Select which horse/rider combo this bookmark should be saved for.
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {bookmarkPickerEvent.venue}, {bookmarkPickerEvent.province} · Q{bookmarkPickerEvent.qualifier_number}
-              </p>
-            </div>
+        </div> {/* end tab panels */}
+      </div> {/* end sidebar + content flex */}
 
-            <div className="space-y-2">
-              <label className="block text-xs font-medium text-gray-600">Horse/rider combo</label>
-              <select
-                value={bookmarkPickerComboId}
-                onChange={e => setBookmarkPickerComboId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select a combo</option>
-                {combos.map(combo => (
-                  <option key={combo.id} value={combo.id}>
-                    {combo.horse_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => {
-                  setBookmarkPickerEvent(null)
-                  setBookmarkPickerComboId('')
-                }}
-                className="px-3 py-2 rounded-lg text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmBookmarkComboSelection}
-                className="px-3 py-2 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 transition"
-              >
-                Save bookmark
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm ?? (() => {})}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }

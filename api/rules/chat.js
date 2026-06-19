@@ -3,10 +3,10 @@
 // Env vars required (set in Vercel project settings and local .env):
 //   CF_ACCOUNT_ID   - Cloudflare account id
 //   CF_API_TOKEN    - Cloudflare API token with Workers AI permission
-//   CF_MODEL        - optional, defaults to @cf/meta/llama-3-8b-instruct
+//   CF_MODEL        - optional, defaults to @cf/meta/llama-3.3-70b-instruct-fp8-fast
 
-const DEFAULT_MODEL = '@cf/meta/llama-3-8b-instruct'
-const MAX_CONTEXT_CHARS = 8000
+const DEFAULT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+const MAX_CONTEXT_CHARS = 16000
 
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body
@@ -50,6 +50,7 @@ export default async function handler(req, res) {
   const query = String(body.query || '').trim()
   const context = String(body.context || '').slice(0, MAX_CONTEXT_CHARS)
   const systemPrompt = String(body.systemPrompt || 'You are a helpful assistant.')
+  const history = Array.isArray(body.history) ? body.history : []
 
   if (!query) {
     res.status(400).json({ error: 'query is required' })
@@ -59,6 +60,11 @@ export default async function handler(req, res) {
   const userContent = context
     ? `${context}\n\nQuestion: ${query}`
     : query
+
+  const priorTurns = history.slice(-10).map(m => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: String(m.content || '').slice(0, 2000),
+  }))
 
   try {
     const cfRes = await fetch(
@@ -72,9 +78,11 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           messages: [
             { role: 'system', content: systemPrompt },
+            ...priorTurns,
             { role: 'user', content: userContent },
           ],
           temperature: 0.2,
+          max_tokens: 900,
         }),
       }
     )

@@ -8,23 +8,28 @@ import { createCroppedImageFile } from '../../lib/imageCrop'
 import { uploadImageToBucket, uploadVideoToBucket, UploadValidationError } from '../../lib/storageUploads'
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
+  Bell,
   Bug,
   Calendar,
   CheckCircle2,
+  Heart,
+  Info,
   Pencil,
   Plus,
   Save,
   Scissors,
   ShieldAlert,
+  ShieldCheck,
   Syringe,
   Trash2,
   Video,
   Wrench,
   X
 } from 'lucide-react'
-import { Button, Card, CardContent, EmptyState, Input, PageHeader, Skeleton, Textarea } from '../../components/ui'
+import { Button, Card, CardContent, ConfirmDialog, EmptyState, Input, PageHeader, Skeleton, Textarea } from '../../components/ui'
 import VitalsTrendCard from '../../components/horses/VitalsTrendCard'
 
 const SEX_OPTIONS = [
@@ -75,7 +80,7 @@ const REMINDER_TYPES = [
 ]
 
 const REMINDER_GROUP_ORDER = ['Vaccinations', 'Routine Care', 'Administrative', 'Other']
-const HORSE_DETAILS_TABS = ['details', 'medical', 'vitals', 'reminders']
+const HORSE_DETAILS_TABS = ['details', 'medical', 'vitals', 'reminders', 'vaccinations']
 
 function parseISODate(value) {
   if (!value) return null
@@ -330,6 +335,7 @@ export default function HorseDetails() {
   const [activeTab, setActiveTab] = useState('details') // details | medical | vitals | reminders
   const [isEditingDetails, setIsEditingDetails] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null })
 
   const [medical, setMedical] = useState([])
   const [reminders, setReminders] = useState([])
@@ -369,6 +375,12 @@ export default function HorseDetails() {
   })
 
   const [addingReminder, setAddingReminder] = useState(false)
+  const [medicalTypeFilter, setMedicalTypeFilter] = useState('all')
+  const [showAddReminderForm, setShowAddReminderForm] = useState(false)
+  const [vacFluForm, setVacFluForm] = useState({ v1_date: '', v2_date: '', v3_date: '', annual_last_date: '', vet_name: '', competition_date: '', notes: '' })
+  const [vacAhsForm, setVacAhsForm] = useState({ v1_date: '', v2_date: '', v3_date: '', annual_last_date: '', vet_name: '', competition_date: '', notes: '' })
+  const [savingVaccFlu, setSavingVaccFlu] = useState(false)
+  const [savingVaccAhs, setSavingVaccAhs] = useState(false)
   const [reminderForm, setReminderForm] = useState({
     reminder_type: 'farrier',
     custom_label: '',
@@ -762,21 +774,27 @@ export default function HorseDetails() {
     }
   }
 
-  async function handleDeleteHorseVideo(videoId) {
-    if (!confirm('Delete this video?')) return
-    try {
-      const { error } = await supabase
-        .from('horse_videos')
-        .delete()
-        .eq('id', videoId)
-        .eq('user_id', profile.id)
-      if (error) throw error
-      toast.success('Video deleted')
-      await fetchAll()
-    } catch (error) {
-      console.error(error)
-      toast.error('Could not delete video')
-    }
+  function handleDeleteHorseVideo(videoId) {
+    setConfirmDialog({
+      open: true,
+      title: 'Delete video?',
+      description: 'This cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('horse_videos')
+            .delete()
+            .eq('id', videoId)
+            .eq('user_id', profile.id)
+          if (error) throw error
+          toast.success('Video deleted')
+          await fetchAll()
+        } catch (error) {
+          console.error(error)
+          toast.error('Could not delete video')
+        }
+      },
+    })
   }
 
   async function handleAddMedical() {
@@ -816,21 +834,27 @@ export default function HorseDetails() {
     }
   }
 
-  async function handleDeleteMedical(entryId) {
-    if (!confirm('Delete this medical entry?')) return
-    try {
-      const { error } = await supabase
-        .from('horse_medical_entries')
-        .delete()
-        .eq('id', entryId)
-        .eq('user_id', profile.id)
-      if (error) throw error
-      toast.success('Entry deleted')
-      await fetchAll()
-    } catch (e) {
-      console.error(e)
-      toast.error('Error deleting entry')
-    }
+  function handleDeleteMedical(entryId) {
+    setConfirmDialog({
+      open: true,
+      title: 'Delete medical entry?',
+      description: 'This cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('horse_medical_entries')
+            .delete()
+            .eq('id', entryId)
+            .eq('user_id', profile.id)
+          if (error) throw error
+          toast.success('Entry deleted')
+          await fetchAll()
+        } catch (e) {
+          console.error(e)
+          toast.error('Error deleting entry')
+        }
+      },
+    })
   }
 
   async function handleAddVital() {
@@ -914,6 +938,78 @@ export default function HorseDetails() {
       toast.error(e?.message || 'Error adding vitals entry')
     } finally {
       setAddingVital(false)
+    }
+  }
+
+  async function handleSaveVaccination(vaccType, formData, setSaving) {
+    const isAhs = vaccType === 'ahs_vaccination'
+    const doseDates = isAhs
+      ? [formData.v1_date, formData.v2_date].filter(Boolean)
+      : [formData.v1_date, formData.v2_date, formData.v3_date].filter(Boolean)
+    if (doseDates.length === 0 && !formData.annual_last_date) {
+      toast.error('Log at least one vaccination date')
+      return
+    }
+    if (!formData.vet_name.trim()) {
+      toast.error('Vet name is required for vaccinations')
+      return
+    }
+    const v1v2 = formData.v1_date && formData.v2_date ? dayDiff(formData.v1_date, formData.v2_date) : null
+    const v2v3 = formData.v2_date && formData.v3_date ? dayDiff(formData.v2_date, formData.v3_date) : null
+    if (v1v2 !== null && (v1v2 < 21 || v1v2 > 92)) { toast.error('V2 must be 21–92 days after V1'); return }
+    if (!isAhs && v2v3 !== null && (v2v3 < 150 || v2v3 > 215)) { toast.error('V3 must be 150–215 days after V2'); return }
+
+    const primaryCourseComplete = isAhs
+      ? Boolean(formData.v1_date && formData.v2_date)
+      : Boolean(formData.v1_date && formData.v2_date && formData.v3_date)
+    const lastDoneDate = formData.annual_last_date || formData.v3_date || formData.v2_date || formData.v1_date
+    const nextDueDate = annualDueDate(lastDoneDate)
+    if (!nextDueDate) { toast.error('Could not calculate next due date'); return }
+
+    const label = vaccType === 'flu_vaccination' ? 'Flu Vaccination (Equine Influenza)' : 'AHS Vaccination (African Horse Sickness)'
+    setSaving(true)
+    try {
+      const fullPayload = {
+        horse_id: horseId, user_id: profile.id, reminder_type: vaccType, label,
+        last_done_date: lastDoneDate || null, next_due_date: nextDueDate, due_date: nextDueDate,
+        vet_name: formData.vet_name.trim() || null, notes: formData.notes.trim() || null,
+        is_primary_course_complete: primaryCourseComplete, is_done: false,
+        notification_days_before: 30,
+      }
+      const compactPayload = { horse_id: horseId, user_id: profile.id, reminder_type: vaccType, label, last_done_date: lastDoneDate || null, next_due_date: nextDueDate, due_date: nextDueDate, is_done: false }
+      const legacyPayload = { horse_id: horseId, user_id: profile.id, label, due_date: nextDueDate, is_done: false }
+      let error = null
+      for (const attempt of [fullPayload, compactPayload, legacyPayload]) {
+        const r = await supabase.from('horse_reminders').insert(attempt)
+        if (!r.error) { error = null; break }
+        error = r.error
+      }
+      if (error) throw error
+
+      const doseRows = isAhs
+        ? [{ dose: 1, date: formData.v1_date }, { dose: 2, date: formData.v2_date }]
+        : [{ dose: 1, date: formData.v1_date }, { dose: 2, date: formData.v2_date }, { dose: 3, date: formData.v3_date }]
+      const logRows = doseRows.filter(d => d.date).map(d => ({
+        horse_id: horseId, user_id: profile.id,
+        vaccination_type: isAhs ? 'ahs' : 'flu',
+        dose_number: d.dose, date_administered: d.date,
+        vet_name: formData.vet_name.trim(),
+      }))
+      if (formData.annual_last_date) {
+        logRows.push({ horse_id: horseId, user_id: profile.id, vaccination_type: isAhs ? 'ahs' : 'flu', dose_number: null, date_administered: formData.annual_last_date, vet_name: formData.vet_name.trim() })
+      }
+      if (logRows.length > 0) {
+        await supabase.from('horse_vaccination_log').insert(logRows)
+      }
+
+      toast.success('Vaccination logged & reminder set!')
+      await fetchAll()
+      setActiveTab('vaccinations')
+    } catch (e) {
+      console.error(e)
+      toast.error(e?.message || 'Error saving vaccination')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1204,21 +1300,27 @@ export default function HorseDetails() {
     }
   }
 
-  async function handleDeleteReminder(reminderId) {
-    if (!confirm('Delete this reminder?')) return
-    try {
-      const { error } = await supabase
-        .from('horse_reminders')
-        .delete()
-        .eq('id', reminderId)
-        .eq('user_id', profile.id)
-      if (error) throw error
-      toast.success('Reminder deleted')
-      await fetchAll()
-    } catch (e) {
-      console.error(e)
-      toast.error('Error deleting reminder')
-    }
+  function handleDeleteReminder(reminderId) {
+    setConfirmDialog({
+      open: true,
+      title: 'Delete reminder?',
+      description: 'This cannot be undone.',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('horse_reminders')
+            .delete()
+            .eq('id', reminderId)
+            .eq('user_id', profile.id)
+          if (error) throw error
+          toast.success('Reminder deleted')
+          await fetchAll()
+        } catch (e) {
+          console.error(e)
+          toast.error('Error deleting reminder')
+        }
+      },
+    })
   }
 
   async function handleDeleteHorse() {
@@ -1277,30 +1379,108 @@ export default function HorseDetails() {
         }
       />
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
-        {[
-          { key: 'details', label: 'Details' },
-          { key: 'medical', label: `Medical log (${medical.length})` },
-          {
-            key: 'vitals',
-            label: `Vitals (${vitalTrendSeries.temperaturePoints.length + vitalTrendSeries.heartRatePoints.length})`,
-          },
-          { key: 'reminders', label: `Reminders (${upcomingReminders.length})` },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${
-              activeTab === t.key
-                ? 'border-green-700 text-green-800'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Persistent horse identity strip */}
+      <div className="flex items-center gap-4 bg-white rounded-2xl border border-gray-200 p-4">
+        <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center">
+          {horse.photo_url ? (
+            <img src={horse.photo_url} alt={horse.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-white font-black text-2xl">{horse.name?.charAt(0)?.toUpperCase()}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xl font-black text-gray-900 truncate">{horse.name}</p>
+          <p className="text-sm text-gray-500 truncate mt-0.5">
+            {[horse.breed, horse.color, horse.sex && horse.sex !== 'unknown' ? horse.sex : null].filter(Boolean).join(' · ') || 'No details yet'}
+          </p>
+        </div>
+        <div className="hidden sm:flex flex-col items-end gap-1 text-right flex-shrink-0">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Reminders</span>
+          <span className={`text-2xl font-black ${upcomingReminders.filter(r => reminderUrgency(r.next_due_date).tone === 'red').length > 0 ? 'text-red-600' : 'text-green-700'}`}>
+            {upcomingReminders.length}
+          </span>
+        </div>
       </div>
+
+      {/* Mobile tab grid */}
+      {(() => {
+        const sections = [
+          { key: 'details',      label: 'Details',    icon: Info,        count: null },
+          { key: 'medical',      label: 'Medical',    icon: Activity,    count: medical.length },
+          { key: 'vitals',       label: 'Vitals',     icon: Heart,       count: vitalTrendSeries.temperaturePoints.length + vitalTrendSeries.heartRatePoints.length },
+          { key: 'reminders',    label: 'Reminders',  icon: Bell,        count: upcomingReminders.length },
+          { key: 'vaccinations', label: 'Vaccines',   icon: Syringe,     count: upcomingReminders.filter(r => r.reminder_type === 'flu_vaccination' || r.reminder_type === 'ahs_vaccination').length },
+        ]
+        return (
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 md:hidden">
+            {sections.map(({ key, label, icon: Icon, count }) => {
+              const active = activeTab === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 px-2 text-xs font-semibold transition relative ${
+                    active
+                      ? 'bg-green-700 border-green-700 text-white shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-green-300 hover:text-green-700'
+                  }`}
+                >
+                  <Icon size={18} />
+                  {label}
+                  {count !== null && count > 0 && (
+                    <span className={`absolute top-1.5 right-1.5 text-[9px] font-black min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 ${active ? 'bg-white/30 text-white' : 'bg-green-100 text-green-700'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })()}
+
+      {/* Desktop sidebar + content */}
+      <div className="flex gap-5 items-start">
+
+        {/* Desktop sidebar */}
+        {(() => {
+          const sections = [
+            { key: 'details',      label: 'Details',      icon: Info,        count: null },
+            { key: 'medical',      label: 'Medical log',  icon: Activity,    count: medical.length },
+            { key: 'vitals',       label: 'Vitals',       icon: Heart,       count: vitalTrendSeries.temperaturePoints.length + vitalTrendSeries.heartRatePoints.length },
+            { key: 'reminders',    label: 'Reminders',    icon: Bell,        count: upcomingReminders.length },
+            { key: 'vaccinations', label: 'Vaccines',     icon: Syringe,     count: upcomingReminders.filter(r => r.reminder_type === 'flu_vaccination' || r.reminder_type === 'ahs_vaccination').length },
+          ]
+          return (
+            <nav className="hidden md:flex flex-col gap-1 flex-shrink-0 w-44 bg-white rounded-xl border border-gray-200 p-2">
+              {sections.map(({ key, label, icon: Icon, count }) => {
+                const active = activeTab === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActiveTab(key)}
+                    className={`flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition text-left ${
+                      active
+                        ? 'bg-green-700 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon size={16} className="flex-shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    {count !== null && count > 0 && (
+                      <span className={`text-[10px] font-bold min-w-[18px] h-4 flex items-center justify-center rounded-full px-1 ${active ? 'bg-white/25 text-white' : 'bg-green-100 text-green-700'}`}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </nav>
+          )
+        })()}
+
+        {/* Tab panels */}
+        <div className="flex-1 min-w-0">
 
       {/* DETAILS */}
       {activeTab === 'details' && (
@@ -1626,90 +1806,188 @@ export default function HorseDetails() {
       {/* MEDICAL */}
       {activeTab === 'medical' && (
         <div className="space-y-4">
-          <div className="flex justify-end gap-2 flex-wrap">
-            <Button variant="secondary" onClick={() => setShowVitalsModal(true)}>
-              <Plus size={16} />
-              Vitals entry
-            </Button>
-            <Button onClick={() => setShowMedicalModal(true)}>
-              <Plus size={16} />
-              Add entry
-            </Button>
+          {/* Header row */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm text-gray-500">{medical.length} {medical.length === 1 ? 'entry' : 'entries'}</p>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setShowVitalsModal(true)}>
+                <Heart size={15} />
+                Vitals
+              </Button>
+              <Button onClick={() => setShowMedicalModal(true)}>
+                <Plus size={16} />
+                Add entry
+              </Button>
+            </div>
           </div>
+
+          {/* Type filter pills */}
+          {medical.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'all', label: 'All', icon: null },
+                { value: 'vaccination', label: 'Vaccination', icon: Syringe },
+                { value: 'deworming', label: 'Deworming', icon: Bug },
+                { value: 'farrier', label: 'Farrier', icon: Scissors },
+                { value: 'vet_visit', label: 'Vet Visit', icon: Activity },
+                { value: 'injury', label: 'Injury', icon: AlertTriangle },
+                { value: 'vitals', label: 'Vitals', icon: Heart },
+                { value: 'other', label: 'Other', icon: Wrench },
+              ].filter(f => f.value === 'all' || medical.some(e => (e.type || 'other') === f.value)).map(f => {
+                const active = medicalTypeFilter === f.value
+                return (
+                  <button
+                    key={f.value}
+                    onClick={() => setMedicalTypeFilter(f.value)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                      active ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-200 hover:border-green-300 hover:text-green-700'
+                    }`}
+                  >
+                    {f.icon && <f.icon size={11} />}
+                    {f.label}
+                    {f.value !== 'all' && (
+                      <span className={`ml-0.5 ${active ? 'text-white/70' : 'text-gray-400'}`}>
+                        {medical.filter(e => (e.type || 'other') === f.value).length}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {medical.length === 0 ? (
             <EmptyState
               title="No medical entries yet"
               description="Add vaccinations, deworming, farrier visits, vet notes, injuries, and more."
             />
-          ) : (
-            <div className="space-y-3">
-              {medical.map(entry => {
-                const vitalFlagged = vitalsEntryShowsFlagged(entry)
-                const vitalReason = vitalsAbnormalReasonForDisplay(entry)
-                const vitalNotesBody = vitalsNotesBody(entry, vitalReason)
-                return (
-                <Card key={entry.id}>
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-                            {entry.type === 'vitals'
-                              ? 'Vitals'
-                              : (MEDICAL_TYPES.find(t => t.value === entry.type)?.label || 'Other')}
-                          </span>
-                          <span className="text-xs text-gray-400 flex items-center gap-1">
-                            <Calendar size={12} />
-                            {formatDate(entry.recorded_at || entry.date)}
-                          </span>
-                          {entry.type === 'vitals' && vitalFlagged ? (
-                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
-                              Flagged
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-2 font-semibold text-gray-900 break-words">{entry.title}</p>
-                        {entry.type === 'vitals' ? (
-                          <div className="mt-1 text-sm text-gray-600 space-y-1">
-                            <p>Recorded: {formatDateTime(entry.recorded_at || entry.created_at)}</p>
-                            {vitalFlagged && vitalReason ? (
-                              <p className="text-red-700">{vitalReason}</p>
+          ) : (() => {
+            const filtered = medicalTypeFilter === 'all'
+              ? medical
+              : medical.filter(e => (e.type || 'other') === medicalTypeFilter)
+            const TYPE_ICON = {
+              vaccination: { icon: Syringe,       bg: 'bg-blue-100',   text: 'text-blue-600',   badge: 'bg-blue-100 text-blue-700' },
+              deworming:   { icon: Bug,            bg: 'bg-purple-100', text: 'text-purple-600', badge: 'bg-purple-100 text-purple-700' },
+              farrier:     { icon: Scissors,       bg: 'bg-orange-100', text: 'text-orange-600', badge: 'bg-orange-100 text-orange-700' },
+              vet_visit:   { icon: Activity,       bg: 'bg-teal-100',   text: 'text-teal-600',   badge: 'bg-teal-100 text-teal-700' },
+              injury:      { icon: AlertTriangle,  bg: 'bg-red-100',    text: 'text-red-600',    badge: 'bg-red-100 text-red-700' },
+              vitals:      { icon: Heart,          bg: 'bg-green-100',  text: 'text-green-600',  badge: 'bg-green-100 text-green-700' },
+              other:       { icon: Wrench,         bg: 'bg-gray-100',   text: 'text-gray-500',   badge: 'bg-gray-100 text-gray-700' },
+            }
+            return (
+              <div className="space-y-2">
+                {filtered.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-6">No entries of this type.</p>
+                )}
+                {filtered.map(entry => {
+                  const vitalFlagged = vitalsEntryShowsFlagged(entry)
+                  const vitalReason = vitalsAbnormalReasonForDisplay(entry)
+                  const vitalNotesBody = vitalsNotesBody(entry, vitalReason)
+                  const cfg = TYPE_ICON[entry.type] || TYPE_ICON.other
+                  const EntryIcon = cfg.icon
+                  return (
+                    <div key={entry.id} className="bg-white rounded-xl border border-gray-200 flex overflow-hidden hover:border-green-200 transition">
+                      {/* Icon column */}
+                      <div className={`w-14 flex-shrink-0 flex items-center justify-center ${cfg.bg}`}>
+                        <EntryIcon size={20} className={cfg.text} />
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cfg.badge}`}>
+                                {entry.type === 'vitals' ? 'Vitals' : (MEDICAL_TYPES.find(t => t.value === entry.type)?.label || 'Other')}
+                              </span>
+                              {entry.type === 'vitals' && vitalFlagged && (
+                                <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                                  <AlertTriangle size={10} /> Flagged
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-400 flex items-center gap-1">
+                                <Calendar size={11} />
+                                {formatDate(entry.recorded_at || entry.date)}
+                              </span>
+                            </div>
+                            <p className="mt-1.5 font-semibold text-gray-900 break-words text-sm">{entry.title}</p>
+                            {entry.type === 'vitals' && vitalFlagged && vitalReason && (
+                              <p className="mt-0.5 text-xs text-red-600">{vitalReason}</p>
+                            )}
+                            {entry.type === 'vitals' && vitalNotesBody ? (
+                              <p className="mt-0.5 text-xs text-gray-500 whitespace-pre-wrap break-words">{vitalNotesBody}</p>
+                            ) : entry.type !== 'vitals' && entry.notes ? (
+                              <p className="mt-0.5 text-xs text-gray-500 whitespace-pre-wrap break-words">{entry.notes}</p>
                             ) : null}
                           </div>
-                        ) : null}
-                        {entry.type === 'vitals' && vitalNotesBody ? (
-                          <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap break-words">{vitalNotesBody}</p>
-                        ) : entry.type !== 'vitals' && entry.notes ? (
-                          <p className="mt-1 text-sm text-gray-600 whitespace-pre-wrap break-words">{entry.notes}</p>
-                        ) : null}
+                          <button
+                            onClick={() => handleDeleteMedical(entry.id)}
+                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition flex-shrink-0"
+                            title="Delete entry"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteMedical(entry.id)}
-                        className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex-shrink-0"
-                        title="Delete entry"
-                      >
-                        <Trash2 size={16} />
-                      </button>
                     </div>
-                  </CardContent>
-                </Card>
-                )
-              })}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       )}
 
       {/* VITALS */}
       {activeTab === 'vitals' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
-            <Button variant="secondary" onClick={() => setShowVitalsModal(true)}>
-              <Plus size={16} />
-              Vitals entry
-            </Button>
-          </div>
+          {/* Latest readings summary */}
+          {vitalsEntries.length > 0 && (() => {
+            const lastTemp = [...vitalsEntries].filter(v => v.type === 'temperature').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0]
+            const lastHR = [...vitalsEntries].filter(v => v.type === 'heart_rate').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0]
+            const lastResp = [...vitalsEntries].filter(v => v.type === 'respiration_rate').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0]
+            const isTempOk = lastTemp && lastTemp.value >= 37.2 && lastTemp.value <= 38.6
+            const isHROk = lastHR && lastHR.value >= 28 && lastHR.value <= 44
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {lastTemp && (
+                  <div className={`rounded-xl border p-4 text-center ${isTempOk ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Temperature</p>
+                    <p className={`text-2xl font-black ${isTempOk ? 'text-green-700' : 'text-red-600'}`}>{lastTemp.value}<span className="text-sm font-semibold ml-0.5">°C</span></p>
+                    <p className="text-xs text-gray-400 mt-1">Normal: 37.2–38.6</p>
+                    <p className={`text-xs font-semibold mt-1 ${isTempOk ? 'text-green-600' : 'text-red-600'}`}>{isTempOk ? '✓ Normal' : '⚠ Abnormal'}</p>
+                  </div>
+                )}
+                {lastHR && (
+                  <div className={`rounded-xl border p-4 text-center ${isHROk ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Heart Rate</p>
+                    <p className={`text-2xl font-black ${isHROk ? 'text-green-700' : 'text-red-600'}`}>{lastHR.value}<span className="text-sm font-semibold ml-0.5">bpm</span></p>
+                    <p className="text-xs text-gray-400 mt-1">Normal: 28–44</p>
+                    <p className={`text-xs font-semibold mt-1 ${isHROk ? 'text-green-600' : 'text-red-600'}`}>{isHROk ? '✓ Normal' : '⚠ Abnormal'}</p>
+                  </div>
+                )}
+                {lastResp && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-center col-span-2 sm:col-span-1">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Respiration</p>
+                    <p className="text-2xl font-black text-blue-700">{lastResp.value}<span className="text-sm font-semibold ml-0.5">/min</span></p>
+                    <p className="text-xs text-gray-400 mt-1">Normal: 8–16</p>
+                    <p className={`text-xs font-semibold mt-1 ${lastResp.value >= 8 && lastResp.value <= 16 ? 'text-green-600' : 'text-red-600'}`}>
+                      {lastResp.value >= 8 && lastResp.value <= 16 ? '✓ Normal' : '⚠ Abnormal'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Add vitals CTA */}
+          <button
+            onClick={() => setShowVitalsModal(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-green-300 bg-green-50 py-4 text-sm font-semibold text-green-700 hover:bg-green-100 hover:border-green-400 transition"
+          >
+            <Plus size={18} />
+            Record vitals
+          </button>
+
           <VitalsTrendCard
             temperaturePoints={vitalTrendSeries.temperaturePoints}
             heartRatePoints={vitalTrendSeries.heartRatePoints}
@@ -1721,9 +1999,23 @@ export default function HorseDetails() {
       {/* REMINDERS */}
       {activeTab === 'reminders' && (
         <div className="space-y-4">
+          {/* Add reminder toggle button */}
+          <button
+            onClick={() => setShowAddReminderForm(v => !v)}
+            className={`w-full flex items-center justify-center gap-2 rounded-xl border-2 py-4 text-sm font-semibold transition ${
+              showAddReminderForm
+                ? 'border-green-400 bg-green-700 text-white'
+                : 'border-dashed border-green-300 bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-400'
+            }`}
+          >
+            <Plus size={18} className={showAddReminderForm ? 'rotate-45 transition-transform' : 'transition-transform'} />
+            {showAddReminderForm ? 'Cancel' : 'Add new reminder'}
+          </button>
+
+          {showAddReminderForm && (
           <Card>
             <CardContent className="p-6">
-              <h3 className="font-semibold text-gray-900">Horse health & maintenance reminders</h3>
+              <h3 className="font-semibold text-gray-900">New reminder</h3>
 
               <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
@@ -1941,61 +2233,101 @@ export default function HorseDetails() {
                 />
               </div>
               <div className="mt-4 flex justify-end">
-                <Button onClick={handleAddReminder} disabled={addingReminder}>
+                <Button onClick={() => { handleAddReminder(); setShowAddReminderForm(false) }} disabled={addingReminder}>
                   <Plus size={16} />
                   {addingReminder ? 'Adding…' : 'Add reminder'}
                 </Button>
               </div>
             </CardContent>
           </Card>
+          )}
 
           {upcomingReminders.length === 0 ? (
-            <EmptyState title="No upcoming reminders" description="Add one above to start tracking due dates." />
+            <EmptyState title="No reminders yet" description="Add your first reminder above to track due dates." />
           ) : (
             <div className="space-y-2">
-              {upcomingReminders.map(r => (
-                <div
-                  key={r.id}
-                  className={`bg-white rounded-xl border p-4 flex items-start justify-between gap-3 ${
-                    reminderUrgency(r.next_due_date).tone === 'red'
-                      ? 'border-red-300'
-                      : reminderUrgency(r.next_due_date).tone === 'amber'
-                      ? 'border-amber-300'
-                      : reminderUrgency(r.next_due_date).tone === 'yellow'
-                      ? 'border-yellow-300'
-                      : 'border-green-300'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 break-words">{reminderDisplayLabel(r)}</p>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      Last done {r.last_done_date ? formatDate(r.last_done_date) : 'Not set'} · Next due{' '}
-                      {new Date(r.next_due_date || r.due_date).toLocaleDateString('en-ZA', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      })}
-                    </p>
-                    <p className="text-xs mt-1 text-gray-500">{reminderUrgency(r.next_due_date).text}</p>
+              {upcomingReminders.map(r => {
+                const urg = reminderUrgency(r.next_due_date)
+                const RIcon = reminderTypeConfig(resolvedReminderType(r)).icon || Calendar
+                return (
+                  <div
+                    key={r.id}
+                    className={`bg-white rounded-xl border overflow-hidden flex items-stretch ${
+                      urg.tone === 'red' ? 'border-red-200' :
+                      urg.tone === 'amber' ? 'border-amber-200' :
+                      urg.tone === 'yellow' ? 'border-yellow-200' :
+                      'border-green-200'
+                    }`}
+                  >
+                    {/* Left accent */}
+                    <div className={`w-1.5 flex-shrink-0 ${
+                      urg.tone === 'red' ? 'bg-red-400' :
+                      urg.tone === 'amber' ? 'bg-amber-400' :
+                      urg.tone === 'yellow' ? 'bg-yellow-400' :
+                      'bg-green-400'
+                    }`} />
+                    {/* Icon column */}
+                    <div className={`w-12 flex-shrink-0 flex items-center justify-center ${
+                      urg.tone === 'red' ? 'bg-red-50' :
+                      urg.tone === 'amber' ? 'bg-amber-50' :
+                      urg.tone === 'yellow' ? 'bg-yellow-50' :
+                      'bg-green-50'
+                    }`}>
+                      <RIcon size={18} className={
+                        urg.tone === 'red' ? 'text-red-500' :
+                        urg.tone === 'amber' ? 'text-amber-500' :
+                        urg.tone === 'yellow' ? 'text-yellow-600' :
+                        'text-green-600'
+                      } />
+                    </div>
+                    {/* Content */}
+                    <div className="flex items-center gap-3 flex-1 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm break-words">{reminderDisplayLabel(r)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Last done: {r.last_done_date ? formatDate(r.last_done_date) : 'Not recorded'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Due {new Date(r.next_due_date || r.due_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                      {/* Countdown badge */}
+                      <div className={`flex-shrink-0 rounded-lg px-2.5 py-1.5 text-center min-w-[52px] ${
+                        urg.tone === 'red' ? 'bg-red-100 text-red-700' :
+                        urg.tone === 'amber' ? 'bg-amber-100 text-amber-700' :
+                        urg.tone === 'yellow' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>
+                        <p className="text-xs font-black leading-none">{urg.text.split(' ')[0]}</p>
+                        <p className="text-[9px] font-semibold leading-none mt-0.5 opacity-80">{urg.text.split(' ').slice(1).join(' ')}</p>
+                      </div>
+                      {/* Actions */}
+                      <div className="flex-shrink-0 flex flex-col gap-1">
+                        <button
+                          onClick={() => toggleReminderDone(r)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                            urg.tone === 'red' || urg.tone === 'amber'
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                          }`}
+                          title="Mark as done"
+                        >
+                          <CheckCircle2 size={13} />
+                          Done
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReminder(r.id)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                          title="Delete reminder"
+                        >
+                          <Trash2 size={13} />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => toggleReminderDone(r)}
-                      className="p-2 text-gray-400 hover:text-green-700 hover:bg-green-50 rounded-lg transition"
-                      title="Log as done"
-                    >
-                      <CheckCircle2 size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteReminder(r.id)}
-                      className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                      title="Delete reminder"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -2031,6 +2363,259 @@ export default function HorseDetails() {
           </Card>
         </div>
       )}
+
+      {/* VACCINATIONS */}
+      {activeTab === 'vaccinations' && (
+        <div className="space-y-5">
+          {/* Nationals eligibility summary */}
+          {(() => {
+            const fluR = upcomingReminders.find(r => r.reminder_type === 'flu_vaccination')
+            const ahsR = upcomingReminders.find(r => r.reminder_type === 'ahs_vaccination')
+            const fluDays = fluR ? dayDiff(todayISO(), fluR.next_due_date) : null
+            const ahsDays = ahsR ? dayDiff(todayISO(), ahsR.next_due_date) : null
+            const fluOk = Boolean(fluR?.is_primary_course_complete && fluDays !== null && fluDays > 7)
+            const ahsOk = Boolean(ahsR?.is_primary_course_complete && ahsDays !== null && ahsDays > 7)
+            const bothOk = fluOk && ahsOk
+            const neitherLogged = !fluR && !ahsR
+            return (
+              <div className={`rounded-2xl border p-5 ${bothOk ? 'bg-green-50 border-green-300' : neitherLogged ? 'bg-gray-50 border-gray-200' : 'bg-amber-50 border-amber-300'}`}>
+                <div className="flex items-center gap-4">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${bothOk ? 'bg-green-600' : neitherLogged ? 'bg-gray-300' : 'bg-amber-500'}`}>
+                    {bothOk
+                      ? <ShieldCheck size={28} className="text-white" />
+                      : <AlertTriangle size={28} className="text-white" />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-lg font-black ${bothOk ? 'text-green-800' : neitherLogged ? 'text-gray-600' : 'text-amber-800'}`}>
+                      {bothOk ? 'Vaccination eligible for nationals' : neitherLogged ? 'No vaccinations logged yet' : 'Not fully vaccination eligible'}
+                    </p>
+                    <p className={`text-sm mt-0.5 ${bothOk ? 'text-green-600' : neitherLogged ? 'text-gray-400' : 'text-amber-700'}`}>
+                      {bothOk
+                        ? `Flu: ${fluDays} days left · AHS: ${ahsDays} days left`
+                        : neitherLogged
+                        ? 'Log your flu and AHS vaccinations below'
+                        : [!fluOk && (fluR ? `Flu: ${fluDays !== null && fluDays <= 0 ? 'overdue' : fluDays === null ? 'no record' : 'primary incomplete'}` : 'Flu: not logged'), !ahsOk && (ahsR ? `AHS: ${ahsDays !== null && ahsDays <= 0 ? 'overdue' : ahsDays === null ? 'no record' : 'primary incomplete'}` : 'AHS: not logged')].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-gray-500">
+                  <div className="flex items-start gap-1.5"><CheckCircle2 size={13} className="text-gray-400 mt-0.5 flex-shrink-0" /><span>Primary course complete (Flu: V1+V2+V3 · AHS: V1+V2)</span></div>
+                  <div className="flex items-start gap-1.5"><CheckCircle2 size={13} className="text-gray-400 mt-0.5 flex-shrink-0" /><span>Annual booster within 365 days (366 in leap year)</span></div>
+                  <div className="flex items-start gap-1.5"><CheckCircle2 size={13} className="text-gray-400 mt-0.5 flex-shrink-0" /><span>No vaccination within 7 days before any competition</span></div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Flu + AHS cards side by side on larger screens */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* FLU VACCINATION CARD */}
+            {(() => {
+              const fluR = upcomingReminders.find(r => r.reminder_type === 'flu_vaccination')
+              const fluDays = fluR ? dayDiff(todayISO(), fluR.next_due_date) : null
+              const fluOk = Boolean(fluR?.is_primary_course_complete && fluDays !== null && fluDays > 7)
+              return (
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className={`px-5 py-4 flex items-center gap-3 ${fluOk ? 'bg-blue-600' : fluR ? 'bg-amber-500' : 'bg-gray-200'}`}>
+                    <Syringe size={20} className={fluR ? 'text-white' : 'text-gray-500'} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-bold text-sm ${fluR ? 'text-white' : 'text-gray-700'}`}>Equine Influenza (Flu)</p>
+                      {fluR && (
+                        <p className={`text-xs ${fluOk ? 'text-blue-100' : 'text-amber-100'}`}>
+                          Next booster: {new Date(fluR.next_due_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {fluDays !== null && ` · ${fluDays <= 0 ? `${Math.abs(fluDays)}d overdue` : `${fluDays}d left`}`}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 ${fluOk ? 'bg-white/20 text-white' : fluR ? 'bg-white/20 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                      {fluOk ? '✓ OK' : fluR ? '⚠ Action needed' : 'Not logged'}
+                    </span>
+                  </div>
+
+                  {/* History */}
+                  {fluHistory.length > 0 && (
+                    <div className="px-5 pt-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">History ({fluHistory.length} entries)</p>
+                      <div className="space-y-1.5">
+                        {fluHistory.slice(0, 3).map(row => (
+                          <div key={row.id} className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                            <span className="font-semibold text-gray-800">{row.dose_number ? `V${row.dose_number}` : 'Annual'}</span>
+                            <span className="text-gray-400">·</span>
+                            <span>{formatDate(row.date_administered)}</span>
+                            {row.vet_name && <><span className="text-gray-400">·</span><span className="text-gray-500 truncate">{row.vet_name}</span></>}
+                          </div>
+                        ))}
+                        {fluHistory.length > 3 && <p className="text-xs text-gray-400 text-center">+{fluHistory.length - 3} more</p>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Log form */}
+                  <div className="p-5 space-y-3">
+                    <p className="text-sm font-semibold text-gray-800">Log vaccination</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['v1_date','v2_date','v3_date'].map((key, i) => (
+                        <div key={key}>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">V{i+1} date</label>
+                          <Input type="date" value={vacFluForm[key]} onChange={e => setVacFluForm(f => ({ ...f, [key]: e.target.value }))} />
+                        </div>
+                      ))}
+                    </div>
+                    {vacFluForm.v1_date && vacFluForm.v2_date && (() => {
+                      const diff = dayDiff(vacFluForm.v1_date, vacFluForm.v2_date)
+                      return diff !== null && (diff < 21 || diff > 92) ? (
+                        <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={11} /> V2 must be 21–92 days after V1 (currently {diff} days)</p>
+                      ) : null
+                    })()}
+                    {vacFluForm.v2_date && vacFluForm.v3_date && (() => {
+                      const diff = dayDiff(vacFluForm.v2_date, vacFluForm.v3_date)
+                      return diff !== null && (diff < 150 || diff > 215) ? (
+                        <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={11} /> V3 must be 150–215 days after V2 (currently {diff} days)</p>
+                      ) : null
+                    })()}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Last annual booster</label>
+                        <Input type="date" value={vacFluForm.annual_last_date} onChange={e => setVacFluForm(f => ({ ...f, annual_last_date: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Vet name <span className="text-red-500">*</span></label>
+                        <Input value={vacFluForm.vet_name} onChange={e => setVacFluForm(f => ({ ...f, vet_name: e.target.value }))} placeholder="Registered vet" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Next competition (optional — checks 7-day blackout)</label>
+                      <Input type="date" value={vacFluForm.competition_date} onChange={e => setVacFluForm(f => ({ ...f, competition_date: e.target.value }))} />
+                    </div>
+                    {vacFluForm.annual_last_date && (
+                      <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800">
+                        <p className="font-semibold">Next annual booster due: {formatDate(annualDueDate(vacFluForm.annual_last_date))}</p>
+                        {vacFluForm.competition_date && (() => {
+                          const lastSafe = addDays(vacFluForm.competition_date, -7)
+                          const annualDue = annualDueDate(vacFluForm.annual_last_date)
+                          const conflict = annualDue && lastSafe && dayDiff(annualDue, lastSafe) < 0
+                          return conflict ? (
+                            <p className="mt-1 text-red-700 flex items-center gap-1"><AlertTriangle size={11} /> Booster due during blackout — vaccinate before {formatDate(lastSafe)}</p>
+                          ) : (
+                            <p className="mt-1 text-blue-600">Last safe vaccination date: {formatDate(lastSafe)}</p>
+                          )
+                        })()}
+                      </div>
+                    )}
+                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                      If gap exceeds 365 days (366 in leap year), the full primary course must be repeated.
+                    </div>
+                    <Button
+                      onClick={() => handleSaveVaccination('flu_vaccination', vacFluForm, setSavingVaccFlu)}
+                      disabled={savingVaccFlu}
+                      className="w-full"
+                    >
+                      <Syringe size={15} />
+                      {savingVaccFlu ? 'Saving…' : 'Save & set reminder'}
+                    </Button>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* AHS VACCINATION CARD */}
+            {(() => {
+              const ahsR = upcomingReminders.find(r => r.reminder_type === 'ahs_vaccination')
+              const ahsDays = ahsR ? dayDiff(todayISO(), ahsR.next_due_date) : null
+              const ahsOk = Boolean(ahsR?.is_primary_course_complete && ahsDays !== null && ahsDays > 7)
+              return (
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className={`px-5 py-4 flex items-center gap-3 ${ahsOk ? 'bg-green-600' : ahsR ? 'bg-amber-500' : 'bg-gray-200'}`}>
+                    <ShieldAlert size={20} className={ahsR ? 'text-white' : 'text-gray-500'} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-bold text-sm ${ahsR ? 'text-white' : 'text-gray-700'}`}>African Horse Sickness (AHS)</p>
+                      {ahsR && (
+                        <p className={`text-xs ${ahsOk ? 'text-green-100' : 'text-amber-100'}`}>
+                          Next booster: {new Date(ahsR.next_due_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {ahsDays !== null && ` · ${ahsDays <= 0 ? `${Math.abs(ahsDays)}d overdue` : `${ahsDays}d left`}`}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 ${ahsOk ? 'bg-white/20 text-white' : ahsR ? 'bg-white/20 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                      {ahsOk ? '✓ OK' : ahsR ? '⚠ Action needed' : 'Not logged'}
+                    </span>
+                  </div>
+
+                  {ahsHistory.length > 0 && (
+                    <div className="px-5 pt-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">History ({ahsHistory.length} entries)</p>
+                      <div className="space-y-1.5">
+                        {ahsHistory.slice(0, 3).map(row => (
+                          <div key={row.id} className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                            <span className="font-semibold text-gray-800">{row.dose_number ? `V${row.dose_number}` : 'Annual'}</span>
+                            <span className="text-gray-400">·</span>
+                            <span>{formatDate(row.date_administered)}</span>
+                            {row.vet_name && <><span className="text-gray-400">·</span><span className="text-gray-500 truncate">{row.vet_name}</span></>}
+                          </div>
+                        ))}
+                        {ahsHistory.length > 3 && <p className="text-xs text-gray-400 text-center">+{ahsHistory.length - 3} more</p>}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-5 space-y-3">
+                    <p className="text-sm font-semibold text-gray-800">Log vaccination</p>
+                    <p className="text-xs text-gray-500">AHS follows a 2-dose annual course (V1 + V2).</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['v1_date','v2_date'].map((key, i) => (
+                        <div key={key}>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">V{i+1} date</label>
+                          <Input type="date" value={vacAhsForm[key]} onChange={e => setVacAhsForm(f => ({ ...f, [key]: e.target.value }))} />
+                        </div>
+                      ))}
+                    </div>
+                    {vacAhsForm.v1_date && vacAhsForm.v2_date && (() => {
+                      const diff = dayDiff(vacAhsForm.v1_date, vacAhsForm.v2_date)
+                      return diff !== null && (diff < 21 || diff > 92) ? (
+                        <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={11} /> V2 must be 21–92 days after V1 (currently {diff} days)</p>
+                      ) : null
+                    })()}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Last annual booster</label>
+                        <Input type="date" value={vacAhsForm.annual_last_date} onChange={e => setVacAhsForm(f => ({ ...f, annual_last_date: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Vet name <span className="text-red-500">*</span></label>
+                        <Input value={vacAhsForm.vet_name} onChange={e => setVacAhsForm(f => ({ ...f, vet_name: e.target.value }))} placeholder="Registered vet" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Next competition (optional)</label>
+                      <Input type="date" value={vacAhsForm.competition_date} onChange={e => setVacAhsForm(f => ({ ...f, competition_date: e.target.value }))} />
+                    </div>
+                    {vacAhsForm.annual_last_date && (
+                      <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-xs text-green-800">
+                        <p className="font-semibold">Next annual booster due: {formatDate(annualDueDate(vacAhsForm.annual_last_date))}</p>
+                      </div>
+                    )}
+                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                      All vaccinations must be administered by a registered veterinarian.
+                    </div>
+                    <Button
+                      onClick={() => handleSaveVaccination('ahs_vaccination', vacAhsForm, setSavingVaccAhs)}
+                      disabled={savingVaccAhs}
+                      className="w-full"
+                    >
+                      <ShieldAlert size={15} />
+                      {savingVaccAhs ? 'Saving…' : 'Save & set reminder'}
+                    </Button>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
+        </div> {/* end tab panels */}
+      </div> {/* end sidebar + content flex */}
 
       {/* Delete horse confirm modal */}
       {showDeleteConfirm && (
@@ -2104,40 +2689,56 @@ export default function HorseDetails() {
       {/* Add medical modal */}
       {showMedicalModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
-            <div className="flex items-start justify-between gap-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Add medical entry</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Log vaccinations, deworming, farrier, vet visits, injuries, etc.
-                </p>
+                <p className="text-sm text-gray-500 mt-0.5">Log what happened for {horse.name}</p>
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => setShowMedicalModal(false)}
-                disabled={addingMedical}
-              >
-                Close
-              </Button>
+              <button onClick={() => setShowMedicalModal(false)} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-6 space-y-4">
+              {/* Type selector — icon buttons */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select
-                  value={medicalForm.type}
-                  onChange={e => setMedicalForm(f => ({ ...f, type: e.target.value }))}
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  {MEDICAL_TYPES.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'vaccination', label: 'Vaccination', icon: Syringe,       color: 'blue' },
+                    { value: 'deworming',   label: 'Deworming',   icon: Bug,            color: 'purple' },
+                    { value: 'farrier',     label: 'Farrier',     icon: Scissors,       color: 'orange' },
+                    { value: 'vet_visit',   label: 'Vet Visit',   icon: Activity,       color: 'teal' },
+                    { value: 'injury',      label: 'Injury',      icon: AlertTriangle,  color: 'red' },
+                    { value: 'other',       label: 'Other',       icon: Wrench,         color: 'gray' },
+                  ].map(({ value, label, icon: Icon, color }) => {
+                    const active = medicalForm.type === value
+                    const activeClasses = {
+                      blue:   'bg-blue-600 border-blue-600 text-white',
+                      purple: 'bg-purple-600 border-purple-600 text-white',
+                      orange: 'bg-orange-500 border-orange-500 text-white',
+                      teal:   'bg-teal-600 border-teal-600 text-white',
+                      red:    'bg-red-600 border-red-600 text-white',
+                      gray:   'bg-gray-600 border-gray-600 text-white',
+                    }
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => setMedicalForm(f => ({ ...f, type: value }))}
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 px-2 text-xs font-semibold transition ${active ? activeClasses[color] : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Title <span className="text-red-500">*</span>
-                </label>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title <span className="text-red-500">*</span></label>
                 <Input
                   value={medicalForm.title}
                   onChange={e => setMedicalForm(f => ({ ...f, title: e.target.value }))}
@@ -2147,33 +2748,22 @@ export default function HorseDetails() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="date"
-                  value={medicalForm.date}
-                  onChange={e => setMedicalForm(f => ({ ...f, date: e.target.value }))}
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date <span className="text-red-500">*</span></label>
+                <Input type="date" value={medicalForm.date} onChange={e => setMedicalForm(f => ({ ...f, date: e.target.value }))} />
               </div>
-              <div className="sm:col-span-2">
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <Textarea
                   value={medicalForm.notes}
                   onChange={e => setMedicalForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Optional details (dosage, vet name, observations, etc.)"
+                  placeholder="Dosage, vet name, observations..."
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setShowMedicalModal(false)}
-                disabled={addingMedical}
-              >
-                Cancel
-              </Button>
+            <div className="flex gap-3 justify-end px-6 pb-6">
+              <Button variant="secondary" onClick={() => setShowMedicalModal(false)} disabled={addingMedical}>Cancel</Button>
               <Button onClick={handleAddMedical} disabled={addingMedical}>
                 <Plus size={16} />
                 {addingMedical ? 'Adding…' : 'Add entry'}
@@ -2185,99 +2775,111 @@ export default function HorseDetails() {
 
       {showVitalsModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl p-6">
-            <div className="flex items-start justify-between gap-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Vitals entry</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Save a vital with automatic date and time.
-                </p>
+                <h3 className="text-lg font-bold text-gray-900">Record vitals</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Timestamp added automatically</p>
               </div>
-              <Button variant="secondary" onClick={() => setShowVitalsModal(false)} disabled={addingVital}>
-                Close
-              </Button>
+              <button onClick={() => setShowVitalsModal(false)} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Normal ranges</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-gray-700">
-                <p><span className="font-semibold">Temp:</span> 37.2-38.6 °C</p>
-                <p><span className="font-semibold">HR:</span> 28-44 bpm</p>
-                <p><span className="font-semibold">Resp:</span> 8-16 breaths/min</p>
+            <div className="p-6 space-y-4">
+              {/* Vital type selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">What are you recording?</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {VITAL_TYPES.map(type => {
+                    const active = vitalForm.vital_type === type.value
+                    const threshold = VITAL_THRESHOLDS[type.value]
+                    return (
+                      <button
+                        key={type.value}
+                        onClick={() => setVitalForm(f => ({ ...f, vital_type: type.value, value: '' }))}
+                        className={`flex flex-col items-start gap-0.5 rounded-xl border px-4 py-3 text-left transition ${active ? 'bg-green-700 border-green-700 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-green-300'}`}
+                      >
+                        <span className="text-sm font-semibold">{type.label}</span>
+                        {threshold && <span className={`text-xs ${active ? 'text-green-200' : 'text-gray-400'}`}>{threshold.min}–{threshold.max} {threshold.unit}</span>}
+                        {!threshold && <span className={`text-xs ${active ? 'text-green-200' : 'text-gray-400'}`}>Select value</span>}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-gray-200 bg-white p-4">
+              {/* Value input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Vital <span className="text-red-500">*</span>
+                  Value <span className="text-red-500">*</span>
+                  {VITAL_THRESHOLDS[vitalForm.vital_type] && (
+                    <span className="ml-2 font-normal text-gray-400 text-xs">Normal: {VITAL_THRESHOLDS[vitalForm.vital_type].min}–{VITAL_THRESHOLDS[vitalForm.vital_type].max} {VITAL_THRESHOLDS[vitalForm.vital_type].unit}</span>
+                  )}
                 </label>
-                <select
-                  value={vitalForm.vital_type}
-                  onChange={e => setVitalForm(f => ({ ...f, vital_type: e.target.value, value: '' }))}
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  {VITAL_TYPES.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {vitalForm.vital_type === 'gut_sounds' ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Value <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={vitalForm.gut_sounds}
-                    onChange={e => setVitalForm(f => ({ ...f, gut_sounds: e.target.value }))}
-                    className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  >
-                    {GUT_SOUND_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                {vitalForm.vital_type === 'gut_sounds' ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {GUT_SOUND_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setVitalForm(f => ({ ...f, gut_sounds: opt.value }))}
+                        className={`rounded-lg border py-2.5 text-sm font-medium transition ${vitalForm.gut_sounds === opt.value ? 'bg-green-700 border-green-700 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-green-300'}`}
+                      >
+                        {opt.label}
+                      </button>
                     ))}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Value <span className="text-red-500">*</span>
-                  </label>
+                  </div>
+                ) : (
                   <Input
                     value={vitalForm.value}
                     onChange={e => setVitalForm(f => ({ ...f, value: e.target.value }))}
-                    placeholder={`Enter value in ${VITAL_TYPES.find(t => t.value === vitalForm.vital_type)?.unit || ''}`}
+                    placeholder={`e.g. ${VITAL_THRESHOLDS[vitalForm.vital_type] ? (VITAL_THRESHOLDS[vitalForm.vital_type].min + VITAL_THRESHOLDS[vitalForm.vital_type].max) / 2 : ''} ${VITAL_TYPES.find(t => t.value === vitalForm.vital_type)?.unit || ''}`}
                     autoFocus
+                    type="number"
+                    step="0.1"
                   />
-                </div>
-              )}
+                )}
+                {/* Live range indicator */}
+                {vitalForm.value && VITAL_THRESHOLDS[vitalForm.vital_type] && (() => {
+                  const num = parseFloat(vitalForm.value)
+                  const thr = VITAL_THRESHOLDS[vitalForm.vital_type]
+                  if (Number.isNaN(num)) return null
+                  const ok = num >= thr.min && num <= thr.max
+                  return (
+                    <p className={`mt-1.5 text-xs font-semibold flex items-center gap-1 ${ok ? 'text-green-600' : 'text-red-600'}`}>
+                      {ok ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                      {ok ? 'Within normal range' : `Outside normal range (${thr.min}–${thr.max} ${thr.unit})`}
+                    </p>
+                  )
+                })()}
+              </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <Textarea
-                  value={vitalForm.notes}
-                  onChange={e => setVitalForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Optional observations"
-                />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                <Textarea value={vitalForm.notes} onChange={e => setVitalForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any observations..." />
               </div>
             </div>
 
-            <p className="mt-3 text-xs text-gray-500">
-              Date and time are added automatically when this entry is saved.
-            </p>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setShowVitalsModal(false)} disabled={addingVital}>
-                Cancel
-              </Button>
+            <div className="flex gap-3 justify-end px-6 pb-6">
+              <Button variant="secondary" onClick={() => setShowVitalsModal(false)} disabled={addingVital}>Cancel</Button>
               <Button onClick={handleAddVital} disabled={addingVital}>
-                <Plus size={16} />
+                <Heart size={15} />
                 {addingVital ? 'Saving…' : 'Save vitals'}
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm ?? (() => {})}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }

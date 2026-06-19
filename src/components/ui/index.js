@@ -1,4 +1,7 @@
 export * from './Badge'
+export * from './ConfirmDialog'
+export * from './Modal'
+export * from './Tabs'
 export * from './Button'
 export * from './Card'
 export * from './EmptyState'

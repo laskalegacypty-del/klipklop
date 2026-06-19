@@ -58,11 +58,37 @@ these environment variables (see `.env.example`):
 
 - `CF_ACCOUNT_ID` — Cloudflare account id
 - `CF_API_TOKEN` — Cloudflare API token with the **Workers AI** permission
-- `CF_MODEL` — optional, defaults to `@cf/meta/llama-3-8b-instruct`
+- `CF_MODEL` — optional, defaults to `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
 
-Set them in **Vercel → Project Settings → Environment Variables** for production.
-For local API testing run `vercel dev` (a plain `npm run dev` won't run the
-`/api` function — the assistant then falls back to offline rule lookups).
+Set them in **Vercel → Project Settings → Environment Variables** for production
+**after** local Layer 2 testing passes (do not redeploy until the Assistant
+lazy-load fix is on the branch you deploy).
+
+### Local Layer 2 testing (full AI + API)
+
+A plain `npm run dev` won't run `/api` — the assistant falls back to offline
+rule lookups only. For the full stack locally:
+
+```bash
+# Terminal 1 (or single command):
+npm run dev:layer2
+```
+
+This starts a local API server on port 3001 and Vite on port 5173 (Vite proxies
+`/api` to the local server). Sign in, open **Assistant**, and ask questions.
+
+Automated smoke tests (API server must be running):
+
+```bash
+npm run dev:api          # terminal 1
+npm run test:layer2      # terminal 2
+```
+
+Alternatively, after `npx vercel login`, run `npx vercel dev` for the official
+Vercel dev server (same env vars in `.env`).
+
+> **Model note:** `@cf/meta/llama-3-8b-instruct` was deprecated 2026-05-30. The
+> proxy now defaults to `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (free tier).
 
 > Security: never prefix the token with `VITE_` and never commit it. If a token
 > has been shared anywhere (chat, screenshots, etc.), rotate it in the Cloudflare

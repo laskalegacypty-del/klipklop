@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/layout/Layout'
@@ -7,6 +7,7 @@ import Layout from './components/layout/Layout'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Landing from './pages/Landing'
+import ShareTimes from './pages/ShareTimes'
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -28,8 +29,17 @@ import Matrix from './pages/user/Matrix'
 import SupporterRiders from './pages/user/SupporterRiders'
 import ClubRiders from './pages/user/ClubRiders'
 import FriendsLeaderboard from './pages/user/FriendsLeaderboard'
-import Assistant from './pages/user/Assistant'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
+
+const Assistant = lazy(() => import('./pages/user/Assistant'))
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center">
+      <div className="text-gray-500">Loading...</div>
+    </div>
+  )
+}
 
 function ProtectedRoute({ children }) {
   const { user, profile, loading, profileLoaded, signOut } = useAuth()
@@ -110,6 +120,7 @@ export default function App() {
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/share/:token" element={<ShareTimes />} />
         <Route path="/pending" element={
           <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
             <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">
@@ -185,7 +196,11 @@ export default function App() {
           <ProtectedRoute><FriendsLeaderboard /></ProtectedRoute>
         } />
         <Route path="/assistant" element={
-          <ProtectedRoute><Assistant /></ProtectedRoute>
+          <ProtectedRoute>
+            <Suspense fallback={<RouteFallback />}>
+              <Assistant />
+            </Suspense>
+          </ProtectedRoute>
         } />
 
         {/* Admin routes */}

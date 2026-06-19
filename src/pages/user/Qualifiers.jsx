@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { QUALIFIER_GAMES, PROVINCES } from '../../lib/constants'
-import { uploadVideoToBucket, UploadValidationError } from '../../lib/storageUploads'
-import { Card, CardContent, PageHeader, Skeleton } from '../../components/ui'
+import { QUALIFIER_GAMES } from '../../lib/constants'
+import { Card, CardContent, ConfirmDialog, EmptyState, PageHeader, Skeleton } from '../../components/ui'
 import {
   Calendar,
   MapPin,
@@ -18,8 +17,7 @@ import {
   Tag,
   StickyNote,
   CalendarDays,
-  Search,
-  Trash2
+  Search
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -72,105 +70,12 @@ const EVENT_TYPE_COLORS = {
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
-function QualifierDetailModal({ event, bookmarks, onToggleBookmark, onClose, profileId }) {
-  const [videos, setVideos] = useState([])
-  const [videoTitle, setVideoTitle] = useState('')
-  const [videoFile, setVideoFile] = useState(null)
-  const [uploadingVideo, setUploadingVideo] = useState(false)
-  const [videoProgress, setVideoProgress] = useState(0)
-  const [videoError, setVideoError] = useState('')
-  const videoInputRef = useRef(null)
+function QualifierDetailModal({ event, bookmarks, onToggleBookmark, onClose }) {
   if (!event) return null
   const isBookmarked = bookmarks.includes(event.id)
   const games = event.qualifier_number ? QUALIFIER_GAMES[event.qualifier_number] : null
   const status = getEventStatus(event.date)
   const typeColor = EVENT_TYPE_COLORS[event.event_type] || 'bg-gray-600'
-
-  useEffect(() => {
-    if (!event?.id || !profileId) return
-    fetchVideos()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [event?.id, profileId])
-
-  async function fetchVideos() {
-    const { data, error } = await supabase
-      .from('horse_videos')
-      .select('*')
-      .eq('qualifier_id', event.id)
-      .eq('user_id', profileId)
-      .order('created_at', { ascending: false })
-    if (error) {
-      setVideoError('Could not load videos for this qualifier.')
-      return
-    }
-    setVideos(data || [])
-  }
-
-  async function handleUploadVideo() {
-    if (!videoFile) {
-      setVideoError('Please choose a video file first.')
-      return
-    }
-    if (!videoTitle.trim()) {
-      setVideoError('Please enter a video title.')
-      return
-    }
-
-    setVideoError('')
-    setUploadingVideo(true)
-    setVideoProgress(0)
-
-    try {
-      const extension = videoFile.type === 'video/quicktime' ? 'mov' : 'mp4'
-      const path = `${profileId}/qualifiers/${event.id}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`
-      const { publicUrl } = await uploadVideoToBucket({
-        bucket: 'videos',
-        path,
-        file: videoFile,
-        onProgress: setVideoProgress,
-      })
-
-      const { error } = await supabase.from('horse_videos').insert({
-        user_id: profileId,
-        horse_id: null,
-        qualifier_id: event.id,
-        video_url: publicUrl,
-        title: videoTitle.trim(),
-      })
-      if (error) throw error
-
-      setVideoTitle('')
-      setVideoFile(null)
-      if (videoInputRef.current) videoInputRef.current.value = ''
-      setVideoProgress(0)
-      toast.success('Video uploaded')
-      await fetchVideos()
-    } catch (error) {
-      const message =
-        error instanceof UploadValidationError
-          ? error.message
-          : error?.message || 'Could not upload video.'
-      setVideoError(message)
-      toast.error(message)
-    } finally {
-      setUploadingVideo(false)
-    }
-  }
-
-  async function handleDeleteVideo(videoId) {
-    if (!confirm('Delete this video?')) return
-    const { error } = await supabase
-      .from('horse_videos')
-      .delete()
-      .eq('id', videoId)
-      .eq('user_id', profileId)
-    if (error) {
-      toast.error('Could not delete video')
-      return
-    }
-    toast.success('Video deleted')
-    await fetchVideos()
-  }
 
   return (
     <div
@@ -297,70 +202,6 @@ function QualifierDetailModal({ event, bookmarks, onToggleBookmark, onClose, pro
             </div>
           )}
 
-          <div className="space-y-3">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Videos</p>
-            <div className="grid grid-cols-1 gap-2">
-              <input
-                type="text"
-                value={videoTitle}
-                onChange={e => setVideoTitle(e.target.value)}
-                placeholder="Video title"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800"
-                disabled={uploadingVideo}
-              />
-              <input
-                ref={videoInputRef}
-                type="file"
-                accept="video/mp4,video/quicktime,.mp4,.mov"
-                onChange={e => {
-                  const file = e.target.files?.[0] || null
-                  setVideoFile(file)
-                  if (file && !videoTitle.trim()) setVideoTitle(file.name.replace(/\.[^.]+$/, ''))
-                }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600"
-                disabled={uploadingVideo}
-              />
-              <button
-                onClick={handleUploadVideo}
-                disabled={uploadingVideo}
-                className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-100 disabled:opacity-60"
-              >
-                {uploadingVideo ? 'Uploading video…' : 'Attach video'}
-              </button>
-            </div>
-            {uploadingVideo && (
-              <div className="space-y-1">
-                <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
-                  <div className="h-full bg-green-600" style={{ width: `${videoProgress}%` }} />
-                </div>
-                <p className="text-xs text-gray-500">{videoProgress}% uploaded</p>
-              </div>
-            )}
-            {videoError && <p className="text-sm text-red-600">{videoError}</p>}
-            {videoFile && <p className="text-xs text-gray-500">Selected file: {videoFile.name}</p>}
-            {videos.length > 0 ? (
-              <div className="space-y-3">
-                {videos.map(video => (
-                  <div key={video.id} className="rounded-lg border border-gray-200 p-2">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-gray-800">{video.title}</p>
-                      <button
-                        onClick={() => handleDeleteVideo(video.id)}
-                        className="p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
-                        title="Delete video"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <video src={video.video_url} controls preload="metadata" className="w-full rounded-md bg-black" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">No videos attached to this qualifier yet.</p>
-            )}
-          </div>
-
           {/* Divider */}
           <div className="border-t border-gray-100" />
 
@@ -378,6 +219,7 @@ function QualifierDetailModal({ event, bookmarks, onToggleBookmark, onClose, pro
           </button>
         </div>
       </div>
+
     </div>
   )
 }
@@ -471,6 +313,7 @@ export default function Qualifiers() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [bookmarks, setBookmarks] = useState([])
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null })
   const [combos, setCombos] = useState([])
   const [selectedBookmarkEvent, setSelectedBookmarkEvent] = useState(null)
   const [selectedBookmarkComboId, setSelectedBookmarkComboId] = useState('')
@@ -480,6 +323,8 @@ export default function Qualifiers() {
   const [searchQuery, setSearchQuery] = useState('')
   const [listYearFilter, setListYearFilter] = useState(String(currentYear))
   const [listTimingFilter, setListTimingFilter] = useState('upcoming')
+  const [calProvinceFilter, setCalProvinceFilter] = useState('')
+  const [calTypeFilter, setCalTypeFilter] = useState('')
 
   // Calendar navigation state — start at current month
   const today = new Date()
@@ -625,8 +470,16 @@ export default function Qualifiers() {
   // ── Events for calendar month ──
   const grid = getMonthGrid(calendarYear, calendarMonth)
 
+  // ── Calendar filters ──
+  const calProvinces = Array.from(new Set(events.map(e => e.province).filter(Boolean))).sort()
+  const calFilteredEvents = events.filter(e => {
+    if (calProvinceFilter && e.province !== calProvinceFilter) return false
+    if (calTypeFilter && e.event_type !== calTypeFilter) return false
+    return true
+  })
+
   function eventsOnDay(date) {
-    return events.filter(e => isSameDay(new Date(e.date), date))
+    return calFilteredEvents.filter(e => isSameDay(new Date(e.date), date))
   }
 
   // ── List view: all events sorted ──
@@ -688,6 +541,12 @@ export default function Qualifiers() {
   })
   const groupedListEvents = groupByMonth(listEvents)
 
+  const upcomingCount = events.filter(e => new Date(e.date) >= todayStart).length
+  const nextEvent = events.find(e => new Date(e.date) >= todayStart)
+  const nextEventDays = nextEvent
+    ? Math.ceil((new Date(nextEvent.date) - todayStart) / 86400000)
+    : null
+
   return (
     <div className="space-y-5" data-tour="qualifiers-view">
 
@@ -743,8 +602,27 @@ export default function Qualifiers() {
         }
       />
 
+      {/* Quick stats strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 fade-up fade-up-1">
+        {[
+          { label: 'Total events', value: events.length, color: 'text-gray-800' },
+          { label: 'Upcoming', value: upcomingCount, color: 'text-green-700' },
+          { label: 'Saved', value: bookmarks.length, color: 'text-purple-700' },
+          {
+            label: nextEvent ? `Next: ${nextEvent.venue}` : 'Next event',
+            value: nextEventDays === null ? '—' : nextEventDays === 0 ? 'Today!' : `${nextEventDays}d`,
+            color: nextEventDays !== null && nextEventDays <= 7 ? 'text-orange-600' : 'text-blue-700',
+          },
+        ].map(stat => (
+          <div key={stat.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
+            <p className={`text-2xl font-bold leading-none ${stat.color}`}>{stat.value}</p>
+            <p className="text-xs text-gray-400 mt-1 truncate">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Search bar */}
-      <div className="relative">
+      <div className="relative fade-up fade-up-2">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
         <input
           type="text"
@@ -765,7 +643,7 @@ export default function Qualifiers() {
 
       {/* ── CALENDAR VIEW ─────────────────────────────────────────── */}
       {viewMode === 'calendar' && (
-        <div className="space-y-4">
+        <div className="space-y-4 fade-up fade-up-3">
 
           {/* ── SEARCH RESULTS (all events, above calendar) ── */}
           {searchQuery.trim() && (
@@ -814,6 +692,69 @@ export default function Qualifiers() {
               <ChevronRight size={20} />
             </button>
           </div>
+
+          {/* Calendar filters */}
+          {(() => {
+            const activeCount = (calProvinceFilter ? 1 : 0) + (calTypeFilter ? 1 : 0)
+            return (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Province */}
+                <div className="relative">
+                  <select
+                    value={calProvinceFilter}
+                    onChange={e => setCalProvinceFilter(e.target.value)}
+                    className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white transition ${
+                      calProvinceFilter
+                        ? 'border-green-400 text-green-700 font-medium'
+                        : 'border-gray-300 text-gray-600'
+                    }`}
+                  >
+                    <option value="">All provinces</option>
+                    {calProvinces.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+
+                {/* Event type */}
+                <div className="relative">
+                  <select
+                    value={calTypeFilter}
+                    onChange={e => setCalTypeFilter(e.target.value)}
+                    className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white transition ${
+                      calTypeFilter
+                        ? 'border-green-400 text-green-700 font-medium'
+                        : 'border-gray-300 text-gray-600'
+                    }`}
+                  >
+                    <option value="">All event types</option>
+                    {Object.keys(EVENT_TYPE_COLORS).map(t => (
+                      <option key={t} value={t} className="capitalize">{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+
+                {/* Clear */}
+                {activeCount > 0 && (
+                  <button
+                    onClick={() => { setCalProvinceFilter(''); setCalTypeFilter('') }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition"
+                  >
+                    <X size={12} />
+                    Clear {activeCount} filter{activeCount > 1 ? 's' : ''}
+                  </button>
+                )}
+
+                {activeCount > 0 && (
+                  <span className="ml-auto text-xs text-gray-400">
+                    {calFilteredEvents.length} of {events.length} events shown
+                  </span>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Calendar grid */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
@@ -906,7 +847,7 @@ export default function Qualifiers() {
 
           {/* Events this month — only shown when NOT searching */}
           {!searchQuery.trim() && (() => {
-            const monthEvents = events.filter(e => {
+            const monthEvents = calFilteredEvents.filter(e => {
               const d = new Date(e.date)
               return d.getFullYear() === calendarYear && d.getMonth() === calendarMonth
             })
@@ -937,7 +878,7 @@ export default function Qualifiers() {
 
       {/* ── LIST VIEW ─────────────────────────────────────────────── */}
       {viewMode === 'list' && (
-        <div className="space-y-8">
+        <div className="space-y-8 fade-up fade-up-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <p className="text-sm text-gray-500">
               Showing <span className="font-semibold text-gray-700">{listTimingFilter}</span> qualifiers for <span className="font-semibold text-gray-700">{listYearFilter}</span>
@@ -1040,7 +981,7 @@ export default function Qualifiers() {
         })
 
         return (
-          <div className="space-y-8">
+          <div className="space-y-8 fade-up fade-up-3">
             <div className="flex items-center gap-2 px-1">
               <BookmarkCheck size={16} className="text-green-600" />
               <span className="text-sm font-semibold text-gray-600">
@@ -1076,7 +1017,6 @@ export default function Qualifiers() {
           bookmarks={bookmarks}
           onToggleBookmark={handleBookmarkAction}
           onClose={() => setSelectedEvent(null)}
-          profileId={profile?.id}
         />
       )}
       {selectedBookmarkEvent && (
@@ -1126,6 +1066,16 @@ export default function Qualifiers() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm ?? (() => {})}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }

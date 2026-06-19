@@ -19,7 +19,11 @@ import {
   Trophy,
   Users,
   X,
-  Star
+  Star,
+  HeartPulse,
+  BarChart2,
+  MessageCircle,
+  Table2
 } from 'lucide-react'
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -345,7 +349,7 @@ function AnnouncementsDrawer({ announcements, open, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-500"
+            className="p-2.5 rounded-lg hover:bg-gray-100 transition text-gray-500 min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <X size={16} />
           </button>
@@ -412,54 +416,66 @@ function EligibilityCard({ combo, province }) {
   // Colour theme based on criteria met (0 → red-orange, 1 → orange, 2 → amber, 3 → green)
   const theme = allMet
     ? {
-        card:    'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300',
-        header:  'text-green-800',
-        sub:     'text-green-600',
-        icon:    'text-green-500',
-        bar:     'bg-green-500',
-        barBg:   'bg-green-100',
-        row:     'text-green-700',
-        rowBg:   'bg-green-100/60',
-        link:    'text-green-700 hover:text-green-900',
-        badge:   'bg-green-600 text-white',
+        card:       'bg-gradient-to-br from-green-50 to-emerald-50 border-green-300',
+        header:     'text-green-800',
+        sub:        'text-green-600',
+        icon:       'text-green-500',
+        bar:        'bg-green-500',
+        barBg:      'bg-green-100',
+        row:        'text-green-700',
+        rowBg:      'bg-green-100/60',
+        link:       'text-green-700 hover:text-green-900',
+        badge:      'bg-green-600 text-white',
+        ringStroke: '#22c55e',
+        ringTrack:  '#dcfce7',
+        ringText:   '#166534',
       }
     : criteriaMet === 2
     ? {
-        card:    'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300',
-        header:  'text-amber-800',
-        sub:     'text-amber-600',
-        icon:    'text-amber-500',
-        bar:     'bg-amber-400',
-        barBg:   'bg-amber-100',
-        row:     'text-amber-700',
-        rowBg:   'bg-amber-100/60',
-        link:    'text-amber-700 hover:text-amber-900',
-        badge:   'bg-amber-500 text-white',
+        card:       'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300',
+        header:     'text-amber-800',
+        sub:        'text-amber-600',
+        icon:       'text-amber-500',
+        bar:        'bg-amber-400',
+        barBg:      'bg-amber-100',
+        row:        'text-amber-700',
+        rowBg:      'bg-amber-100/60',
+        link:       'text-amber-700 hover:text-amber-900',
+        badge:      'bg-amber-500 text-white',
+        ringStroke: '#f59e0b',
+        ringTrack:  '#fef3c7',
+        ringText:   '#92400e',
       }
     : criteriaMet === 1
     ? {
-        card:    'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-300',
-        header:  'text-orange-800',
-        sub:     'text-orange-600',
-        icon:    'text-orange-500',
-        bar:     'bg-orange-500',
-        barBg:   'bg-orange-100',
-        row:     'text-orange-700',
-        rowBg:   'bg-orange-100/60',
-        link:    'text-orange-700 hover:text-orange-900',
-        badge:   'bg-orange-500 text-white',
+        card:       'bg-gradient-to-br from-orange-50 to-amber-50 border-orange-300',
+        header:     'text-orange-800',
+        sub:        'text-orange-600',
+        icon:       'text-orange-500',
+        bar:        'bg-orange-500',
+        barBg:      'bg-orange-100',
+        row:        'text-orange-700',
+        rowBg:      'bg-orange-100/60',
+        link:       'text-orange-700 hover:text-orange-900',
+        badge:      'bg-orange-500 text-white',
+        ringStroke: '#f97316',
+        ringTrack:  '#ffedd5',
+        ringText:   '#9a3412',
       }
     : {
-        card:    'bg-gradient-to-br from-red-50 to-orange-50 border-red-300',
-        header:  'text-red-800',
-        sub:     'text-red-500',
-        icon:    'text-red-400',
-        bar:     'bg-red-400',
-        barBg:   'bg-red-100',
-        row:     'text-red-700',
-        rowBg:   'bg-red-100/60',
-        link:    'text-red-700 hover:text-red-900',
-        badge:   'bg-red-500 text-white',
+        card:       'bg-gradient-to-br from-red-50 to-orange-50 border-red-300',
+        header:     'text-red-800',
+        sub:        'text-red-500',
+        icon:       'text-red-400',
+        bar:        'bg-red-400',
+        barBg:      'bg-red-100',
+        row:        'text-red-700',
+        rowBg:      'bg-red-100/60',
+        link:       'text-red-700 hover:text-red-900',
+        badge:      'bg-red-500 text-white',
+        ringStroke: '#ef4444',
+        ringTrack:  '#fee2e2',
+        ringText:   '#991b1b',
       }
 
   const hasAnyProgress =
@@ -523,19 +539,43 @@ function EligibilityCard({ combo, province }) {
         </span>
       </div>
 
-      {/* Overall progress bar */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1">
-          <span className={`text-[11px] font-semibold uppercase tracking-wide ${theme.sub}`}>
-            Overall progress
-          </span>
-          <span className={`text-[11px] font-bold ${theme.header}`}>{criteriaMet}/3 criteria met</span>
+      {/* Progress ring */}
+      <div className="flex items-center gap-4 mb-4">
+        <div className="flex-shrink-0">
+          <svg width="68" height="68" viewBox="0 0 68 68" aria-label={`${criteriaMet} of 3 criteria met`}>
+            <circle cx="34" cy="34" r="27" fill="none" stroke={theme.ringTrack} strokeWidth="5.5" />
+            <circle
+              cx="34" cy="34" r="27"
+              fill="none"
+              stroke={theme.ringStroke}
+              strokeWidth="5.5"
+              strokeDasharray="169.6"
+              strokeDashoffset={169.6 * (1 - criteriaMet / 3)}
+              strokeLinecap="round"
+              transform="rotate(-90 34 34)"
+              style={{ transition: 'stroke-dashoffset 0.7s ease' }}
+            />
+            <text x="34" y="39" textAnchor="middle" fontSize="14" fontWeight="700" fill={theme.ringText}>
+              {criteriaMet}/3
+            </text>
+          </svg>
         </div>
-        <div className={`h-2 rounded-full ${theme.barBg}`}>
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${theme.bar}`}
-            style={{ width: `${(criteriaMet / 3) * 100}%` }}
-          />
+        <div className="flex-1 min-w-0">
+          <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 ${theme.sub}`}>
+            Overall progress
+          </p>
+          <div className="space-y-1.5">
+            {criteria.map((c, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                {c.met
+                  ? <CheckCircle2 size={12} className="text-green-500 flex-shrink-0" />
+                  : <XCircle size={12} className={`${theme.icon} flex-shrink-0`} />
+                }
+                <span className={`text-xs ${theme.row} truncate`}>{c.label}</span>
+                <span className={`text-xs font-bold ${theme.header} ml-auto flex-shrink-0 pl-2`}>{c.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -543,7 +583,7 @@ function EligibilityCard({ combo, province }) {
       <div className="space-y-2 mb-4">
         {criteria.map((c, i) => (
           <div key={i} className={`rounded-xl px-3 py-2.5 ${theme.rowBg}`}>
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-1.5 gap-0.5">
               <div className="flex items-center gap-1.5">
                 {c.met
                   ? <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
@@ -551,7 +591,7 @@ function EligibilityCard({ combo, province }) {
                 }
                 <span className={`text-xs font-medium ${theme.row}`}>{c.label}</span>
               </div>
-              <span className={`text-xs font-bold ${theme.header}`}>{c.detail}</span>
+              <span className={`text-xs font-bold ${theme.header} sm:ml-0 ml-5`}>{c.detail}</span>
             </div>
             <div className={`h-1.5 rounded-full ${theme.barBg}`}>
               <div
@@ -636,7 +676,7 @@ function HorseCard({ combo, riderName }) {
         {/* Qualifiers attended */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Qualifiers attended</span>
+            <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Qualifiers attended</span>
             <span className="text-xs font-bold text-gray-700">{combo.qualifiersAttended}</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -652,7 +692,7 @@ function HorseCard({ combo, riderName }) {
         {/* Games covered */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-gray-500 font-medium uppercase tracking-wide">Games covered</span>
+            <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Games covered</span>
             <span className="text-xs font-bold text-gray-700">{combo.gamesCovered}<span className="font-normal text-gray-400">/13</span></span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -1025,19 +1065,50 @@ export default function Dashboard() {
     return 'Rider'
   }
 
+  function getWelcomeDescription() {
+    const n = linkedRiderSummaries.length
+    const s = n === 1 ? '' : 's'
+    if (isSupporter) return `Tracking ${n} rider${s}.`
+    if (isClubHead) return `Managing ${n} club member${s}.`
+    if (!primaryCombo) return 'Start by adding your first horse on your profile.'
+    if (!isEligibilityAtRisk) return "You're nationals eligible — keep it up!"
+    const missing = 3 - [
+      primaryCombo.qualifiersAttended >= 2,
+      primaryCombo.gamesCovered >= 11,
+      primaryCombo.provinceQualifiers >= 2,
+    ].filter(Boolean).length
+    return `You have ${missing} criterion${missing === 1 ? '' : 'a'} still to meet for nationals.`
+  }
+
+  const quickActions = isSupporter
+    ? [
+        { label: 'My Riders',  icon: UserSearch, to: '/my-riders' },
+        { label: 'Qualifiers', icon: Calendar,   to: '/qualifiers' },
+        { label: 'Matrix',     icon: Table2,     to: '/matrix' },
+        { label: 'Assistant',  icon: MessageCircle, to: '/assistant' },
+      ]
+    : isClubHead
+    ? [
+        { label: 'My Riders',  icon: Users,     to: '/my-club-riders' },
+        { label: 'Qualifiers', icon: Calendar,  to: '/qualifiers' },
+        { label: 'Tracker',    icon: BarChart2, to: '/tracker' },
+        { label: 'Rankings',   icon: Trophy,    to: '/friends-leaderboard' },
+      ]
+    : [
+        { label: 'My Times',   icon: Clock,      to: '/my-times' },
+        { label: 'Qualifiers', icon: Calendar,   to: '/qualifiers' },
+        { label: 'Horses',     icon: HeartPulse, to: '/horses' },
+        { label: 'Rankings',   icon: Trophy,     to: '/friends-leaderboard' },
+      ]
+
   return (
     <div className="space-y-6">
 
       {/* Welcome header + Announcements toggle button */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 fade-up fade-up-1">
         <PageHeader
           title={`Welcome back, ${profile?.rider_name?.split(' ')[0] || getRoleLabel()}!`}
-          description={new Date().toLocaleDateString('en-ZA', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })}
+          description={getWelcomeDescription()}
         />
 
         {/* Announcements toggle */}
@@ -1063,8 +1134,76 @@ export default function Dashboard() {
         onClose={() => setAnnouncementsOpen(false)}
       />
 
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 fade-up fade-up-2">
+        {quickActions.map(({ label, icon: Icon, to }) => (
+          <Link
+            key={to}
+            to={to}
+            className="flex flex-col items-center gap-2 rounded-2xl border border-gray-200 bg-white p-4 text-center hover:border-green-300 hover:bg-green-50 transition shadow-sm"
+          >
+            <Icon size={22} className="text-green-700" />
+            <span className="text-xs font-semibold text-gray-700">{label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Next qualifier countdown */}
+      {upcomingEvents.length > 0 && (() => {
+        const next = upcomingEvents[0]
+        const days = Math.ceil(
+          (new Date(next.date + 'T00:00:00') - new Date(new Date().toDateString())) / (1000 * 60 * 60 * 24)
+        )
+        return (
+          <div className="flex items-center gap-2.5 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-800 fade-up fade-up-3">
+            <Calendar size={15} className="text-green-600 flex-shrink-0" />
+            <span>
+              {days === 0
+                ? <><strong>Today:</strong> {next.venue}, {next.province}</>
+                : days === 1
+                ? <>Next qualifier <strong>tomorrow</strong> — {next.venue}, {next.province}</>
+                : <>Next qualifier in <strong>{days} days</strong> — {next.venue}, {next.province}</>
+              }
+            </span>
+          </div>
+        )
+      })()}
+
+      {/* Stat cards */}
+      {(() => {
+        const nextDays = upcomingEvents.length > 0
+          ? Math.ceil((new Date(upcomingEvents[0].date + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000)
+          : null
+
+        const cards = showRiderStats
+          ? [
+              { label: 'Qualifiers',    value: primaryCombo?.qualifiersAttended ?? '—',                                                           sub: 'attended this season', color: 'text-green-700'  },
+              { label: 'Games covered', value: primaryCombo?.gamesCovered != null ? `${primaryCombo.gamesCovered}/13` : '—',                      sub: 'need 11 or more',      color: 'text-blue-700'   },
+              { label: 'Days to next',  value: nextDays ?? '—',                                                                                    sub: 'qualifier',            color: nextDays != null && nextDays <= 7 ? 'text-orange-600' : 'text-gray-700' },
+              { label: 'Level',         value: primaryCombo ? `L${primaryCombo.current_level ?? 0}` : '—',                                        sub: 'current level',        color: 'text-purple-700' },
+            ]
+          : [
+              { label: 'Riders',        value: linkedRiderSummaries.length || '—',                                                                 sub: isClubHead ? 'in your club' : 'tracked',  color: 'text-green-700'  },
+              { label: 'Qualifiers',    value: linkedRiderSummaries.length ? linkedRiderSummaries.reduce((s,r) => s + (r.qualifiersAttended||0), 0) : '—', sub: 'total this season',  color: 'text-blue-700'   },
+              { label: 'Avg games',     value: linkedRiderSummaries.length ? Math.round(linkedRiderSummaries.reduce((s,r) => s + (r.gamesCovered||0), 0) / linkedRiderSummaries.length) : '—', sub: 'per rider', color: 'text-orange-600' },
+              { label: 'Days to next',  value: nextDays ?? '—',                                                                                    sub: 'qualifier',            color: nextDays != null && nextDays <= 7 ? 'text-red-600' : 'text-gray-700' },
+            ]
+
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 fade-up fade-up-4">
+            {cards.map(({ label, value, sub, color }) => (
+              <div key={label} className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+                <p className={`text-2xl font-bold leading-none ${color}`}>{value}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{sub}</p>
+                <p className="text-[10px] font-semibold text-gray-400 mt-2 uppercase tracking-widest">{label}</p>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       {showRiderStats && pendingClubInvite && (
-        <Card className="border-yellow-200 bg-yellow-50/80 shadow-sm">
+        <Card className="border-yellow-200 bg-yellow-50/80 shadow-sm fade-up fade-up-5">
           <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full overflow-hidden border border-yellow-200 bg-yellow-100 flex items-center justify-center flex-shrink-0">
@@ -1102,7 +1241,7 @@ export default function Dashboard() {
 
       {/* === SUPPORTER VIEW === */}
       {isSupporter && (
-        <div>
+        <div className="fade-up fade-up-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Users size={18} className="text-gray-400" />
@@ -1182,7 +1321,7 @@ export default function Dashboard() {
 
       {/* === CLUB HEAD VIEW === */}
       {isClubHead && (
-        <div>
+        <div className="fade-up fade-up-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Users size={18} className="text-gray-400" />
@@ -1262,7 +1401,7 @@ export default function Dashboard() {
 
       {/* === RIDER VIEW === */}
       {showRiderStats && (
-        <>
+        <div className="space-y-6 fade-up fade-up-5">
           {/* Eligibility card */}
           {primaryCombo && (
             <EligibilityCard combo={primaryCombo} province={profile?.province} />
@@ -1314,62 +1453,12 @@ export default function Dashboard() {
 
           {/* ── Upcoming Qualifiers — Mini Calendar ── */}
           <CalendarSection events={upcomingEvents} />
-        </>
+        </div>
       )}
 
-      {/* Upcoming events for non-rider roles */}
+      {/* Upcoming qualifiers calendar for non-rider roles */}
       {!showRiderStats && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Calendar size={18} className="text-gray-400" />
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                Upcoming Qualifiers
-              </h2>
-            </div>
-            <Link to="/qualifiers" className="text-sm font-semibold text-green-800 hover:underline">
-              View all →
-            </Link>
-          </div>
-
-          {upcomingEvents.length === 0 ? (
-            <EmptyState title="No upcoming events" description="Check back later for qualifier dates." />
-          ) : (
-            <div className="space-y-3">
-              {upcomingEvents.slice(0, 3).map(event => (
-                <Card key={event.id}>
-                  <CardContent className="p-4 flex items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="brand" className="capitalize">{event.event_type}</Badge>
-                        {event.qualifier_number && (
-                          <Badge>Q{event.qualifier_number}</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <Calendar size={14} className="text-gray-400" />
-                        <span className="text-sm font-medium text-gray-700">
-                          {new Date(event.date + 'T00:00:00').toLocaleDateString('en-ZA', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <MapPin size={14} className="text-gray-400" />
-                        <span className="text-sm text-gray-500">
-                          {event.venue}, {event.province}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight size={18} className="text-gray-300" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+        <CalendarSection events={upcomingEvents} />
       )}
 
     </div>

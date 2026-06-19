@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { GAMES, normalizeGameName } from '../../lib/constants'
 import { MATRIX, getLevel, getNationalsLevel, getTimeToNextLevel } from '../../lib/matrix'
-import { Button, EmptyState, PageHeader, Skeleton } from '../../components/ui'
+import { Button, ConfirmDialog, EmptyState, PageHeader, Skeleton } from '../../components/ui'
 import { uploadVideoToBucket, UploadValidationError } from '../../lib/storageUploads'
 import {
   Trophy,
@@ -18,12 +18,19 @@ import {
   Calendar,
   Trash2,
   Video,
-  X
+  X,
+  LayoutGrid,
+  History,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { APP_NAME } from '../../constants/branding'
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
 import { fetchClubHeadRoster, fetchCombosForRider } from '../../lib/clubRiderRoster'
+import {
+  ShareLinkModal,
+  ManageShareLinks,
+  ShareTimesButton,
+} from '../../components/times/ShareLinkPanel'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -306,6 +313,7 @@ export default function MyTimes() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('times')
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null })
   const [nationalsLevel, setNationalsLevel] = useState(null)
   const [levelBreakdown, setLevelBreakdown] = useState({})
   const [trendGame, setTrendGame] = useState(GAMES[0])
@@ -314,6 +322,8 @@ export default function MyTimes() {
   const [videoUploadProgress, setVideoUploadProgress] = useState(0)
   const [uploadingVideoKey, setUploadingVideoKey] = useState('')
   const [videoError, setVideoError] = useState('')
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareLinksKey, setShareLinksKey] = useState(0)
 
   useTabQueryParam({
     activeTab,
@@ -559,20 +569,26 @@ export default function MyTimes() {
     }
   }
 
-  async function handleDeleteVideo(videoId) {
+  function handleDeleteVideo(videoId) {
     if (!effectiveUserId) return
-    if (!confirm('Delete this video?')) return
-    const { error } = await supabase
-      .from('horse_videos')
-      .delete()
-      .eq('id', videoId)
-      .eq('user_id', effectiveUserId)
-    if (error) {
-      toast.error('Could not delete video')
-      return
-    }
-    toast.success('Video deleted')
-    await fetchVideos()
+    setConfirmDialog({
+      open: true,
+      title: 'Delete video?',
+      description: 'This cannot be undone.',
+      onConfirm: async () => {
+        const { error } = await supabase
+          .from('horse_videos')
+          .delete()
+          .eq('id', videoId)
+          .eq('user_id', effectiveUserId)
+        if (error) {
+          toast.error('Could not delete video')
+          return
+        }
+        toast.success('Video deleted')
+        await fetchVideos()
+      },
+    })
   }
 
   async function fetchYearBests() {
@@ -874,6 +890,9 @@ export default function MyTimes() {
         }
         actions={
           <div className="flex items-center gap-2">
+            {selectedCombo && !isClubHead && (
+              <ShareTimesButton onClick={() => setShareModalOpen(true)} />
+            )}
             <div className="relative group">
               <Button variant="secondary">
                 <Download size={16} />
@@ -963,6 +982,9 @@ export default function MyTimes() {
             </div>
           </div>
         </div>
+        {!isClubHead && selectedCombo && (
+          <ManageShareLinks key={`${selectedCombo.id}-${shareLinksKey}`} comboId={selectedCombo.id} />
+        )}
       </div>
 
       {/* ── Nationals level card ────────────────────────────────────────────── */}
@@ -1050,30 +1072,76 @@ export default function MyTimes() {
         />
       </div>
 
-      {/* ── Tabs ───────────────────────────────────────────────────────────── */}
-      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
-        {['times', 'grid', 'history', 'videos', 'trends'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-              activeTab === tab
-                ? 'border-green-600 text-green-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab === 'times'
-              ? 'Personal Bests'
-              : tab === 'grid'
-              ? 'Qualifier Grid'
-              : tab === 'history'
-              ? 'Qualifier History'
-              : tab === 'videos'
-              ? 'Videos'
-              : 'Time Trends'}
-          </button>
-        ))}
-      </div>
+      {/* ── Section nav ────────────────────────────────────────────────────── */}
+      {(() => {
+        const sections = [
+          { id: 'times',   label: 'Personal Bests',    icon: Star },
+          { id: 'grid',    label: 'Qualifier Grid',    icon: LayoutGrid },
+          { id: 'history', label: 'History',           icon: History },
+          { id: 'videos',  label: 'Videos',            icon: Video },
+          { id: 'trends',  label: 'Trends',            icon: TrendingUp },
+        ]
+        return (
+          /* Mobile: 2-col icon grid */
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 md:hidden">
+            {sections.map(({ id, label, icon: Icon }) => {
+              const active = activeTab === id
+              return (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 px-2 text-xs font-semibold transition ${
+                    active
+                      ? 'bg-green-700 border-green-700 text-white shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-green-300 hover:text-green-700'
+                  }`}
+                >
+                  <Icon size={20} />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })()}
+
+      {/* ── Content: sidebar nav (md+) + tab panels ───────────────────────── */}
+      <div className="flex gap-5 items-start">
+
+        {/* Desktop sidebar */}
+        {(() => {
+          const sections = [
+            { id: 'times',   label: 'Personal Bests', icon: Star },
+            { id: 'grid',    label: 'Qualifier Grid',  icon: LayoutGrid },
+            { id: 'history', label: 'History',         icon: History },
+            { id: 'videos',  label: 'Videos',          icon: Video },
+            { id: 'trends',  label: 'Trends',          icon: TrendingUp },
+          ]
+          return (
+            <nav className="hidden md:flex flex-col gap-1 flex-shrink-0 w-40 bg-white rounded-xl border border-gray-200 p-2">
+              {sections.map(({ id, label, icon: Icon }) => {
+                const active = activeTab === id
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setActiveTab(id)}
+                    className={`flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition text-left ${
+                      active
+                        ? 'bg-green-700 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Icon size={16} className="flex-shrink-0" />
+                    {label}
+                  </button>
+                )
+              })}
+            </nav>
+          )
+        })()}
+
+        {/* Tab panels */}
+        <div className="flex-1 min-w-0">
 
       {/* ── Personal Bests tab ─────────────────────────────────────────────── */}
       {activeTab === 'times' && (
@@ -1605,6 +1673,9 @@ export default function MyTimes() {
         </div>
       )}
 
+        </div> {/* end tab panels */}
+      </div> {/* end sidebar + content flex */}
+
       {/* ── Hidden PDF print area (4 pages) ───────────────────────────────── */}
       {(() => {
         const P = {
@@ -1957,6 +2028,22 @@ export default function MyTimes() {
         )
       })()}
 
+      <ShareLinkModal
+        open={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        combo={selectedCombo}
+        onCreated={() => setShareLinksKey(k => k + 1)}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog(d => ({ ...d, open: false }))}
+        onConfirm={confirmDialog.onConfirm ?? (() => {})}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   )
 }
