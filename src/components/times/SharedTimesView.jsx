@@ -126,19 +126,19 @@ export default function SharedTimesView({
     setPersonalBests(pbMap)
     setYearBests(ybMap)
     const timeMap = {}
-    Object.values(pbMap).forEach(pb => { timeMap[pb.game] = pb.best_time })
+    Object.values(ybMap).forEach(pb => { timeMap[pb.game] = pb.best_time })
     setNationalsLevel(getNationalsLevel(timeMap))
     const breakdown = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
-    Object.values(pbMap).forEach(pb => {
+    Object.values(ybMap).forEach(pb => {
       const level = getLevel(pb.game, pb.best_time)
       if (level !== null) breakdown[level]++
     })
     setLevelBreakdown(breakdown)
   }
 
-  const gamesCovered = Object.keys(personalBests).length
+  const gamesCovered = Object.keys(yearBests).length
   const gamesAtOrAboveLevel = nationalsLevel !== null
-    ? Object.entries(personalBests).filter(([game, pb]) => getLevel(game, pb.best_time) >= nationalsLevel).length
+    ? Object.entries(yearBests).filter(([game, pb]) => getLevel(game, pb.best_time) >= nationalsLevel).length
     : 0
 
   if (loading) {
