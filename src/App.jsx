@@ -29,6 +29,7 @@ import Matrix from './pages/user/Matrix'
 import SupporterRiders from './pages/user/SupporterRiders'
 import ClubRiders from './pages/user/ClubRiders'
 import FriendsLeaderboard from './pages/user/FriendsLeaderboard'
+import EventDay from './pages/user/EventDay'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
 const Assistant = lazy(() => import('./pages/user/Assistant'))
@@ -194,6 +195,9 @@ export default function App() {
         } />
         <Route path="/friends-leaderboard" element={
           <ProtectedRoute><FriendsLeaderboard /></ProtectedRoute>
+        } />
+        <Route path="/event-day" element={
+          <ProtectedRoute><EventDay /></ProtectedRoute>
         } />
         <Route path="/assistant" element={
           <ProtectedRoute>
