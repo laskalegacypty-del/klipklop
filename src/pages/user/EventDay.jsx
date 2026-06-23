@@ -18,8 +18,6 @@ import {
   ChevronLeft,
   Check,
   X,
-  Search,
-  Trophy,
   ClipboardList,
   Save,
   Users,
@@ -87,8 +85,12 @@ export default function EventDay() {
   const [parseError, setParseError] = useState('')
   const fileInputRef = useRef(null)
 
-  const [searchQuery, setSearchQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState(new Set())
+
+  // Step 3 — manual entry form
+  const [addRiderName, setAddRiderName] = useState('')
+  const [addHorseName, setAddHorseName] = useState('')
+  const [addError, setAddError] = useState('')
 
   const [myCombos, setMyCombos] = useState([])
   const [enteredTimes, setEnteredTimes] = useState({})
@@ -172,16 +174,6 @@ export default function EventDay() {
     } catch { /* ignore */ }
   }, [entries, selectedIds, enteredTimes, primaryEvent, isBackToBack, secondaryEvent])
 
-  // ── Auto-select own horses after parsing ─────────────────────────────────
-  function autoSelectOwnHorses(parsed) {
-    const autoSelected = new Set()
-    parsed.forEach(entry => {
-      const match = findMatchingCombo(entry, myCombos)
-      if (match) autoSelected.add(entryKey(entry))
-    })
-    return autoSelected
-  }
-
   // ── PDF upload & parse ───────────────────────────────────────────────────
   async function handleFileUpload(e) {
     const file = e.target.files?.[0]
@@ -204,9 +196,11 @@ export default function EventDay() {
       }
 
       setEntries(parsed)
-      const autoSelected = autoSelectOwnHorses(parsed)
-      setSelectedIds(autoSelected)
+      setSelectedIds(new Set())
       setEnteredTimes({})
+      setAddRiderName('')
+      setAddHorseName('')
+      setAddError('')
       toast.dismiss(toastId)
       toast.success(`Found ${parsed.length} entries across ${Math.max(...parsed.map(e => e.group))} group${parsed.length > 1 ? 's' : ''}`)
     } catch (err) {
@@ -219,34 +213,56 @@ export default function EventDay() {
     }
   }
 
-  // ── Entry selection helpers ───────────────────────────────────────────────
-  function toggleEntry(entry) {
+  // ── Add combo by name (Step 3) ───────────────────────────────────────────
+  function handleAddCombo() {
+    const riderInput = addRiderName.trim()
+    const horseInput = addHorseName.trim()
+
+    if (!riderInput || !horseInput) {
+      setAddError('Enter both the rider name and horse name.')
+      return
+    }
+
+    const riderNorm = normalizeForMatch(stripDayAnnotation(riderInput))
+    const horseNorm = normalizeForMatch(horseInput)
+
+    // Exact normalised match first
+    let match = entries.find(e =>
+      normalizeForMatch(stripDayAnnotation(e.riderName)) === riderNorm &&
+      normalizeForMatch(e.horseName) === horseNorm
+    )
+
+    // Fallback: horse name matches (in case rider name has annotation user omitted)
+    if (!match) {
+      match = entries.find(e => normalizeForMatch(e.horseName) === horseNorm)
+    }
+
+    if (!match) {
+      setAddError('No entry found with that name and horse. Check the spelling matches the running list exactly.')
+      return
+    }
+
+    const key = entryKey(match)
+    if (selectedIds.has(key)) {
+      setAddError('This combo is already added.')
+      return
+    }
+
+    setSelectedIds(prev => new Set([...prev, key]))
+    setAddRiderName('')
+    setAddHorseName('')
+    setAddError('')
+  }
+
+  function handleRemoveCombo(entry) {
     const key = entryKey(entry)
     setSelectedIds(prev => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      next.delete(key)
       return next
     })
   }
 
-  const filteredEntries = useMemo(() => {
-    if (!searchQuery.trim()) return entries
-    const q = normalizeForMatch(searchQuery)
-    return entries.filter(e =>
-      normalizeForMatch(e.riderName).includes(q) ||
-      normalizeForMatch(e.horseName).includes(q) ||
-      normalizeForMatch(e.club).includes(q)
-    )
-  }, [entries, searchQuery])
-
-  const groupedFiltered = useMemo(() => {
-    const groups = {}
-    for (const entry of filteredEntries) {
-      if (!groups[entry.group]) groups[entry.group] = []
-      groups[entry.group].push(entry)
-    }
-    return groups
-  }, [filteredEntries])
 
   const selectedEntries = useMemo(
     () => entries.filter(e => selectedIds.has(entryKey(e))),
@@ -569,74 +585,83 @@ export default function EventDay() {
         </Card>
       )}
 
-      {/* ── STEP 3: SELECT RIDERS ─────────────────────────────────────────── */}
+      {/* ── STEP 3: ADD RIDER COMBOS ──────────────────────────────────────── */}
       {step === 3 && (
         <div className="space-y-4">
-          {/* Search + bulk actions */}
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search rider or horse…"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full h-10 pl-9 pr-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <button
-              onClick={() => setSelectedIds(new Set(entries.map(entryKey)))}
-              className="px-3 text-xs font-medium text-green-700 border border-green-300 rounded-lg hover:bg-green-50"
-            >
-              All
-            </button>
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              className="px-3 text-xs font-medium text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              None
-            </button>
-          </div>
-
-          <p className="text-xs text-gray-500 px-1">{selectedIds.size} of {entries.length} selected</p>
-
-          {/* Groups */}
-          {Object.entries(groupedFiltered).sort(([a], [b]) => Number(a) - Number(b)).map(([group, groupEntries]) => (
-            <div key={group}>
-              <div className="text-xs font-bold uppercase tracking-widest text-gray-400 px-1 mb-2">Group {group}</div>
-              <div className="space-y-1">
-                {groupEntries.map(entry => {
-                  const key = entryKey(entry)
-                  const checked = selectedIds.has(key)
-                  const isMyHorse = !!findMatchingCombo(entry, myCombos)
-                  return (
-                    <div
-                      key={key}
-                      onClick={() => toggleEntry(entry)}
-                      className={`flex items-center gap-3 px-3 py-3 rounded-xl border cursor-pointer transition ${checked ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                    >
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition ${checked ? 'border-green-600 bg-green-600' : 'border-gray-300'}`}>
-                        {checked && <Check size={12} className="text-white" />}
-                      </div>
-                      <div className="w-8 text-center text-xs font-bold text-gray-500 flex-shrink-0">#{entry.runNumber}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-gray-800 truncate">{stripDayAnnotation(entry.riderName)}</span>
-                          {isMyHorse && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">My horse</span>}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">{entry.horseName}</div>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${CATEGORY_COLORS[entry.category] || 'bg-gray-100 text-gray-600'}`}>
-                          {entry.category}{entry.level}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
+          <Card>
+            <CardContent className="space-y-4 py-6">
+              <div>
+                <p className="text-sm font-semibold text-gray-800 mb-0.5">Add rider &amp; horse</p>
+                <p className="text-xs text-gray-500">Enter the name <strong>exactly as it appears</strong> in the running list.</p>
               </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Rider name</label>
+                  <input
+                    type="text"
+                    value={addRiderName}
+                    onChange={e => { setAddRiderName(e.target.value); setAddError('') }}
+                    onKeyDown={e => e.key === 'Enter' && handleAddCombo()}
+                    placeholder="e.g. Liani Van Der Walt"
+                    className="w-full h-11 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Horse name</label>
+                  <input
+                    type="text"
+                    value={addHorseName}
+                    onChange={e => { setAddHorseName(e.target.value); setAddError('') }}
+                    onKeyDown={e => e.key === 'Enter' && handleAddCombo()}
+                    placeholder="e.g. Next Level"
+                    className="w-full h-11 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+
+                {addError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{addError}</p>
+                )}
+
+                <Button onClick={handleAddCombo} className="w-full flex items-center justify-center gap-2">
+                  <Check size={15} /> Add combo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Added combos list */}
+          {selectedEntries.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 px-1 uppercase tracking-wide">
+                {selectedEntries.length} combo{selectedEntries.length !== 1 ? 's' : ''} added
+              </p>
+              {selectedEntries.map(entry => (
+                <div
+                  key={entryKey(entry)}
+                  className="flex items-center gap-3 bg-white border border-green-200 rounded-xl px-4 py-3"
+                >
+                  <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center text-xs font-bold text-green-700 flex-shrink-0">
+                    #{entry.runNumber}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-800 truncate">{stripDayAnnotation(entry.riderName)}</div>
+                    <div className="text-xs text-gray-500">{entry.horseName} · Group {entry.group}</div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded flex-shrink-0 ${CATEGORY_COLORS[entry.category] || 'bg-gray-100 text-gray-600'}`}>
+                    {entry.category}{entry.level}
+                  </span>
+                  <button
+                    onClick={() => handleRemoveCombo(entry)}
+                    className="text-gray-400 hover:text-red-500 transition flex-shrink-0 p-1"
+                    aria-label="Remove"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
 
           <div className="flex justify-between pt-2">
             <Button variant="ghost" onClick={() => setStep(2)} className="flex items-center gap-2">
