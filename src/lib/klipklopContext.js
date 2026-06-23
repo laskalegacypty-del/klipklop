@@ -6,7 +6,7 @@ import { GAMES, normalizeGameName, QUALIFIER_GAMES } from './constants'
 import { getLevel, getNationalsLevel } from './matrix'
 import { fetchFriendsLeaderboard, LEADERBOARD_MODES } from './friendsLeaderboard'
 
-export const RIDER_SUMMARY_MAX_CHARS = 6000
+export const RIDER_SUMMARY_MAX_CHARS = 15000
 
 const CURRENT_YEAR = new Date().getFullYear()
 
@@ -95,7 +95,8 @@ async function buildCombosAndSeasonBlock(profile, combos) {
           qualifier_events ( date, venue, qualifier_number, province )
         `)
         .eq('combo_id', combo.id)
-        .limit(20),
+        .order('qualifier_events(date)', { ascending: false })
+        .limit(50),
     ])
 
     const yearResults = resultsRes.data || []
@@ -270,16 +271,16 @@ async function buildHorsesBlock(profileId) {
 
     if (otherMedical.length) {
       lines.push(`  Medical log (${otherMedical.length} entries, most recent first):`)
-      otherMedical.slice(0, 12).forEach(m => {
+      otherMedical.slice(0, 20).forEach(m => {
         const flag = m.is_abnormal ? ' [ABNORMAL]' : ''
         lines.push(`    - ${fmtDate(m.date)} [${m.type}] ${m.title}${flag}${m.notes ? ` — ${m.notes}` : ''}`)
       })
-      if (otherMedical.length > 12) lines.push(`    …and ${otherMedical.length - 12} older entries`)
+      if (otherMedical.length > 20) lines.push(`    …and ${otherMedical.length - 20} older entries`)
     }
 
     if (data.vaccinations.length) {
       lines.push('  Vaccinations:')
-      data.vaccinations.slice(0, 6).forEach(v => {
+      data.vaccinations.forEach(v => {
         lines.push(`    - ${fmtDate(v.date_administered)} ${String(v.vaccination_type).toUpperCase()}${v.dose_number ? ` V${v.dose_number}` : ' (annual)'}${v.vet_name ? `, vet ${v.vet_name}` : ''}`)
       })
     }
@@ -300,6 +301,42 @@ async function buildHorsesBlock(profileId) {
     lines.push('')
   }
   return `HORSES, VITALS, MEDICAL & REMINDERS\n${lines.join('\n')}`.trim()
+}
+
+async function buildPersonalBestsBlock(combos) {
+  if (!combos.length) return ''
+  const comboIds = combos.map(c => c.id)
+  const { data, error } = await supabase
+    .from('personal_bests')
+    .select('combo_id, game, best_time, season_year')
+    .in('combo_id', comboIds)
+    .order('season_year', { ascending: false })
+  if (error) { console.error('[klipklopContext] personal_bests query error:', error); return '' }
+  if (!data?.length) return ''
+
+  // Group by combo → season year → game
+  const byCombo = {}
+  data.forEach(row => {
+    const comboName = combos.find(c => c.id === row.combo_id)?.horse_name || row.combo_id
+    if (!byCombo[comboName]) byCombo[comboName] = {}
+    if (!byCombo[comboName][row.season_year]) byCombo[comboName][row.season_year] = []
+    byCombo[comboName][row.season_year].push({ game: normalizeGameName(row.game), time: row.best_time })
+  })
+
+  const lines = []
+  for (const [comboName, years] of Object.entries(byCombo)) {
+    lines.push(`Combo: ${comboName}`)
+    for (const year of Object.keys(years).sort((a, b) => b - a)) {
+      const entries = years[year].sort((a, b) => (a.game || '').localeCompare(b.game || ''))
+      lines.push(`  ${year} season PBs:`)
+      entries.forEach(e => {
+        const level = getLevel(e.game, e.time)
+        lines.push(`    - ${e.game}: ${fmtTime(e.time)}${level !== null ? ` (L${level})` : ''}`)
+      })
+    }
+    lines.push('')
+  }
+  return `PERSONAL BESTS BY SEASON\n${lines.join('\n')}`.trim()
 }
 
 async function buildVideosBlock(profileId) {
@@ -429,6 +466,7 @@ export async function fetchKlipklopSummary(profile) {
 
     const [
       combosBlock,
+      personalBestsBlock,
       horsesBlock,
       videosBlock,
       eventsBlock,
@@ -437,6 +475,7 @@ export async function fetchKlipklopSummary(profile) {
       announcementsBlock,
     ] = await Promise.all([
       buildCombosAndSeasonBlock(profile, combos).catch(e => { console.error('[klipklopContext] combosBlock error:', e); return '' }),
+      buildPersonalBestsBlock(combos).catch(e => { console.error('[klipklopContext] personalBestsBlock error:', e); return '' }),
       buildHorsesBlock(profile.id).catch(e => { console.error('[klipklopContext] horsesBlock error:', e); return '' }),
       buildVideosBlock(profile.id).catch(e => { console.error('[klipklopContext] videosBlock error:', e); return '' }),
       buildEventsBlock(profile).catch(e => { console.error('[klipklopContext] eventsBlock error:', e); return '' }),
@@ -445,12 +484,13 @@ export async function fetchKlipklopSummary(profile) {
       buildAnnouncementsBlock().catch(e => { console.error('[klipklopContext] announcementsBlock error:', e); return '' }),
     ])
 
-    console.log('[klipklopContext] blocks built — horses:', horsesBlock.length, 'combos:', combosBlock.length, 'events:', eventsBlock.length)
+    console.log('[klipklopContext] blocks built — combos:', combosBlock.length, 'pbs:', personalBestsBlock.length, 'horses:', horsesBlock.length, 'events:', eventsBlock.length)
 
     const profileBlock = buildProfileBlock(profile)
     const blocks = [
       profileBlock,
       combosBlock,
+      personalBestsBlock,
       horsesBlock,
       videosBlock,
       eventsBlock,
