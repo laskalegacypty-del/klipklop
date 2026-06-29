@@ -269,16 +269,16 @@ export default function Layout({ children }) {
           </ul>
 
           {!isAdmin && (
-            <button
-              type="button"
-              onClick={handleReplayTutorial}
-              title={col ? 'How to start' : undefined}
+            <Link
+              to="/getting-started"
+              onClick={() => setSidebarOpen(false)}
+              title={col ? 'Getting Started' : undefined}
               className={`mt-3 w-full flex items-center gap-3 py-2.5 rounded-lg transition text-white/80 hover:bg-white/10 hover:text-white
                 ${col ? 'lg:justify-center lg:px-0' : 'px-4'}`}
             >
               <Settings size={20} />
-              <span className={`text-sm font-medium ${col ? 'lg:hidden' : ''}`}>How to start</span>
-            </button>
+              <span className={`text-sm font-medium ${col ? 'lg:hidden' : ''}`}>Getting Started</span>
+            </Link>
           )}
         </nav>
 
