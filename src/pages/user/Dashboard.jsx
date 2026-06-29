@@ -23,7 +23,8 @@ import {
   HeartPulse,
   BarChart2,
   MessageCircle,
-  Table2
+  Table2,
+  ClipboardList,
 } from 'lucide-react'
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -1083,22 +1084,22 @@ export default function Dashboard() {
   const quickActions = isSupporter
     ? [
         { label: 'My Riders',  icon: UserSearch, to: '/my-riders' },
+        { label: 'Event Day',  icon: ClipboardList, to: '/event-day' },
         { label: 'Qualifiers', icon: Calendar,   to: '/qualifiers' },
         { label: 'Matrix',     icon: Table2,     to: '/matrix' },
-        { label: 'Assistant',  icon: MessageCircle, to: '/assistant' },
       ]
     : isClubHead
     ? [
+        { label: 'Event Day',  icon: ClipboardList, to: '/event-day' },
         { label: 'My Riders',  icon: Users,     to: '/my-club-riders' },
         { label: 'Qualifiers', icon: Calendar,  to: '/qualifiers' },
         { label: 'Tracker',    icon: BarChart2, to: '/tracker' },
-        { label: 'Rankings',   icon: Trophy,    to: '/friends-leaderboard' },
       ]
     : [
+        { label: 'Event Day',  icon: ClipboardList, to: '/event-day' },
         { label: 'My Times',   icon: Clock,      to: '/my-times' },
         { label: 'Qualifiers', icon: Calendar,   to: '/qualifiers' },
         { label: 'Horses',     icon: HeartPulse, to: '/horses' },
-        { label: 'Rankings',   icon: Trophy,     to: '/friends-leaderboard' },
       ]
 
   return (

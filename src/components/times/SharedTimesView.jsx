@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { normalizeGameName } from '../../lib/constants'
-import { getLevel, getNationalsLevel, getTimeToNextLevel } from '../../lib/matrix'
+import { getLevel, getNationalsLevel, getProjectedNationalsLevel, getTimeToNextLevel } from '../../lib/matrix'
 import { Skeleton } from '../ui'
 import { Trophy, Star, ChevronDown, TrendingUp } from 'lucide-react'
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
@@ -109,7 +109,22 @@ export default function SharedTimesView({
         }
       })
 
-      applyStats(pbMap, ybMap)
+      // Build sorted attended events from joined data for overcount projection
+      const seenEvents = {}
+      resultsRes.data?.forEach(result => {
+        const eventId = result.event_id
+        if (!seenEvents[eventId] && result.qualifier_events?.date) {
+          seenEvents[eventId] = { id: eventId, date: result.qualifier_events.date }
+        }
+      })
+      const sortedAttendedEvents = Object.values(seenEvents).sort((a, b) => new Date(a.date) - new Date(b.date))
+      const startingLevel = parseInt(combo?.current_level) || 0
+      const rawResults = resultsRes.data || []
+      const projectedLevel = rawResults.length > 0
+        ? getProjectedNationalsLevel(rawResults, sortedAttendedEvents, startingLevel)
+        : null
+
+      applyStats(pbMap, ybMap, projectedLevel)
       setHistory(Object.values(grouped))
       setTrendRows(rows)
     } finally {
@@ -122,12 +137,12 @@ export default function SharedTimesView({
     [trendRows, trendGame],
   )
 
-  function applyStats(pbMap, ybMap) {
+  function applyStats(pbMap, ybMap, projectedLevel = null) {
     setPersonalBests(pbMap)
     setYearBests(ybMap)
     const timeMap = {}
     Object.values(ybMap).forEach(pb => { timeMap[pb.game] = pb.best_time })
-    setNationalsLevel(getNationalsLevel(timeMap))
+    setNationalsLevel(projectedLevel !== null ? projectedLevel : getNationalsLevel(timeMap))
     const breakdown = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 }
     Object.values(ybMap).forEach(pb => {
       const level = getLevel(pb.game, pb.best_time)
@@ -168,7 +183,7 @@ export default function SharedTimesView({
       <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-xl p-5 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-green-200 text-sm font-medium">Nationals Level — {selectedYear}</p>
+            <p className="text-green-200 text-sm font-medium">Predicted Nationals Level — {selectedYear}</p>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-4xl font-bold">
                 {nationalsLevel !== null ? `L${nationalsLevel}` : '—'}

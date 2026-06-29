@@ -3,7 +3,7 @@
 
 import { supabase } from './supabaseClient'
 import { GAMES, normalizeGameName, QUALIFIER_GAMES } from './constants'
-import { getLevel, getNationalsLevel } from './matrix'
+import { getLevel, getNationalsLevel, getProjectedNationalsLevel } from './matrix'
 import { fetchFriendsLeaderboard, LEADERBOARD_MODES } from './friendsLeaderboard'
 
 export const RIDER_SUMMARY_MAX_CHARS = 15000
@@ -69,13 +69,17 @@ async function buildCombosAndSeasonBlock(profile, combos) {
 
   const { data: yearEvents } = await supabase
     .from('qualifier_events')
-    .select('id, province')
+    .select('id, province, date')
     .gte('date', yearStart)
     .lte('date', yearEnd)
 
   const yearEventIds = yearEvents?.map(e => e.id) || []
   const eventProvinceMap = {}
-  yearEvents?.forEach(e => { eventProvinceMap[e.id] = e.province })
+  const eventDateMap = {}
+  yearEvents?.forEach(e => {
+    eventProvinceMap[e.id] = e.province
+    eventDateMap[e.id] = e.date
+  })
 
   const lines = []
 
@@ -84,7 +88,7 @@ async function buildCombosAndSeasonBlock(profile, combos) {
       yearEventIds.length > 0
         ? supabase
             .from('qualifier_results')
-            .select('event_id, game, time, is_nt')
+            .select('event_id, game, time, is_nt, level_entered, level_achieved')
             .eq('combo_id', combo.id)
             .in('event_id', yearEventIds)
         : Promise.resolve({ data: [] }),
@@ -123,7 +127,16 @@ async function buildCombosAndSeasonBlock(profile, combos) {
     const games = Object.keys(pbMap).sort()
     const timeMap = {}
     games.forEach(g => { timeMap[g] = pbMap[g].time })
-    const nationalsLevel = getNationalsLevel(timeMap)
+
+    const attendedEventIds = [...new Set(yearResults.map(r => r.event_id))]
+    const sortedAttendedEvents = attendedEventIds
+      .filter(id => eventDateMap[id])
+      .map(id => ({ id, date: eventDateMap[id] }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+    const startingLevel = parseInt(combo.current_level) || 0
+    const nationalsLevel = yearResults.length > 0
+      ? getProjectedNationalsLevel(yearResults, sortedAttendedEvents, startingLevel)
+      : getNationalsLevel(timeMap)
 
     const uniqueEventIds = [...new Set(yearResults.map(r => r.event_id))]
     const provinceQualifiers = new Set(
@@ -150,8 +163,9 @@ async function buildCombosAndSeasonBlock(profile, combos) {
     if (combo.current_level != null) {
       lines.push(`  Current level (combo): L${combo.current_level}`)
     }
+    const levelMethod = yearResults.length > 0 ? 'overcount rule' : '8/13 rule fallback'
     lines.push(
-      `  Nationals level: ${nationalsLevel !== null ? `L${nationalsLevel}` : 'not enough data'} (games with times: ${games.length}/13)`,
+      `  Predicted nationals level (${levelMethod}): ${nationalsLevel !== null ? `L${nationalsLevel}` : 'not enough data'} (games with times ever: ${games.length}/13)`,
     )
     lines.push(
       `  ${CURRENT_YEAR} season: ${gamesCovered}/13 games covered, ${uniqueEventIds.length} qualifiers attended, ${provinceQualifiers} in ${profile.province || 'province'} — nationals eligible: ${eligible ? 'yes' : 'no'}`,

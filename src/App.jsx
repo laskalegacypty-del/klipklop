@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Landing from './pages/Landing'
 import ShareTimes from './pages/ShareTimes'
+import EventDayHelper from './pages/EventDayHelper'
 
 // Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -122,6 +123,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/share/:token" element={<ShareTimes />} />
+        <Route path="/event-day/help/:token" element={<EventDayHelper />} />
         <Route path="/pending" element={
           <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
             <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">

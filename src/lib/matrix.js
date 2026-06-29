@@ -43,6 +43,59 @@ export const MATRIX = {
     return parseFloat((bestTime - nextLevelMax).toFixed(3))
   }
 
+  /**
+   * Applies the SAWMGA overcount principle to one qualifier event.
+   * resultsForEvent: array of { level_achieved } — NT results must be excluded before calling.
+   * levelEntered: the level the rider entered that qualifier at.
+   * Returns the new level after the qualifier.
+   */
+  export function computeOvercountLevel(levelEntered, resultsForEvent) {
+    let rawOC = 0
+    let bonusOC = 0
+    for (const r of resultsForEvent) {
+      const achieved = typeof r === 'number' ? r : r.level_achieved
+      if (achieved === null || achieved === undefined) continue
+      const oc = Math.max(0, achieved - levelEntered)
+      rawOC += oc
+      if (oc >= 3) bonusOC++
+    }
+    const effectiveOC = rawOC + bonusOC
+    const jump = Math.floor(effectiveOC / 4)
+    return Math.min(4, levelEntered + jump)
+  }
+
+  /**
+   * Predicts the nationals competition level by chaining the overcount principle
+   * through every qualifier the rider attended this season, in date order.
+   * resultsData: array of { event_id, level_entered, level_achieved, is_nt }
+   * sortedEvents: array of { id, date } sorted ascending by date
+   * startingLevel: the rider's registered level at season start
+   */
+  export function getProjectedNationalsLevel(resultsData, sortedEvents, startingLevel) {
+    if (!resultsData?.length || !sortedEvents?.length) return startingLevel ?? 0
+
+    const byEvent = {}
+    for (const r of resultsData) {
+      if (!byEvent[r.event_id]) byEvent[r.event_id] = []
+      byEvent[r.event_id].push(r)
+    }
+
+    let currentLevel = startingLevel ?? 0
+
+    for (const event of sortedEvents) {
+      const eventResults = byEvent[event.id]
+      if (!eventResults?.length) continue
+      const levelEntered = eventResults[0]?.level_entered ?? currentLevel
+      const valid = eventResults.filter(
+        r => !r.is_nt && r.level_achieved !== null && r.level_achieved !== undefined
+      )
+      if (!valid.length) continue
+      currentLevel = computeOvercountLevel(levelEntered, valid)
+    }
+
+    return currentLevel
+  }
+
   export function getNationalsLevel(personalBests) {
     // Count how many games have a time recorded
     const gamesWithTimes = Object.entries(personalBests)

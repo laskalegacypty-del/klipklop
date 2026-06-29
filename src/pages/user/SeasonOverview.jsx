@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { GAMES, QUALIFIER_GAMES, PROVINCES, normalizeGameName } from '../../lib/constants'
-import { getLevel, getNationalsLevel } from '../../lib/matrix'
+import { getLevel, getNationalsLevel, getProjectedNationalsLevel, MATRIX } from '../../lib/matrix'
 import {
   CheckCircle,
   XCircle,
@@ -130,11 +130,13 @@ export default function SeasonOverview() {
   const [attendedEvents, setAttendedEvents] = useState([])
   const [personalBests, setPersonalBests] = useState({})
   const [yearBests, setYearBests] = useState({})
+  const [detailedResults, setDetailedResults] = useState([])
   const [seasonCoveredGames, setSeasonCoveredGames] = useState(new Set())
   const [missingGamesProvinceFilter, setMissingGamesProvinceFilter] = useState('all')
   const [missingGamesMonthFilter, setMissingGamesMonthFilter] = useState('all')
   const [missingGamesGameFilter, setMissingGamesGameFilter] = useState('all')
   const [showFindQualifiers, setShowFindQualifiers] = useState(false)
+  const [showLevelUp, setShowLevelUp] = useState(true)
 
   const [linkedRiders, setLinkedRiders] = useState([])
   const [selectedRider, setSelectedRider] = useState(null)
@@ -238,7 +240,7 @@ export default function SeasonOverview() {
       yearEventIds.length > 0
         ? supabase
             .from('qualifier_results')
-            .select('event_id, game, time, is_nt')
+            .select('event_id, game, time, is_nt, level_entered, level_achieved')
             .eq('combo_id', selectedCombo.id)
             .in('event_id', yearEventIds)
         : Promise.resolve({ data: [] }),
@@ -256,6 +258,7 @@ export default function SeasonOverview() {
     setPersonalBests(pbMap)
     setSeasonCoveredGames(buildSeasonCoveredGameSet(resultsRes.data))
     setYearBests(buildYearBestsFromResults(resultsRes.data))
+    setDetailedResults(resultsRes.data || [])
   }
 
   const gamesCovered = GAMES.filter(game => seasonCoveredGames.has(game))
@@ -288,7 +291,49 @@ export default function SeasonOverview() {
 
   const isEligible = hasMinQualifiers && hasMinGames && hasMinProvinceQualifiers
 
-  const nationalsLevel = getNationalsLevel(personalBests)
+  // Overcount-based projection: chain the official SAWMGA rule through each qualifier attended
+  const sortedAttendedEvents = events
+    .filter(e => attendedEvents.includes(e.id))
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+  const startingLevel = parseInt(selectedCombo?.current_level) || 0
+  const projectedLevel = getProjectedNationalsLevel(detailedResults, sortedAttendedEvents, startingLevel)
+
+  // Keep the 8/13 rule as a fallback when there are no qualifier results yet
+  const nationalsLevel = detailedResults.length > 0 ? projectedLevel : getNationalsLevel(personalBests)
+  const effectiveLevel = nationalsLevel
+  // Focus on the PREDICTED level — show games still below it so rider can solidify that level
+  const targetLevel = effectiveLevel !== null ? effectiveLevel : 1
+
+  // Games where the season best is below targetLevel — sorted by smallest gap first
+  const improvementGames = GAMES
+    .map(game => {
+      const yearBest = yearBests[game]
+      const currentTime = yearBest?.best_time ?? null
+      const currentLevel = currentTime !== null ? getLevel(game, currentTime) : null
+      if (currentLevel !== null && currentLevel >= targetLevel) return null // already at or above predicted level
+      const targetMax = MATRIX[game]?.[targetLevel]?.[1] // max time allowed at targetLevel
+      const gap = currentTime !== null && targetMax !== undefined && targetMax !== Infinity
+        ? parseFloat((currentTime - targetMax).toFixed(3))
+        : null
+      const upcoming = events.filter(ev =>
+        ev.qualifier_number &&
+        (QUALIFIER_GAMES[ev.qualifier_number] || []).includes(game) &&
+        new Date(ev.date) >= todayStart
+      )
+      return { game, currentTime, currentLevel, gap, upcoming }
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.gap !== null && b.gap === null) return -1
+      if (a.gap === null && b.gap !== null) return 1
+      if (a.gap !== null && b.gap !== null) return a.gap - b.gap
+      return 0
+    })
+
+  const gamesAlreadyAtTarget = GAMES.filter(g => {
+    const yb = yearBests[g]
+    return yb && getLevel(g, yb.best_time) >= targetLevel
+  }).length
 
   const today = todayStart
   const { start: seasonStart, end: seasonEnd } = getSeasonDates(selectedYear)
@@ -444,7 +489,7 @@ export default function SeasonOverview() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">
-              Projected Nationals Level
+              Projected Nationals Level {detailedResults.length > 0 ? '(Overcount)' : ''}
             </p>
             <p className="text-5xl font-black tracking-tight">
               {nationalsLevel !== null ? `L${nationalsLevel}` : '—'}
@@ -601,6 +646,98 @@ export default function SeasonOverview() {
           })}
         </div>
       </div>
+
+      {/* ── Level Up section ────────────────────────────────────────────────── */}
+      {improvementGames.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <button
+            onClick={() => setShowLevelUp(prev => !prev)}
+            className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition"
+          >
+            <div className="flex items-center gap-2">
+              <Zap size={17} className="text-orange-500" />
+              <span className="font-semibold text-gray-800">
+                Solidify L{targetLevel} — Games Still Below Your Predicted Level
+              </span>
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                {gamesAlreadyAtTarget}/13 at L{targetLevel}+
+              </span>
+            </div>
+            <ChevronRight
+              size={16}
+              className={`text-gray-400 transition-transform ${showLevelUp ? 'rotate-90' : ''}`}
+            />
+          </button>
+
+          {showLevelUp && (
+            <div className="border-t border-gray-100">
+              <div className="px-5 py-3 bg-orange-50 border-b border-orange-100">
+                <p className="text-xs text-orange-800">
+                  You are predicted to compete at <strong>L{targetLevel}</strong>. These games are still below that level — improving them means you ride the full qualifier at L{targetLevel}.
+                  {' '}{gamesAlreadyAtTarget > 0 && <>{gamesAlreadyAtTarget} of 13 games are already at L{targetLevel} or above.</>}
+                  {' '}Smallest gap listed first.
+                </p>
+              </div>
+
+              <div className="divide-y divide-gray-100">
+                {improvementGames.map(({ game, currentTime, currentLevel, gap, upcoming }) => (
+                  <div key={game} className="px-5 py-4">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-gray-800">{game}</span>
+                          {currentLevel !== null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${LEVEL_STYLES[currentLevel]}`}>
+                              L{currentLevel} current
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${LEVEL_STYLES[targetLevel]}`}>
+                            L{targetLevel} predicted
+                          </span>
+                        </div>
+
+                        {currentTime !== null ? (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Your best: <span className="font-mono font-semibold text-gray-700">{currentTime.toFixed(3)}s</span>
+                            {gap !== null && (
+                              <> · <span className="text-orange-600 font-semibold">cut {gap.toFixed(3)}s</span> to reach L{targetLevel} predicted level</>
+                            )}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-orange-600 mt-0.5 font-medium">No time yet this season</p>
+                        )}
+
+                        {/* Upcoming qualifiers for this game */}
+                        {upcoming.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {upcoming.map(ev => (
+                              <span
+                                key={ev.id}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg bg-green-50 border border-green-200 text-green-800"
+                              >
+                                Q{ev.qualifier_number} · {new Date(ev.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })} · {ev.venue}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 mt-1.5">No upcoming qualifiers with this game</p>
+                        )}
+                      </div>
+
+                      {gap !== null && (
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-lg font-black text-orange-500">-{gap.toFixed(3)}s</p>
+                          <p className="text-[10px] text-gray-400 font-medium">to cut</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Find qualifiers for missing games ───────────────────────────────── */}
       {gamesMissing.length > 0 && (

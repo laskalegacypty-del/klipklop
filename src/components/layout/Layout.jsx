@@ -49,9 +49,10 @@ const supporterNavItems = [
   { path: '/dashboard',     label: 'Home',          icon: Home,          group: null },
   { path: '/qualifiers',    label: 'Qualifiers',    icon: Calendar,      group: 'compete' },
   { path: '/matrix',        label: 'Matrix',        icon: Table2,        group: 'compete' },
+  { path: '/event-day',     label: 'Event Day',     icon: ClipboardList, group: 'compete' },
   { path: '/my-riders',     label: 'My Riders',     icon: UserSearch,    group: 'stable' },
-  { path: '/assistant',     label: 'Assistant',     icon: MessageCircle, group: 'tools' },
-  { path: '/notifications', label: 'Notifications', icon: Bell,          group: 'tools' },
+  { path: '/assistant',        label: 'Assistant',       icon: MessageCircle, group: 'tools' },
+  { path: '/notifications',    label: 'Notifications',   icon: Bell,          group: 'tools' },
 ]
 
 const clubHeadNavItems = [
@@ -72,8 +73,9 @@ const clubMemberNavItems = [
   { path: '/qualifiers',    label: 'Qualifiers',    icon: Calendar,      group: 'compete' },
   { path: '/matrix',        label: 'Matrix',        icon: Table2,        group: 'compete' },
   { path: '/my-times',      label: 'My Times',      icon: Clock,         group: 'compete' },
-  { path: '/assistant',     label: 'Assistant',     icon: MessageCircle, group: 'tools' },
-  { path: '/notifications', label: 'Notifications', icon: Bell,          group: 'tools' },
+  { path: '/event-day',     label: 'Event Day',     icon: ClipboardList, group: 'compete' },
+  { path: '/assistant',        label: 'Assistant',       icon: MessageCircle, group: 'tools' },
+  { path: '/notifications',    label: 'Notifications',   icon: Bell,          group: 'tools' },
 ]
 
 const adminNavItems = [

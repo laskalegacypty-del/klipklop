@@ -17,6 +17,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Local-only Vercel dev config (not for production)
+vercel.dev.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
