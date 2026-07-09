@@ -2,27 +2,22 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { QUALIFIER_GAMES, PROVINCES } from '../../lib/constants'
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  ChevronDown,
-  Calendar,
-  MapPin,
-  X,
-  Save
+  Plus, Pencil, Trash2, ChevronDown, Calendar, MapPin, X, Save
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button, PageHeader, Skeleton } from '../../components/ui'
 
 const EVENT_TYPES = ['qualifier', 'regionals', 'nationals', 'demo day']
 
+const EVENT_TYPE_STYLE = {
+  qualifier:  'bg-green-100 text-green-700',
+  regionals:  'bg-blue-100 text-blue-700',
+  nationals:  'bg-purple-100 text-purple-700',
+  'demo day': 'bg-orange-100 text-orange-700',
+}
+
 const EMPTY_FORM = {
-  date: '',
-  province: '',
-  venue: '',
-  qualifier_number: '',
-  event_type: 'qualifier',
-  notes: ''
+  date: '', province: '', venue: '', qualifier_number: '', event_type: 'qualifier', notes: ''
 }
 
 export default function AdminEvents() {
@@ -37,24 +32,16 @@ export default function AdminEvents() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
 
-  useEffect(() => {
-    fetchEvents()
-  }, [])
-
-  useEffect(() => {
-    applyFilters()
-  }, [events, provinceFilter, typeFilter])
+  useEffect(() => { fetchEvents() }, [])
+  useEffect(() => { applyFilters() }, [events, provinceFilter, typeFilter])
 
   async function fetchEvents() {
     try {
       const { data, error } = await supabase
-        .from('qualifier_events')
-        .select('*')
-        .order('date', { ascending: true })
-
+        .from('qualifier_events').select('*').order('date', { ascending: true })
       if (error) throw error
       setEvents(data || [])
-    } catch (error) {
+    } catch {
       toast.error('Error loading events')
     } finally {
       setLoading(false)
@@ -63,26 +50,18 @@ export default function AdminEvents() {
 
   function applyFilters() {
     let result = [...events]
-
-    if (provinceFilter !== 'all') {
-      result = result.filter(e => e.province === provinceFilter)
-    }
-
-    if (typeFilter !== 'all') {
-      result = result.filter(e => e.event_type === typeFilter)
-    }
-
+    if (provinceFilter !== 'all') result = result.filter(e => e.province === provinceFilter)
+    if (typeFilter !== 'all') result = result.filter(e => e.event_type === typeFilter)
     setFiltered(result)
   }
 
-  function getEventStatus(date) {
-    const today = new Date()
-    const eventDate = new Date(date)
-    const diffDays = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24))
-
-    if (diffDays < 0) return { label: 'Past', style: 'bg-gray-100 text-gray-500' }
-    if (diffDays <= 7) return { label: 'This week', style: 'bg-green-100 text-green-700' }
-    return { label: 'Upcoming', style: 'bg-blue-100 text-blue-700' }
+  function getEventTiming(date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const d = new Date(date)
+    const diff = Math.ceil((d - today) / 86400000)
+    if (diff < 0)  return { label: 'Past',      style: 'bg-gray-100 text-gray-500', isPast: true  }
+    if (diff <= 7) return { label: 'This week',  style: 'bg-emerald-100 text-emerald-700', isPast: false }
+    return             { label: 'Upcoming',   style: 'bg-blue-100 text-blue-700', isPast: false }
   }
 
   function openAdd() {
@@ -94,11 +73,8 @@ export default function AdminEvents() {
   function openEdit(event) {
     setEditingEvent(event)
     setForm({
-      date: event.date,
-      province: event.province,
-      venue: event.venue,
-      qualifier_number: event.qualifier_number || '',
-      event_type: event.event_type,
+      date: event.date, province: event.province, venue: event.venue,
+      qualifier_number: event.qualifier_number || '', event_type: event.event_type,
       notes: event.notes || ''
     })
     setShowModal(true)
@@ -109,87 +85,45 @@ export default function AdminEvents() {
       toast.error('Please fill in date, province and venue')
       return
     }
-
     if (form.event_type === 'qualifier' && !form.qualifier_number) {
       toast.error('Please select a qualifier number')
       return
     }
-
     setSaving(true)
-
     try {
-      // Coerce qualifier_number to integer (the DB column is numeric).
-      // <select> emits strings, and an unconverted string can fail or be
-      // dropped silently by PostgREST for an int column.
       const parsedQualifierNumber =
         form.qualifier_number === '' || form.qualifier_number == null
-          ? null
-          : Number.parseInt(form.qualifier_number, 10)
+          ? null : Number.parseInt(form.qualifier_number, 10)
 
-      if (
-        form.event_type === 'qualifier' &&
-        (parsedQualifierNumber == null || Number.isNaN(parsedQualifierNumber))
-      ) {
+      if (form.event_type === 'qualifier' && (parsedQualifierNumber == null || Number.isNaN(parsedQualifierNumber))) {
         toast.error('Qualifier number must be a valid number')
         setSaving(false)
         return
       }
 
       const payload = {
-        date: form.date,
-        province: form.province,
-        venue: form.venue,
+        date: form.date, province: form.province, venue: form.venue,
         qualifier_number: Number.isNaN(parsedQualifierNumber) ? null : parsedQualifierNumber,
-        event_type: form.event_type,
-        notes: form.notes || null
+        event_type: form.event_type, notes: form.notes || null
       }
 
       if (editingEvent) {
-        // .select() forces Supabase to return the rows that were actually
-        // updated. If RLS silently blocks the write, data will be an empty
-        // array and we can surface a real error instead of falsely showing
-        // "Event updated successfully".
-        const { data, error } = await supabase
-          .from('qualifier_events')
-          .update(payload)
-          .eq('id', editingEvent.id)
-          .select()
-
+        const { data, error } = await supabase.from('qualifier_events').update(payload).eq('id', editingEvent.id).select()
         if (error) throw error
-        if (!data || data.length === 0) {
-          throw new Error(
-            'Update was not applied. This is usually a Row-Level Security issue — your admin user does not have UPDATE permission on qualifier_events. Run supabase/qualifier_events_rls.sql in the Supabase SQL editor.'
-          )
-        }
-
-        const updated = data[0]
-        setEvents(prev => prev.map(e => (e.id === updated.id ? updated : e)))
+        if (!data || data.length === 0) throw new Error('Update was not applied — check RLS permissions.')
+        setEvents(prev => prev.map(e => e.id === data[0].id ? data[0] : e))
         toast.success('Event updated successfully')
       } else {
-        const { data, error } = await supabase
-          .from('qualifier_events')
-          .insert(payload)
-          .select()
-
+        const { data, error } = await supabase.from('qualifier_events').insert(payload).select()
         if (error) throw error
-        if (!data || data.length === 0) {
-          throw new Error(
-            'Insert was not applied. This is usually a Row-Level Security issue — your admin user does not have INSERT permission on qualifier_events. Run supabase/qualifier_events_rls.sql in the Supabase SQL editor.'
-          )
-        }
-
-        const inserted = data[0]
-        setEvents(prev => [...prev, inserted])
+        if (!data || data.length === 0) throw new Error('Insert was not applied — check RLS permissions.')
+        setEvents(prev => [...prev, data[0]])
         toast.success('Event added successfully')
       }
 
       setShowModal(false)
-      // Re-fetch from the server to make sure every other view of this
-      // page also sees the canonical, post-write state.
       fetchEvents()
-
     } catch (error) {
-      console.error('AdminEvents save failed:', error)
       toast.error(error?.message ? `Error saving event: ${error.message}` : 'Error saving event')
     } finally {
       setSaving(false)
@@ -198,24 +132,14 @@ export default function AdminEvents() {
 
   async function handleDelete(eventId) {
     try {
-      const { data, error } = await supabase
-        .from('qualifier_events')
-        .delete()
-        .eq('id', eventId)
-        .select()
-
+      const { data, error } = await supabase.from('qualifier_events').delete().eq('id', eventId).select()
       if (error) throw error
-      if (!data || data.length === 0) {
-        throw new Error(
-          'Delete was not applied. This is usually a Row-Level Security issue — your admin user does not have DELETE permission on qualifier_events. Run supabase/qualifier_events_rls.sql in the Supabase SQL editor.'
-        )
-      }
+      if (!data || data.length === 0) throw new Error('Delete was not applied — check RLS permissions.')
       toast.success('Event deleted')
       setShowDeleteConfirm(null)
       setEvents(prev => prev.filter(e => e.id !== eventId))
       fetchEvents()
     } catch (error) {
-      console.error('AdminEvents delete failed:', error)
       toast.error(error?.message ? `Error deleting event: ${error.message}` : 'Error deleting event')
     }
   }
@@ -223,282 +147,146 @@ export default function AdminEvents() {
   if (loading) return (
     <div className="space-y-4">
       <Skeleton className="h-10 w-56" />
-      <Skeleton className="h-64" />
+      <Skeleton className="h-20 rounded-2xl" />
+      <Skeleton className="h-64 rounded-2xl" />
     </div>
   )
+
+  const upcoming = filtered.filter(e => !getEventTiming(e.date).isPast)
+  const past     = filtered.filter(e =>  getEventTiming(e.date).isPast)
 
   return (
     <div className="space-y-6">
 
-      {/* Header */}
       <PageHeader
         title="Qualifier Events"
-        description={`${events.length} events in the system`}
+        description={`${events.length} events · ${upcoming.length} upcoming`}
         actions={
           <Button onClick={openAdd}>
-            <Plus size={18} />
-            Add Event
+            <Plus size={18} /> Add Event
           </Button>
         }
       />
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="relative">
-            <select
-              value={provinceFilter}
-              onChange={e => setProvinceFilter(e.target.value)}
-              className="appearance-none pl-4 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
-            >
-              <option value="all">All provinces</option>
-              {PROVINCES.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-
-          <div className="relative">
-            <select
-              value={typeFilter}
-              onChange={e => setTypeFilter(e.target.value)}
-              className="appearance-none pl-4 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
-            >
-              <option value="all">All event types</option>
-              {EVENT_TYPES.map(t => (
-                <option key={t} value={t}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          {[
+            { value: provinceFilter, onChange: setProvinceFilter, options: ['all', ...PROVINCES], label: p => p === 'all' ? 'All provinces' : p },
+            { value: typeFilter,     onChange: setTypeFilter,     options: ['all', ...EVENT_TYPES], label: t => t === 'all' ? 'All types' : t.charAt(0).toUpperCase() + t.slice(1) },
+          ].map((sel, i) => (
+            <div key={i} className="relative">
+              <select
+                value={sel.value}
+                onChange={e => sel.onChange(e.target.value)}
+                className="appearance-none pl-4 pr-9 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white w-full sm:w-auto"
+              >
+                {sel.options.map(o => <option key={o} value={o}>{sel.label(o)}</option>)}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Events list */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100">
-        {filtered.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">
-            No events found. Click "Add Event" to get started.
-          </div>
-        ) : (
-          filtered.map(event => {
-            const status = getEventStatus(event.date)
-            const games = event.qualifier_number
-              ? QUALIFIER_GAMES[event.qualifier_number]
-              : null
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200 py-16 text-center shadow-sm">
+          <Calendar size={32} className="mx-auto mb-3 text-gray-200" />
+          <p className="text-sm text-gray-400 font-medium">No events found</p>
+          <p className="text-xs text-gray-300 mt-1">Click "Add Event" to get started</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
 
-            return (
-              <div key={event.id} className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-
-                    {/* Top row */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${status.style}`}>
-                        {status.label}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700 capitalize">
-                        {event.event_type}
-                      </span>
-                      {event.qualifier_number && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">
-                          Q{event.qualifier_number}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Date and venue */}
-                    <div className="mt-2 flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-gray-700">
-                        <Calendar size={15} className="text-gray-400" />
-                        <span className="text-sm font-medium">
-                          {new Date(event.date).toLocaleDateString('en-ZA', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-gray-700">
-                        <MapPin size={15} className="text-gray-400" />
-                        <span className="text-sm">{event.venue}, {event.province}</span>
-                      </div>
-                    </div>
-
-                    {/* Games */}
-                    {games && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {games.map(game => (
-                          <span
-                            key={game}
-                            className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full"
-                          >
-                            {game}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Notes */}
-                    {event.notes && (
-                      <p className="mt-2 text-xs text-gray-500 italic">{event.notes}</p>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => openEdit(event)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteConfirm(event.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
+          {/* Upcoming */}
+          {upcoming.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                Upcoming — {upcoming.length}
+              </p>
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
+                {upcoming.map(event => <EventRow key={event.id} event={event} onEdit={openEdit} onDelete={setShowDeleteConfirm} />)}
               </div>
-            )
-          })
-        )}
-      </div>
+            </div>
+          )}
+
+          {/* Past */}
+          {past.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                Past — {past.length}
+              </p>
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100 opacity-70">
+                {past.map(event => <EventRow key={event.id} event={event} onEdit={openEdit} onDelete={setShowDeleteConfirm} />)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-5 sm:p-6 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-gray-800">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900">
                 {editingEvent ? 'Edit Event' : 'Add New Event'}
               </h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition">
                 <X size={20} />
               </button>
             </div>
 
             <div className="space-y-4">
-              {/* Event type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Event Type
-                </label>
-                <select
-                  value={form.event_type}
-                  onChange={e => setForm({ ...form, event_type: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                >
-                  {EVENT_TYPES.map(t => (
-                    <option key={t} value={t}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Field label="Event Type">
+                <SelectField value={form.event_type} onChange={v => setForm({ ...form, event_type: v })}>
+                  {EVENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                </SelectField>
+              </Field>
 
-              {/* Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={e => setForm({ ...form, date: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                />
-              </div>
+              <Field label="Date">
+                <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+              </Field>
 
-              {/* Province */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Province
-                </label>
-                <select
-                  value={form.province}
-                  onChange={e => setForm({ ...form, province: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                >
+              <Field label="Province">
+                <SelectField value={form.province} onChange={v => setForm({ ...form, province: v })}>
                   <option value="">Select province</option>
-                  {PROVINCES.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
+                  {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                </SelectField>
+              </Field>
 
-              {/* Venue */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Venue
-                </label>
-                <input
-                  type="text"
-                  value={form.venue}
-                  onChange={e => setForm({ ...form, venue: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+              <Field label="Venue">
+                <input type="text" value={form.venue} onChange={e => setForm({ ...form, venue: e.target.value })}
                   placeholder="e.g. Cavallo Felice, Meyerton"
-                />
-              </div>
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+              </Field>
 
-              {/* Qualifier number */}
               {form.event_type === 'qualifier' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Qualifier Number
-                  </label>
-                  <select
-                    value={form.qualifier_number}
-                    onChange={e => setForm({ ...form, qualifier_number: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                  >
+                <Field label="Qualifier Number">
+                  <SelectField value={form.qualifier_number} onChange={v => setForm({ ...form, qualifier_number: v })}>
                     <option value="">Select qualifier number</option>
                     {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                      <option key={n} value={n}>
-                        Qualifier {n} — {QUALIFIER_GAMES[n]?.join(', ')}
-                      </option>
+                      <option key={n} value={n}>Q{n} — {QUALIFIER_GAMES[n]?.join(', ')}</option>
                     ))}
-                  </select>
-                </div>
+                  </SelectField>
+                </Field>
               )}
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes (optional)
-                </label>
-                <textarea
-                  value={form.notes}
-                  onChange={e => setForm({ ...form, notes: e.target.value })}
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+              <Field label="Notes (optional)">
+                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3}
                   placeholder="Entry fees, contact details, special instructions..."
-                />
-              </div>
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm resize-none" />
+              </Field>
             </div>
 
             <div className="flex gap-3 justify-end mt-6">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
-              >
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition">
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-              >
-                <Save size={16} />
+              <button onClick={handleSave} disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-green-600 rounded-xl hover:bg-green-700 transition disabled:opacity-50">
+                <Save size={15} />
                 {saving ? 'Saving...' : editingEvent ? 'Update Event' : 'Add Event'}
               </button>
             </div>
@@ -506,31 +294,110 @@ export default function AdminEvents() {
         </div>
       )}
 
-      {/* Delete confirm modal */}
+      {/* Delete confirm */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Delete Event?</h3>
-            <p className="text-gray-500 text-sm mb-6">
-              This action cannot be undone.
-            </p>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="font-bold text-gray-900 mb-2">Delete Event?</h3>
+            <p className="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
-              >
+              <button onClick={() => setShowDeleteConfirm(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition">
                 Cancel
               </button>
-              <button
-                onClick={() => handleDelete(showDeleteConfirm)}
-                className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
-              >
+              <button onClick={() => handleDelete(showDeleteConfirm)}
+                className="px-4 py-2 text-sm text-white bg-red-600 rounded-xl hover:bg-red-700 transition">
                 Delete
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function EventRow({ event, onEdit, onDelete }) {
+  const d = new Date(event.date)
+  const day = d.toLocaleDateString('en-ZA', { day: '2-digit' })
+  const mon = d.toLocaleDateString('en-ZA', { month: 'short' }).toUpperCase()
+  const weekday = d.toLocaleDateString('en-ZA', { weekday: 'short' })
+  const games = event.qualifier_number ? QUALIFIER_GAMES[event.qualifier_number] : null
+
+  return (
+    <div className="flex items-start gap-4 p-4">
+      {/* Date stamp */}
+      <div className="flex-shrink-0 w-14 text-center bg-green-50 rounded-xl py-2.5 border border-green-100">
+        <p className="text-xs font-medium text-green-600 leading-none">{mon}</p>
+        <p className="text-2xl font-bold text-green-800 leading-tight mt-0.5">{day}</p>
+        <p className="text-xs text-green-500">{weekday}</p>
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+          {event.qualifier_number && (
+            <span className="text-xs font-bold bg-green-800 text-white px-2 py-0.5 rounded-md">
+              Q{event.qualifier_number}
+            </span>
+          )}
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${EVENT_TYPE_STYLE[event.event_type] || 'bg-gray-100 text-gray-600'}`}>
+            {event.event_type}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-gray-700 mb-1">
+          <MapPin size={13} className="text-gray-400 flex-shrink-0" />
+          <span className="text-sm font-medium truncate">{event.venue}, {event.province}</span>
+        </div>
+
+        {games && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {games.map(g => (
+              <span key={g} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{g}</span>
+            ))}
+          </div>
+        )}
+
+        {event.notes && (
+          <p className="text-xs text-gray-400 italic mt-1.5">{event.notes}</p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-1 flex-shrink-0">
+        <button onClick={() => onEdit(event)}
+          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+          <Pencil size={15} />
+        </button>
+        <button onClick={() => onDelete(event.id)}
+          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
+          <Trash2 size={15} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function SelectField({ value, onChange, children }) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full appearance-none px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white pr-10"
+      >
+        {children}
+      </select>
+      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
     </div>
   )
 }
