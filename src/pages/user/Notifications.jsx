@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import {
   Bell,
+  BellOff,
+  BellRing,
   CheckCheck,
   Trash2,
   Settings,
@@ -28,6 +30,13 @@ import {
   EmptyState,
   ConfirmDialog
 } from '../../components/ui'
+import {
+  isPushSupported,
+  getPushPermission,
+  subscribeToPush,
+  unsubscribeFromPush,
+  getCurrentPushSubscription,
+} from '../../lib/pushNotifications'
 
 const NOTIFICATION_TYPES = {
   account_approved: { icon: UserCheck, color: 'text-green-600', bg: 'bg-green-100' },
@@ -85,6 +94,98 @@ function getDateGroup(dateStr) {
 }
 
 const DATE_GROUP_ORDER = ['Today', 'Yesterday', 'This week', 'Older']
+
+function PushPermissionBanner({ userId }) {
+  const [permission, setPermission] = useState(isPushSupported() ? getPushPermission() : 'unsupported')
+  const [subscribed, setSubscribed] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!isPushSupported()) return
+    getCurrentPushSubscription().then(sub => setSubscribed(!!sub))
+  }, [])
+
+  if (permission === 'unsupported') return null
+
+  async function handleEnable() {
+    setLoading(true)
+    try {
+      const ok = await subscribeToPush(supabase, userId)
+      if (ok) {
+        setPermission('granted')
+        setSubscribed(true)
+        toast.success('Push notifications enabled')
+      } else {
+        setPermission(getPushPermission())
+        toast.error('Permission denied — enable notifications in your browser settings')
+      }
+    } catch {
+      toast.error('Failed to enable push notifications')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDisable() {
+    setLoading(true)
+    try {
+      await unsubscribeFromPush(supabase, userId)
+      setSubscribed(false)
+      toast.success('Push notifications disabled')
+    } catch {
+      toast.error('Failed to disable push notifications')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (permission === 'denied') {
+    return (
+      <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500">
+        <BellOff size={16} className="flex-shrink-0" />
+        <span>Push notifications are blocked. Enable them in your browser or device settings to get notified on your phone.</span>
+      </div>
+    )
+  }
+
+  if (permission === 'granted' && subscribed) {
+    return (
+      <div className="flex items-center justify-between gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
+        <div className="flex items-center gap-3 text-sm text-green-800">
+          <BellRing size={16} className="flex-shrink-0" />
+          <span className="font-medium">Push notifications enabled</span>
+          <span className="text-green-600 hidden sm:inline">— you'll get phone alerts even when the app is closed</span>
+        </div>
+        <button
+          onClick={handleDisable}
+          disabled={loading}
+          className="text-xs text-green-700 hover:text-red-600 underline underline-offset-2 transition flex-shrink-0 disabled:opacity-50"
+        >
+          Turn off
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
+      <div className="flex items-center gap-3 text-sm text-blue-800">
+        <Bell size={16} className="flex-shrink-0" />
+        <div>
+          <span className="font-medium">Enable phone notifications</span>
+          <span className="text-blue-600 hidden sm:inline"> — get alerted on your device when the app is closed</span>
+        </div>
+      </div>
+      <button
+        onClick={handleEnable}
+        disabled={loading}
+        className="text-xs font-semibold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex-shrink-0 disabled:opacity-50"
+      >
+        {loading ? 'Enabling…' : 'Enable'}
+      </button>
+    </div>
+  )
+}
 
 export default function Notifications() {
   const { profile } = useAuth()
@@ -226,6 +327,8 @@ export default function Notifications() {
         confirmLabel="Clear read"
         variant="danger"
       />
+
+      {profile && <PushPermissionBanner userId={profile.id} />}
 
       <PageHeader
         title="Notifications"

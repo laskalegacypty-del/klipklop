@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { PROVINCES } from '../../lib/constants'
 import {
-  CheckCircle, XCircle, AlertCircle, Search, ChevronDown, User, X, Save
+  CheckCircle, XCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader, Skeleton } from '../../components/ui'
@@ -95,12 +95,32 @@ export default function AdminUsers() {
 
   async function handleSaveEdit() {
     setEditSaving(true)
+    const oldRole = editTarget.role
+    const newRole = editForm.role
+    const roleChanged = oldRole !== newRole
+
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ province: editForm.province, age_category: editForm.age_category, role: editForm.role })
-        .eq('id', editTarget.id)
+      const profileUpdate = {
+        province: editForm.province,
+        age_category: newRole === 'supporter' ? null : editForm.age_category,
+        role: newRole,
+      }
+      const { error } = await supabase.from('profiles').update(profileUpdate).eq('id', editTarget.id)
       if (error) throw error
+
+      if (roleChanged) {
+        if (oldRole === 'supporter') {
+          await supabase.from('supporter_rider_links').delete().eq('supporter_id', editTarget.id)
+        }
+        if (oldRole === 'club_head') {
+          await supabase.from('club_member_links').delete().eq('club_head_id', editTarget.id)
+        }
+        if ((oldRole === 'user' || oldRole === 'club_member') && newRole === 'club_head') {
+          const { error: rpcError } = await supabase.rpc('migrate_rider_to_club_head', { target_user_id: editTarget.id })
+          if (rpcError) throw rpcError
+        }
+      }
+
       toast.success('Profile updated successfully')
       setShowEditModal(false)
       fetchUsers()
@@ -301,6 +321,25 @@ export default function AdminUsers() {
                 <X size={20} />
               </button>
             </div>
+
+            {editForm.role !== editTarget.role && (() => {
+              const msgs = []
+              if (editTarget.role === 'supporter') msgs.push('Their supporter–rider links will be removed.')
+              if (editTarget.role === 'club_head') msgs.push('Their club member links will be removed (managed rider data is kept).')
+              if ((editTarget.role === 'user' || editTarget.role === 'club_member') && editForm.role === 'club_head') msgs.push('Their existing horses and times will transfer and appear under their club head profile.')
+              if (editForm.role === 'supporter') msgs.push('Age category will be cleared (not applicable for supporters).')
+              return msgs.length > 0 ? (
+                <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 mb-4">
+                  <TriangleAlert size={14} className="flex-shrink-0 mt-0.5 text-amber-500" />
+                  <div>
+                    <p className="font-semibold mb-1">Role change side effects:</p>
+                    <ul className="space-y-0.5 list-disc list-inside">
+                      {msgs.map((m, i) => <li key={i}>{m}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              ) : null
+            })()}
 
             <div className="space-y-4">
               <div>

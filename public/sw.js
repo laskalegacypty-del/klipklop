@@ -98,3 +98,28 @@ self.addEventListener('fetch', event => {
     })
   )
 })
+
+self.addEventListener('push', event => {
+  const data = event.data?.json() ?? {}
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'KlipKlop', {
+      body: data.body || '',
+      icon: '/brand/klipklop-logo.png',
+      badge: '/brand/klipklop-logo.png',
+      data: { link: data.link || '/' },
+      tag: data.tag || 'klipklop',
+      renotify: true,
+    })
+  )
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const match = list.find(c => c.url.includes(self.location.origin))
+      if (match) return match.focus()
+      return clients.openWindow(event.notification.data?.link || '/')
+    })
+  )
+})
