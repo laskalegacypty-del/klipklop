@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { QUALIFIER_GAMES, normalizeGameName } from '../../lib/constants'
@@ -117,6 +118,17 @@ function StatusDot({ status }) {
 
 export default function EventDay() {
   const { profile, isClubHead } = useAuth()
+  const navigate = useNavigate()
+
+  // Check localStorage synchronously so we can show "resuming" before events load
+  const [resumeDraft] = useState(() => {
+    try {
+      const raw = localStorage.getItem('event-day:session')
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      return parsed?.entries?.length ? parsed : null
+    } catch { return null }
+  })
 
   const [step, setStep] = useState(1)
   const [events, setEvents] = useState([])
@@ -436,6 +448,16 @@ export default function EventDay() {
     restoredRef.current = false
   }
 
+  function handleDoneForNow() {
+    toast.success('Session saved — come back anytime to resume')
+    navigate('/dashboard')
+  }
+
+  function handleEndEvent() {
+    if (!window.confirm('End this event? Your unsaved times will be lost.')) return
+    handleStartOver()
+  }
+
   function handleFindRider() {
     const term = nameSearch.trim()
     if (!term) return
@@ -737,6 +759,24 @@ export default function EventDay() {
       {step === 1 && (
         <Card>
           <CardContent className="space-y-5 py-6">
+            {resumeDraft && !entries.length && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-green-800">Active session found</p>
+                  <p className="text-xs text-green-600 mt-0.5">
+                    {resumeDraft.entries.length} entries · resuming…
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleEndEvent}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium flex-shrink-0"
+                >
+                  End event
+                </button>
+              </div>
+            )}
+
             <div>
               <p className="text-sm font-semibold text-gray-800 mb-0.5">Upload the running list</p>
               <p className="text-xs text-gray-500">Start with the KlipKlop running list PDF for today&apos;s qualifier.</p>
@@ -1283,14 +1323,14 @@ export default function EventDay() {
       )}
 
       {step === 5 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur border-t border-gray-200 z-40">
-          <div className="max-w-2xl mx-auto flex gap-3">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 z-40">
+          <div className="max-w-2xl mx-auto px-4 py-3 flex gap-3 items-center">
             <button
               type="button"
-              onClick={handleStartOver}
-              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 px-3"
+              onClick={handleDoneForNow}
+              className="text-sm text-green-700 hover:text-green-900 font-medium px-2 flex-shrink-0"
             >
-              <ChevronLeft size={16} /> Start over
+              Done for now
             </button>
             <button
               type="button"
@@ -1300,6 +1340,13 @@ export default function EventDay() {
             >
               <Save size={18} />
               {saving ? 'Saving…' : 'Save All Times'}
+            </button>
+            <button
+              type="button"
+              onClick={handleEndEvent}
+              className="text-sm text-red-500 hover:text-red-700 font-medium px-2 flex-shrink-0"
+            >
+              End event
             </button>
           </div>
         </div>
