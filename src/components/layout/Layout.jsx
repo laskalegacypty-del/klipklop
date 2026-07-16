@@ -23,6 +23,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ClipboardList,
+  History,
 } from 'lucide-react'
 import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE_SIDEBAR } from '../../constants/branding'
 import OnboardingTour from '../onboarding/OnboardingTour'
@@ -38,6 +39,7 @@ const userNavItems = [
   { path: '/my-times',            label: 'My Times',          icon: Clock,         group: 'compete' },
   { path: '/tracker',             label: 'Qualifier Tracker', icon: BarChart2,     group: 'compete' },
   { path: '/event-day',           label: 'Event Day',         icon: ClipboardList, group: 'compete' },
+  { path: '/event-day-history',   label: 'Event History',     icon: History,       group: 'compete' },
   { path: '/season',              label: 'Season Overview',   icon: BarChart2,     group: 'compete' },
   { path: '/horses',              label: 'Horses',            icon: HeartPulse,    group: 'stable' },
   { path: '/friends-leaderboard', label: 'Rankings',          icon: Trophy,        group: 'stable' },
@@ -49,7 +51,8 @@ const supporterNavItems = [
   { path: '/dashboard',     label: 'Home',          icon: Home,          group: null },
   { path: '/qualifiers',    label: 'Qualifiers',    icon: Calendar,      group: 'compete' },
   { path: '/matrix',        label: 'Matrix',        icon: Table2,        group: 'compete' },
-  { path: '/event-day',     label: 'Event Day',     icon: ClipboardList, group: 'compete' },
+  { path: '/event-day',         label: 'Event Day',     icon: ClipboardList, group: 'compete' },
+  { path: '/event-day-history', label: 'Event History', icon: History,       group: 'compete' },
   { path: '/my-riders',     label: 'My Riders',     icon: UserSearch,    group: 'stable' },
   { path: '/assistant',        label: 'Assistant',       icon: MessageCircle, group: 'tools' },
   { path: '/notifications',    label: 'Notifications',   icon: Bell,          group: 'tools' },
@@ -61,7 +64,8 @@ const clubHeadNavItems = [
   { path: '/matrix',           label: 'Matrix',            icon: Table2,        group: 'season' },
   { path: '/my-club-riders',   label: 'My Riders',         icon: UsersRound,    group: 'season' },
   { path: '/tracker',          label: 'Qualifier Tracker', icon: BarChart2,     group: 'season' },
-  { path: '/event-day',        label: 'Event Day',         icon: ClipboardList, group: 'season' },
+  { path: '/event-day',         label: 'Event Day',         icon: ClipboardList, group: 'season' },
+  { path: '/event-day-history', label: 'Event History',     icon: History,       group: 'season' },
   { path: '/season',           label: 'Season Overview',   icon: BarChart2,     group: 'season' },
   { path: '/horses',           label: 'Horses',            icon: HeartPulse,    group: 'stable' },
   { path: '/assistant',        label: 'Assistant',         icon: MessageCircle, group: 'tools' },
@@ -73,7 +77,8 @@ const clubMemberNavItems = [
   { path: '/qualifiers',    label: 'Qualifiers',    icon: Calendar,      group: 'compete' },
   { path: '/matrix',        label: 'Matrix',        icon: Table2,        group: 'compete' },
   { path: '/my-times',      label: 'My Times',      icon: Clock,         group: 'compete' },
-  { path: '/event-day',     label: 'Event Day',     icon: ClipboardList, group: 'compete' },
+  { path: '/event-day',         label: 'Event Day',     icon: ClipboardList, group: 'compete' },
+  { path: '/event-day-history', label: 'Event History', icon: History,       group: 'compete' },
   { path: '/assistant',        label: 'Assistant',       icon: MessageCircle, group: 'tools' },
   { path: '/notifications',    label: 'Notifications',   icon: Bell,          group: 'tools' },
 ]

@@ -1,9 +1,9 @@
 import { Modal, Button } from '../ui'
 import { QUALIFIER_GAMES } from '../../lib/constants'
-import { getLevel } from '../../lib/matrix'
+import { getLevel, computeOvercountLevel } from '../../lib/matrix'
 
 const LEVEL_STYLES = {
-  0: 'bg-gray-100 text-gray-600',
+  0: 'bg-gray-100 text-gray-700',
   1: 'bg-blue-100 text-blue-700',
   2: 'bg-green-100 text-green-700',
   3: 'bg-orange-100 text-orange-700',
@@ -18,6 +18,8 @@ export default function EventDayTimeModal({
   onClose,
 }) {
   if (!entry) return null
+
+  const levelEntered = parseInt(entry.level) || 0
 
   function getLiveLevel(event, game) {
     const g = getGameEntry(entry, event, game)
@@ -37,6 +39,22 @@ export default function EventDayTimeModal({
       <div className="space-y-5 max-h-[70vh] overflow-y-auto -mx-2 px-2">
         {activeEvents.map(event => {
           const games = QUALIFIER_GAMES[event.qualifier_number] || []
+
+          const eventResults = games
+            .map(game => {
+              const lvl = getLiveLevel(event, game)
+              return lvl !== null ? { level_achieved: lvl } : null
+            })
+            .filter(Boolean)
+
+          const rawOC = eventResults.reduce(
+            (s, r) => s + Math.max(0, r.level_achieved - levelEntered),
+            0
+          )
+          const newLevel = computeOvercountLevel(levelEntered, eventResults)
+          const bumps = newLevel > levelEntered
+          const showBump = eventResults.length > 0
+
           return (
             <div key={event.id}>
               <div className="text-xs font-bold uppercase tracking-widest text-green-700 mb-3">
@@ -48,7 +66,7 @@ export default function EventDayTimeModal({
                   const level = getLiveLevel(event, game)
                   return (
                     <div key={game} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
-                      <div className="w-32 text-sm text-gray-700 font-medium flex-shrink-0">{game}</div>
+                      <div className="w-28 text-sm text-gray-700 font-medium flex-shrink-0">{game}</div>
                       <div className="flex-1">
                         <input
                           type="number"
@@ -68,15 +86,33 @@ export default function EventDayTimeModal({
                       >
                         NT
                       </button>
-                      {level !== null && (
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${LEVEL_STYLES[level]}`}>
-                          L{level}
-                        </span>
+                      {level !== null ? (
+                        <div className={`w-14 h-10 flex items-center justify-center rounded-xl text-2xl font-black flex-shrink-0 ${LEVEL_STYLES[level]}`}>
+                          {level}
+                        </div>
+                      ) : (
+                        <div className="w-14 h-10 flex-shrink-0" />
                       )}
                     </div>
                   )
                 })}
               </div>
+
+              {showBump && (
+                <div className={`mt-3 rounded-xl px-4 py-3 text-sm font-semibold ${bumps ? 'bg-green-100 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
+                  {bumps ? (
+                    <span>
+                      BUMP! L{levelEntered} → L{newLevel}
+                      <span className="font-normal ml-2">· {rawOC} overcount pts</span>
+                    </span>
+                  ) : (
+                    <span>
+                      {rawOC}/4 overcount pts
+                      <span className="font-normal ml-2">· Need {4 - rawOC} more to bump</span>
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}

@@ -26,6 +26,7 @@ import {
   Upload,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Check,
   X,
   ClipboardList,
@@ -35,6 +36,7 @@ import {
   RefreshCw,
   Download,
   Trash2,
+  List,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -144,6 +146,9 @@ export default function EventDay() {
   const [creatingHelperLink, setCreatingHelperLink] = useState(false)
   const [helperContributions, setHelperContributions] = useState([])
   const [loadingContributions, setLoadingContributions] = useState(false)
+
+  const [showRunningList, setShowRunningList] = useState(false)
+  const [runningListSearch, setRunningListSearch] = useState('')
 
   const restoredRef = useRef(false)
 
@@ -539,19 +544,6 @@ export default function EventDay() {
           const eventYear = new Date(event.date).getFullYear()
           const achievedAt = `${event.date}T00:00:00.000Z`
 
-          const { data: existingRows, error: fetchError } = await supabase
-            .from('qualifier_results')
-            .select('id, game')
-            .eq('combo_id', combo.id)
-            .eq('event_id', event.id)
-
-          if (fetchError) throw fetchError
-
-          const existingByGame = {}
-          existingRows?.forEach(r => {
-            existingByGame[normalizeGameName(r.game)] = r.id
-          })
-
           for (const game of games) {
             const g = eventTimes[game]
             if (!g) continue
@@ -560,30 +552,23 @@ export default function EventDay() {
 
             const finalTime = g.is_nt ? null : (parseFloat(g.time) || null)
             const normalizedGame = normalizeGameName(game)
-            const payload = {
-              combo_id: combo.id,
-              event_id: event.id,
-              game: normalizedGame,
-              time: finalTime,
-              is_nt: g.is_nt || false,
-              level_entered: entry.level,
-              level_achieved: finalTime !== null ? getLevel(normalizedGame, finalTime) : null,
-              penalties: 0,
-            }
+            const levelAchieved = finalTime !== null ? getLevel(normalizedGame, finalTime) : null
 
-            const existingId = existingByGame[normalizedGame]
-            if (existingId) {
-              const { error: updateError } = await supabase
-                .from('qualifier_results')
-                .update(payload)
-                .eq('id', existingId)
-              if (updateError) throw updateError
-            } else {
-              const { error: insertError } = await supabase
-                .from('qualifier_results')
-                .insert(payload)
-              if (insertError) throw insertError
-            }
+            const { error: upsertError } = await supabase
+              .from('event_day_results')
+              .upsert({
+                combo_id: combo.id,
+                event_id: event.id,
+                game: normalizedGame,
+                time: finalTime,
+                is_nt: g.is_nt || false,
+                level_entered: parseInt(entry.level) || 0,
+                level_achieved: levelAchieved,
+                run_number: entry.runNumber || null,
+                rider_name: stripDayAnnotation(entry.riderName) || null,
+                horse_name: entry.horseName || null,
+              }, { onConflict: 'combo_id,event_id,game' })
+            if (upsertError) throw upsertError
 
             totalSaved++
 
@@ -1181,6 +1166,47 @@ export default function EventDay() {
                 </>
               ) : (
                 <div>No times saved yet. Enter times below, then tap Save All.</div>
+              )}
+            </div>
+          )}
+
+          {entries.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowRunningList(v => !v)}
+                className="w-full px-4 py-3 flex items-center justify-between text-sm font-semibold text-gray-800 hover:bg-gray-50 transition"
+              >
+                <span className="flex items-center gap-2">
+                  <List size={15} className="text-green-700" />
+                  Running Order ({entries.length} entries)
+                </span>
+                <ChevronDown size={15} className={`text-gray-400 transition-transform ${showRunningList ? 'rotate-180' : ''}`} />
+              </button>
+              {showRunningList && (
+                <div className="border-t border-gray-100 p-3 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Search name or horse…"
+                    value={runningListSearch}
+                    onChange={e => setRunningListSearch(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <div className="max-h-60 overflow-y-auto space-y-1">
+                    {(runningListSearch ? findEntriesInList(entries, runningListSearch) : entries).map(e => {
+                      const isSelected = selectedIds.has(entryKey(e))
+                      return (
+                        <div
+                          key={entryKey(e)}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg ${isSelected ? 'border-l-4 border-green-600 bg-green-50' : 'bg-gray-50'}`}
+                        >
+                          <span className="text-xs font-bold text-gray-400 w-8 flex-shrink-0">#{e.runNumber}</span>
+                          <EntryInfoCard entry={e} showClub={false} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           )}

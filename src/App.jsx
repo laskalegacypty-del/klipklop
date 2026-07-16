@@ -31,6 +31,7 @@ import SupporterRiders from './pages/user/SupporterRiders'
 import ClubRiders from './pages/user/ClubRiders'
 import FriendsLeaderboard from './pages/user/FriendsLeaderboard'
 import EventDay from './pages/user/EventDay'
+import EventDayHistory from './pages/user/EventDayHistory'
 import GettingStarted from './pages/user/GettingStarted'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
@@ -201,6 +202,9 @@ export default function App() {
         } />
         <Route path="/event-day" element={
           <ProtectedRoute><EventDay /></ProtectedRoute>
+        } />
+        <Route path="/event-day-history" element={
+          <ProtectedRoute><EventDayHistory /></ProtectedRoute>
         } />
         <Route path="/getting-started" element={
           <ProtectedRoute><GettingStarted /></ProtectedRoute>
