@@ -619,11 +619,7 @@ export default function EventDay() {
     if (!helperSessionToken) return
     setLoadingContributions(true)
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData?.session?.access_token
-      if (!accessToken) return
-
-      const data = await fetchHelperContributions(helperSessionToken, accessToken)
+      const data = await fetchHelperContributions(helperSessionToken)
       setHelperContributions(data.contributions || [])
     } catch (err) {
       console.error(err)
@@ -643,20 +639,14 @@ export default function EventDay() {
     if (!primaryEvent || !selectedEntries.length) return
     setCreatingHelperLink(true)
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData?.session?.access_token
-      if (!accessToken) {
-        toast.error('Please sign in again')
-        return
-      }
-
       const result = await createEventDaySession({
         primary_event_id: primaryEvent.id,
         secondary_event_id: secondaryEvent?.id || null,
         is_back_to_back: isBackToBack,
         entries,
         selected_entry_keys: [...selectedIds],
-      }, accessToken)
+        venue: primaryEvent.venue,
+      })
 
       setHelperSessionUrl(result.url)
       setHelperSessionToken(result.session?.token || null)
@@ -677,11 +667,7 @@ export default function EventDay() {
   async function handleRevokeHelperLink() {
     if (!helperSessionToken) return
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData?.session?.access_token
-      if (!accessToken) return
-
-      await revokeEventDaySession(helperSessionToken, accessToken)
+      await revokeEventDaySession(helperSessionToken)
       setHelperSessionUrl(null)
       setHelperSessionToken(null)
       setHelperContributions([])
