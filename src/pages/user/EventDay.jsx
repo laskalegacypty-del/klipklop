@@ -60,9 +60,11 @@ const CATEGORY_COLORS = {
 function findEntriesInList(entries, query) {
   const q = normalizeForMatch(query)
   if (!q) return []
+  const raw = query.trim()
   return entries.filter(e =>
     normalizeForMatch(stripDayAnnotation(e.riderName)).includes(q) ||
-    normalizeForMatch(e.horseName).includes(q)
+    normalizeForMatch(e.horseName).includes(q) ||
+    String(e.runNumber).includes(raw)
   )
 }
 
