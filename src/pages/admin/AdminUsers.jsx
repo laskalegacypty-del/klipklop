@@ -109,16 +109,12 @@ export default function AdminUsers() {
       if (error) throw error
 
       if (roleChanged) {
-        if (oldRole === 'supporter') {
-          await supabase.from('supporter_rider_links').delete().eq('supporter_id', editTarget.id)
-        }
-        if (oldRole === 'club_head') {
-          await supabase.from('club_member_links').delete().eq('club_head_id', editTarget.id)
-        }
-        if ((oldRole === 'user' || oldRole === 'club_member') && newRole === 'club_head') {
-          const { error: rpcError } = await supabase.rpc('migrate_rider_to_club_head', { target_user_id: editTarget.id })
-          if (rpcError) throw rpcError
-        }
+        const { error: rpcError } = await supabase.rpc('admin_role_change_cleanup', {
+          p_target_user_id: editTarget.id,
+          p_old_role: oldRole,
+          p_new_role: newRole,
+        })
+        if (rpcError) throw rpcError
       }
 
       toast.success('Profile updated successfully')
