@@ -66,6 +66,7 @@ const clubHeadNavItems = [
   { path: '/tracker',          label: 'Qualifier Tracker', icon: BarChart2,     group: 'season' },
   { path: '/event-day',         label: 'Event Day',         icon: ClipboardList, group: 'season' },
   { path: '/event-day-history', label: 'Event History',     icon: History,       group: 'season' },
+  { path: '/my-times',         label: 'My Times',          icon: Clock,         group: 'season' },
   { path: '/season',           label: 'Season Overview',   icon: BarChart2,     group: 'season' },
   { path: '/horses',           label: 'Horses',            icon: HeartPulse,    group: 'stable' },
   { path: '/assistant',        label: 'Assistant',         icon: MessageCircle, group: 'tools' },
