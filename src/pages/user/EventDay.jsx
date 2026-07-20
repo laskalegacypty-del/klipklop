@@ -360,7 +360,11 @@ export default function EventDay() {
       const { data: pbData, error } = await supabase.rpc('get_event_entry_pbs', {
         p_entries: entryInputs,
       })
-      if (cancelled || error) return
+      if (cancelled) return
+      if (error) {
+        console.error('[fetchPBs] RPC get_event_entry_pbs failed:', error.message)
+        return
+      }
 
       const currentYear = new Date().getFullYear()
       const byEntry = {}
@@ -1517,7 +1521,7 @@ export default function EventDay() {
                   </div>
                 )}
 
-                {matchedIds.has(entryKey(entry)) && Object.keys(entryPBs[entryKey(entry)] || {}).length > 0 && (
+                {Object.keys(entryPBs[entryKey(entry)] || {}).length > 0 && (
                   <div className="border-t border-gray-100 px-4 py-2 flex flex-wrap gap-x-4 gap-y-1 bg-green-50/40">
                     <span className="text-[10px] font-semibold text-green-700 self-center mr-1">PB:</span>
                     {activeEvents.map(event => {
