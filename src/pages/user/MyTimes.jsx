@@ -1251,72 +1251,82 @@ export default function MyTimes() {
 
       {/* ── Year Bests tab ─────────────────────────────────────────────────── */}
       {activeTab === 'year' && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 px-1">
-            <CalendarDays size={16} className="text-green-700" />
-            <span className="text-sm font-semibold text-gray-700">
-              Best times in {selectedYear}
-            </span>
-            <span className="text-xs text-gray-400 ml-auto">
-              {Object.keys(yearBests).length}/13 games covered
-            </span>
-          </div>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="min-w-[580px] w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Game</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Level</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Best Time {selectedYear}</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Time to Next Level</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Also Overall PB</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {GAMES.map(game => {
+                const yb = yearBests[game]
+                const pb = personalBests[game]
+                const level = yb ? getLevel(game, yb.best_time) : null
+                const timeToNext = yb ? getTimeToNextLevel(game, yb.best_time) : null
+                const isAlsoPB = yb && pb && yb.best_time === pb.best_time
+                const missing = !yb && selectedYear === CURRENT_YEAR
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {GAMES.map(game => {
-              const yb = yearBests[game]
-              const pb = personalBests[game]
-              const level = yb ? getLevel(game, yb.best_time) : null
-              const isAlsoPB = yb && pb && yb.best_time === pb.best_time
-              const missing = !yb && selectedYear === CURRENT_YEAR
-
-              return (
-                <div
-                  key={game}
-                  className={`rounded-xl border p-4 flex flex-col gap-2 ${
-                    missing
-                      ? 'bg-red-50 border-red-200'
-                      : 'bg-white border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-1">
-                    <span className="text-xs font-semibold text-gray-600 leading-tight">{game}</span>
-                    {isAlsoPB && (
-                      <Star size={12} className="text-yellow-400 fill-yellow-400 flex-shrink-0 mt-0.5" />
-                    )}
-                  </div>
-
-                  {yb ? (
-                    <>
-                      <div className="text-2xl font-black text-gray-900 leading-none tabular-nums">
-                        {yb.best_time.toFixed(3)}
-                        <span className="text-sm font-medium text-gray-400 ml-0.5">s</span>
+                return (
+                  <tr
+                    key={game}
+                    className={missing ? MISSING_YEAR_ROW_CLASS : `hover:bg-gray-50 ${yb ? '' : 'opacity-50'}`}
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      <div className="flex items-center gap-2">
+                        {isAlsoPB && <Star size={14} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />}
+                        {game}
                       </div>
-                      <div className="flex items-center justify-between gap-1">
-                        {level !== null && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${LEVEL_STYLES[level]}`}>
-                            L{level}
-                          </span>
-                        )}
-                        {isAlsoPB && (
-                          <span className="text-xs text-yellow-600 font-medium">PB</span>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <div className={`text-sm font-medium mt-1 ${missing ? 'text-red-400' : 'text-gray-300'}`}>
-                      No time yet
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {selectedYear === CURRENT_YEAR && Object.keys(yearBests).length < 13 && (
-            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-4 py-2.5 border border-red-100">
-              <AlertCircle size={13} className="flex-shrink-0" />
-              {13 - Object.keys(yearBests).length} game{13 - Object.keys(yearBests).length !== 1 ? 's' : ''} still missing a time this season
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {level !== null ? (
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${LEVEL_STYLES[level]}`}>
+                          Level {level}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {yb ? (
+                        <span className="font-bold text-gray-800">{yb.best_time.toFixed(3)}s</span>
+                      ) : (
+                        <span className="text-gray-400">No time yet</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {!yb ? (
+                        <span className="text-gray-300">—</span>
+                      ) : level === 4 ? (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-red-100 text-red-700">Top Level</span>
+                      ) : timeToNext !== null ? (
+                        <span className="text-sm font-semibold text-orange-600">-{timeToNext.toFixed(3)}s to L{level + 1}</span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {isAlsoPB ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 text-yellow-700 px-2 py-0.5 text-xs font-bold">
+                          ★ PB
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          {selectedYear === CURRENT_YEAR && (
+            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-3 items-center">
+              <span className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 font-medium">Red row</span>
+              <span className="text-xs text-gray-500">= No time recorded this season</span>
             </div>
           )}
         </div>
