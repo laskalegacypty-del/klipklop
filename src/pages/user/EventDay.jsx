@@ -376,7 +376,20 @@ export default function EventDay() {
       for (const [ek, comboId] of Object.entries(comboMap))
         byEntry[ek] = pbsByCombo[comboId] || {}
 
+      if (cancelled) return
       setEntryPBs(byEntry)
+
+      // Patch any existing active helper session so PBs show on the helper link
+      // without needing a revoke + recreate
+      const token = helperSessionToken
+      if (token && Object.keys(byEntry).length) {
+        const enriched = entries.map(e => ({ ...e, pbs: byEntry[entryKey(e)] || {} }))
+        supabase
+          .from('event_day_sessions')
+          .update({ entries: enriched })
+          .eq('token', token)
+          .then(({ error }) => error && console.error('Failed to patch session PBs', error))
+      }
     }
 
     fetchPBs()
