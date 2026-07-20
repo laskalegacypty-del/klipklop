@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { QUALIFIER_GAMES } from '../lib/constants'
+import { QUALIFIER_GAMES, normalizeGameName } from '../lib/constants'
+import { getLevel, getTimeToNextLevel } from '../lib/matrix'
 import { entryKey, stripDayAnnotation } from '../lib/runningListParser'
-import EventDayTimeModal from '../components/event-day/EventDayTimeModal'
 import { Skeleton } from '../components/ui'
 import {
   fetchEventDaySession,
@@ -14,6 +14,7 @@ import {
   setHelperLabel,
 } from '../lib/eventDayShare'
 import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE } from '../constants/branding'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 const CATEGORY_COLORS = {
   S: 'bg-purple-100 text-purple-700',
@@ -22,32 +23,44 @@ const CATEGORY_COLORS = {
   V: 'bg-amber-100 text-amber-700',
 }
 
+const LEVEL_STYLES = {
+  0: 'bg-gray-100 text-gray-600',
+  1: 'bg-blue-100 text-blue-700',
+  2: 'bg-green-100 text-green-700',
+  3: 'bg-orange-100 text-orange-700',
+  4: 'bg-red-100 text-red-700',
+}
+
+function getBestTime(t1, t2) {
+  const n1 = t1 ? parseFloat(t1) : NaN
+  const n2 = t2 ? parseFloat(t2) : NaN
+  const valid = [n1, n2].filter(n => !isNaN(n) && n > 0)
+  return valid.length ? Math.min(...valid) : null
+}
+
 function entryStatus(entry, enteredTimes, events) {
   const key = entryKey(entry)
   const timesForEntry = enteredTimes[key]
   if (!timesForEntry) return 'empty'
-  let totalGames = 0
-  let filledGames = 0
+  let total = 0
+  let filled = 0
   for (const event of events) {
     const games = QUALIFIER_GAMES[event.qualifier_number] || []
-    totalGames += games.length
+    total += games.length
     const eventTimes = timesForEntry[event.id] || {}
     for (const game of games) {
       const g = eventTimes[game]
-      if (g && (g.is_nt || (g.time && g.time.trim() !== ''))) filledGames++
+      if (!g) continue
+      if (g.is_nt || getBestTime(g.time1, g.time2) !== null) filled++
     }
   }
-  if (filledGames === 0) return 'empty'
-  if (filledGames < totalGames) return 'partial'
+  if (filled === 0) return 'empty'
+  if (filled < total) return 'partial'
   return 'complete'
 }
 
 function StatusDot({ status }) {
-  const colors = {
-    empty: 'bg-gray-300',
-    partial: 'bg-yellow-400',
-    complete: 'bg-green-500',
-  }
+  const colors = { empty: 'bg-gray-300', partial: 'bg-yellow-400', complete: 'bg-green-500' }
   return <span className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors[status] || colors.empty}`} />
 }
 
@@ -65,15 +78,14 @@ function flattenTimesForSync(enteredTimes, activeEvents) {
       for (const game of games) {
         const g = eventTimes[game]
         if (!g) continue
-        const hasValue = g.is_nt || (g.time && g.time.trim() !== '')
-        if (!hasValue) continue
-        rows.push({
-          entry_key: ek,
-          event_id: event.id,
-          game,
-          time: g.is_nt ? null : g.time,
-          is_nt: g.is_nt,
-        })
+        if (g.is_nt) {
+          rows.push({ entry_key: ek, event_id: event.id, game, time: null, is_nt: true })
+        } else {
+          const best = getBestTime(g.time1, g.time2)
+          if (best !== null) {
+            rows.push({ entry_key: ek, event_id: event.id, game, time: best, is_nt: false })
+          }
+        }
       }
     }
   }
@@ -89,8 +101,8 @@ export default function EventDayHelper() {
   const [session, setSession] = useState(null)
   const [helperLabel, setHelperLabelState] = useState(() => getHelperLabel(token))
   const [enteredTimes, setEnteredTimes] = useState({})
-  const [timeModalEntry, setTimeModalEntry] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  const [expandedKey, setExpandedKey] = useState(null)
 
   const syncTimerRef = useRef(null)
   const enteredTimesRef = useRef(enteredTimes)
@@ -101,8 +113,7 @@ export default function EventDayHelper() {
 
   const activeEvents = useMemo(() => {
     if (!session) return []
-    const events = [session.primary_event, session.is_back_to_back ? session.secondary_event : null].filter(Boolean)
-    return events
+    return [session.primary_event, session.is_back_to_back ? session.secondary_event : null].filter(Boolean)
   }, [session])
 
   const selectedEntries = useMemo(() => {
@@ -113,7 +124,6 @@ export default function EventDayHelper() {
 
   useEffect(() => {
     let cancelled = false
-
     async function load() {
       setLoading(true)
       setError(null)
@@ -121,7 +131,6 @@ export default function EventDayHelper() {
         const data = await fetchEventDaySession(token)
         if (cancelled) return
         setSession(data.session)
-
         const local = loadHelperLocalTimes(token, deviceId)
         setEnteredTimes(local.enteredTimes)
         if (local.helperLabel) setHelperLabelState(local.helperLabel)
@@ -136,7 +145,6 @@ export default function EventDayHelper() {
         if (!cancelled) setLoading(false)
       }
     }
-
     if (token) load()
     return () => { cancelled = true }
   }, [token, deviceId])
@@ -147,14 +155,9 @@ export default function EventDayHelper() {
       if (!token || !session) return
       const times = flattenTimesForSync(enteredTimesRef.current, activeEvents)
       if (!times.length) return
-
       setSyncing(true)
       try {
-        await syncHelperTimes(token, {
-          times,
-          helperLabel: helperLabelRef.current,
-          deviceId,
-        })
+        await syncHelperTimes(token, { times, helperLabel: helperLabelRef.current, deviceId })
       } catch (err) {
         console.error(err)
       } finally {
@@ -173,7 +176,13 @@ export default function EventDayHelper() {
   }, [enteredTimes, helperLabel, session, token, deviceId, scheduleSync])
 
   function getGameEntry(entry, event, game) {
-    return enteredTimes[entryKey(entry)]?.[event.id]?.[game] || { time: '', is_nt: false }
+    const g = enteredTimes[entryKey(entry)]?.[event.id]?.[game]
+    if (!g) return { time1: '', time2: '', is_nt: false }
+    // handle old single-time format gracefully
+    if (g.time !== undefined && g.time1 === undefined) {
+      return { time1: g.time || '', time2: '', is_nt: g.is_nt || false }
+    }
+    return { time1: g.time1 || '', time2: g.time2 || '', is_nt: g.is_nt || false }
   }
 
   function setGameEntry(entry, event, game, values) {
@@ -184,7 +193,7 @@ export default function EventDayHelper() {
         ...prev[key],
         [event.id]: {
           ...(prev[key]?.[event.id] || {}),
-          [game]: { ...(prev[key]?.[event.id]?.[game] || { time: '', is_nt: false }), ...values },
+          [game]: { ...(prev[key]?.[event.id]?.[game] || { time1: '', time2: '', is_nt: false }), ...values },
         },
       },
     }))
@@ -240,17 +249,28 @@ export default function EventDayHelper() {
         <p className="text-xs text-gray-400 mt-1">Times save on this device and sync when online.</p>
       </div>
 
-      <div className="space-y-3 pb-8">
+      <div className="space-y-2 pb-8">
         {selectedEntries.map(entry => {
+          const ek = entryKey(entry)
           const status = entryStatus(entry, enteredTimes, activeEvents)
+          const isOpen = expandedKey === ek
+
           return (
             <div
-              key={entryKey(entry)}
-              className={`bg-white border rounded-xl overflow-hidden ${status === 'complete' ? 'border-green-300' : status === 'partial' ? 'border-yellow-300' : 'border-gray-200'}`}
+              key={ek}
+              className={`bg-white border rounded-xl overflow-hidden transition-colors ${
+                status === 'complete' ? 'border-green-300' :
+                status === 'partial' ? 'border-yellow-300' : 'border-gray-200'
+              }`}
             >
-              <div className="px-4 py-3 flex items-center justify-between gap-3">
+              {/* Rider header */}
+              <button
+                type="button"
+                onClick={() => setExpandedKey(isOpen ? null : ek)}
+                className="w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-gray-50 transition text-left"
+              >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-600 flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
                     #{entry.runNumber}
                   </div>
                   <div className="min-w-0">
@@ -260,32 +280,136 @@ export default function EventDayHelper() {
                         {entry.category}{entry.level}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-500">{entry.horseName} · Group {entry.group}</div>
+                    <div className="text-xs text-gray-500">{entry.horseName}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <StatusDot status={status} />
-                  <button
-                    type="button"
-                    onClick={() => setTimeModalEntry(entry)}
-                    className="text-xs font-semibold text-white bg-green-700 hover:bg-green-800 px-3 py-2 rounded-lg transition"
-                  >
-                    Enter Times
-                  </button>
+                  {isOpen
+                    ? <ChevronDown size={16} className="text-gray-400" />
+                    : <ChevronRight size={16} className="text-gray-400" />
+                  }
                 </div>
-              </div>
+              </button>
+
+              {/* Expanded games */}
+              {isOpen && (
+                <div className="border-t border-gray-100 px-4 pt-3 pb-4 space-y-6">
+                  {activeEvents.map(event => {
+                    const games = QUALIFIER_GAMES[event.qualifier_number] || []
+                    return (
+                      <div key={event.id}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-green-700 mb-3">
+                          Q{event.qualifier_number} · {event.venue}
+                        </p>
+                        <div className="space-y-4">
+                          {games.map(game => {
+                            const g = getGameEntry(entry, event, game)
+                            const normGame = normalizeGameName(game) || game
+                            const pb = entry.pbs?.[normGame]
+                            const best = g.is_nt ? null : getBestTime(g.time1, g.time2)
+                            const level = best !== null ? getLevel(normGame, best) : null
+                            const timeToNext = best !== null && level !== null && level < 4
+                              ? getTimeToNextLevel(normGame, best)
+                              : null
+
+                            return (
+                              <div key={game}>
+                                {/* Game name row with PB + live level */}
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <span className="text-xs font-semibold text-gray-700">{game}</span>
+                                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                                    {pb != null && (
+                                      <span className="text-[10px] text-gray-400">
+                                        PB <span className="font-semibold text-gray-600">{parseFloat(pb).toFixed(3)}s</span>
+                                      </span>
+                                    )}
+                                    {level !== null && (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${LEVEL_STYLES[level]}`}>
+                                        L{level}
+                                      </span>
+                                    )}
+                                    {timeToNext !== null && (
+                                      <span className="text-[10px] font-medium text-orange-600">
+                                        -{timeToNext.toFixed(3)}s to L{level + 1}
+                                      </span>
+                                    )}
+                                    {level === 4 && (
+                                      <span className="text-[10px] font-bold text-red-600">Top level</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Time inputs */}
+                                {g.is_nt ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-center text-xs font-semibold text-red-500">
+                                      NT — No Time
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setGameEntry(entry, event, game, { is_nt: false, time1: '', time2: '' })}
+                                      className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-2 transition"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-end gap-2">
+                                    <div className="flex-1">
+                                      <label className="block text-[10px] text-gray-400 mb-1">Round 1</label>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        step="0.001"
+                                        min="0"
+                                        placeholder="0.000"
+                                        value={g.time1}
+                                        onChange={e => setGameEntry(entry, event, game, { time1: e.target.value })}
+                                        className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <label className="block text-[10px] text-gray-400 mb-1">Round 2</label>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        step="0.001"
+                                        min="0"
+                                        placeholder="0.000"
+                                        value={g.time2}
+                                        onChange={e => setGameEntry(entry, event, game, { time2: e.target.value })}
+                                        className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+                                      />
+                                    </div>
+                                    {best !== null && (
+                                      <div className="flex-shrink-0 text-center pb-1">
+                                        <div className="text-[10px] text-gray-400 mb-0.5">Best</div>
+                                        <div className="text-sm font-bold text-green-700 tabular-nums">{best.toFixed(3)}s</div>
+                                      </div>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setGameEntry(entry, event, game, { is_nt: true, time1: '', time2: '' })}
+                                      className="flex-shrink-0 h-10 text-xs font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg px-2 transition"
+                                    >
+                                      NT
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )
         })}
       </div>
-
-      <EventDayTimeModal
-        entry={timeModalEntry}
-        activeEvents={activeEvents}
-        getGameEntry={getGameEntry}
-        setGameEntry={setGameEntry}
-        onClose={() => setTimeModalEntry(null)}
-      />
     </HelperShell>
   )
 }

@@ -17,8 +17,10 @@ import {
   ACTIVE_SESSION_KEY,
   createEventDaySession,
   fetchHelperContributions,
+  fetchMyActiveEventDaySession,
   revokeEventDaySession,
   mergeHelperContributions,
+  syncHelperTimes,
 } from '../../lib/eventDayShare'
 import { copyAndShare } from '../../lib/shareLink'
 import EventDayTimeModal from '../../components/event-day/EventDayTimeModal'
@@ -209,7 +211,10 @@ export default function EventDay() {
 
   // ── Bootstrap active session on mount ────────────────────────────────────
   useEffect(() => {
-    if (!events.length) return
+    if (!events.length || restoredRef.current) return
+
+    let restoredLocally = false
+
     try {
       const draft = localStorage.getItem('event-day:session')
       if (draft) {
@@ -217,6 +222,7 @@ export default function EventDay() {
         const { entries: e, matchedIds: mids, selectedIds: ids, enteredTimes: et, isBackToBack: btb, primaryEventId, secondaryEventId, step: savedStep, helperSessionToken: hst, helperSessionUrl: hsu } = parsed
         if (e?.length) {
           restoredRef.current = true
+          restoredLocally = true
           setEntries(e)
           setMatchedIds(new Set(mids || []))
           setSelectedIds(new Set(ids || []))
@@ -234,15 +240,60 @@ export default function EventDay() {
           }
           if (savedStep) setStep(savedStep)
           toast.success('Restored your saved session')
-          return
         }
       }
 
-      const active = JSON.parse(localStorage.getItem(ACTIVE_SESSION_KEY))
-      if (!active?.primaryEventId || primaryEvent) return
-      const ev = events.find(e => e.id === active.primaryEventId)
-      if (ev) setPrimaryEvent(ev)
+      if (!restoredLocally) {
+        const active = JSON.parse(localStorage.getItem(ACTIVE_SESSION_KEY))
+        if (active?.primaryEventId && !primaryEvent) {
+          const ev = events.find(e => e.id === active.primaryEventId)
+          if (ev) { setPrimaryEvent(ev); restoredLocally = true }
+        }
+      }
     } catch { /* ignore */ }
+
+    if (restoredLocally) return
+
+    // No local session — try DB (handles new device / phone)
+    async function tryRestoreFromDB() {
+      if (restoredRef.current) return
+      try {
+        const dbSession = await fetchMyActiveEventDaySession()
+        if (!dbSession || restoredRef.current) return
+
+        const ev = events.find(e => e.id === dbSession.primary_event_id)
+        if (!ev) return
+
+        restoredRef.current = true
+        const sessionEntries = dbSession.entries || []
+        const selectedKeys = dbSession.selected_entry_keys || []
+
+        setEntries(sessionEntries)
+        setSelectedIds(new Set(selectedKeys))
+        setMatchedIds(new Set())
+        setHelperSessionToken(dbSession.token)
+        setIsBackToBack(dbSession.is_back_to_back || false)
+        setPrimaryEvent(ev)
+
+        if (dbSession.secondary_event_id) {
+          const sec = events.find(e => e.id === dbSession.secondary_event_id)
+          if (sec) setSecondaryEvent(sec)
+        }
+
+        // Merge all contributions (includes organizer's own synced times)
+        const { contributions } = await fetchHelperContributions(dbSession.token)
+        if (contributions.length) {
+          setEnteredTimes(prev => mergeHelperContributions(prev, contributions))
+        }
+
+        setStep(5)
+        toast.success('Restored your session')
+      } catch (err) {
+        console.error('DB session restore failed', err)
+      }
+    }
+
+    tryRestoreFromDB()
   }, [events, primaryEvent])
 
   // ── Load user combos ──────────────────────────────────────────────────────
@@ -346,6 +397,43 @@ export default function EventDay() {
       }
     } catch { /* ignore */ }
   }, [entries, matchedIds, selectedIds, enteredTimes, primaryEvent, isBackToBack, secondaryEvent, step, helperSessionToken, helperSessionUrl])
+
+  // ── Sync organizer's entered times to DB for cross-device access ─────────
+  const orgSyncTimerRef = useRef(null)
+  useEffect(() => {
+    if (!helperSessionToken || !primaryEvent || !entries.length) return
+    if (orgSyncTimerRef.current) clearTimeout(orgSyncTimerRef.current)
+    orgSyncTimerRef.current = setTimeout(async () => {
+      const activeEvs = [primaryEvent, isBackToBack && secondaryEvent].filter(Boolean)
+      const rows = []
+      for (const [ek, byEvent] of Object.entries(enteredTimes)) {
+        for (const ev of activeEvs) {
+          const games = QUALIFIER_GAMES[ev.qualifier_number] || []
+          const eventTimes = byEvent[ev.id] || {}
+          for (const game of games) {
+            const g = eventTimes[game]
+            if (!g) continue
+            if (g.is_nt) {
+              rows.push({ entry_key: ek, event_id: ev.id, game, time: null, is_nt: true })
+            } else if (g.time && String(g.time).trim() !== '') {
+              rows.push({ entry_key: ek, event_id: ev.id, game, time: parseFloat(g.time), is_nt: false })
+            }
+          }
+        }
+      }
+      if (!rows.length) return
+      try {
+        await syncHelperTimes(helperSessionToken, {
+          times: rows,
+          helperLabel: 'Organizer',
+          deviceId: `organizer-${profile?.id || 'main'}`,
+        })
+      } catch (err) {
+        console.error('Organizer sync failed', err)
+      }
+    }, 1200)
+    return () => clearTimeout(orgSyncTimerRef.current)
+  }, [enteredTimes, helperSessionToken, primaryEvent, secondaryEvent, isBackToBack, entries.length, profile])
 
   // ── PDF upload & parse ───────────────────────────────────────────────────
   async function processPdfFile(file) {
@@ -671,11 +759,38 @@ export default function EventDay() {
     if (!primaryEvent || !selectedEntries.length) return
     setCreatingHelperLink(true)
     try {
+      // Collect combo IDs for matched entries so we can bake PBs into the session
+      const comboMap = {}
+      for (const entry of selectedEntries) {
+        const combo = findMatchingCombo(entry, myCombos)
+        if (combo) comboMap[entryKey(entry)] = combo.id
+      }
+      const comboIds = [...new Set(Object.values(comboMap))]
+      const pbsByComboId = {}
+      if (comboIds.length > 0) {
+        const { data: pbRows } = await supabase
+          .from('personal_bests')
+          .select('combo_id, game, best_time')
+          .in('combo_id', comboIds)
+        for (const row of pbRows || []) {
+          if (!pbsByComboId[row.combo_id]) pbsByComboId[row.combo_id] = {}
+          const existing = pbsByComboId[row.combo_id][row.game]
+          if (existing == null || row.best_time < existing) {
+            pbsByComboId[row.combo_id][row.game] = row.best_time
+          }
+        }
+      }
+      const enrichedEntries = entries.map(entry => {
+        const comboId = comboMap[entryKey(entry)]
+        return { ...entry, pbs: comboId ? (pbsByComboId[comboId] || {}) : {} }
+      })
+
       const result = await createEventDaySession({
+        created_by: profile?.id,
         primary_event_id: primaryEvent.id,
         secondary_event_id: secondaryEvent?.id || null,
         is_back_to_back: isBackToBack,
-        entries,
+        entries: enrichedEntries,
         selected_entry_keys: [...selectedIds],
         venue: primaryEvent.venue,
       })

@@ -65,6 +65,7 @@ export async function createEventDaySession(payload) {
     .from('event_day_sessions')
     .insert({
       token,
+      created_by: payload.created_by,
       primary_event_id: payload.primary_event_id,
       secondary_event_id: payload.secondary_event_id || null,
       is_back_to_back: payload.is_back_to_back || false,
@@ -134,6 +135,19 @@ export async function fetchHelperContributions(token) {
 
   if (error) throw new Error(error.message || 'Could not load helper times')
   return { contributions: contributions || [] }
+}
+
+/** Returns the creator's most recent non-expired, non-revoked session. RLS filters by auth.uid() automatically. */
+export async function fetchMyActiveEventDaySession() {
+  const { data } = await supabase
+    .from('event_day_sessions')
+    .select('*')
+    .is('revoked_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data || null
 }
 
 export async function revokeEventDaySession(token) {
