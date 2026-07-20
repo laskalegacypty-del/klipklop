@@ -21,6 +21,7 @@ import {
   X,
   LayoutGrid,
   History,
+  CalendarDays,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { APP_NAME } from '../../constants/branding'
@@ -62,7 +63,7 @@ const LEVEL_DOT_COLORS = {
 const LEVEL_DASH_COLORS = ['#bfdbfe', '#bbf7d0', '#fed7aa', '#fecaca']
 
 const CURRENT_YEAR = new Date().getFullYear()
-const MY_TIMES_TABS = ['times', 'grid', 'history', 'videos', 'trends']
+const MY_TIMES_TABS = ['times', 'year', 'grid', 'history', 'videos', 'trends']
 
 function buildYearOptions() {
   const years = []
@@ -1076,6 +1077,7 @@ export default function MyTimes() {
       {(() => {
         const sections = [
           { id: 'times',   label: 'Personal Bests',    icon: Star },
+          { id: 'year',    label: 'Year Bests',        icon: CalendarDays },
           { id: 'grid',    label: 'Qualifier Grid',    icon: LayoutGrid },
           { id: 'history', label: 'History',           icon: History },
           { id: 'videos',  label: 'Videos',            icon: Video },
@@ -1083,7 +1085,7 @@ export default function MyTimes() {
         ]
         return (
           /* Mobile: 2-col icon grid */
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 md:hidden">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 md:hidden">
             {sections.map(({ id, label, icon: Icon }) => {
               const active = activeTab === id
               return (
@@ -1112,6 +1114,7 @@ export default function MyTimes() {
         {(() => {
           const sections = [
             { id: 'times',   label: 'Personal Bests', icon: Star },
+            { id: 'year',    label: 'Year Bests',     icon: CalendarDays },
             { id: 'grid',    label: 'Qualifier Grid',  icon: LayoutGrid },
             { id: 'history', label: 'History',         icon: History },
             { id: 'videos',  label: 'Videos',          icon: Video },
@@ -1241,6 +1244,79 @@ export default function MyTimes() {
             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-3 items-center">
               <span className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 font-medium">Red row</span>
               <span className="text-xs text-gray-500">= No time recorded this season</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Year Bests tab ─────────────────────────────────────────────────── */}
+      {activeTab === 'year' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <CalendarDays size={16} className="text-green-700" />
+            <span className="text-sm font-semibold text-gray-700">
+              Best times in {selectedYear}
+            </span>
+            <span className="text-xs text-gray-400 ml-auto">
+              {Object.keys(yearBests).length}/13 games covered
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {GAMES.map(game => {
+              const yb = yearBests[game]
+              const pb = personalBests[game]
+              const level = yb ? getLevel(game, yb.best_time) : null
+              const isAlsoPB = yb && pb && yb.best_time === pb.best_time
+              const missing = !yb && selectedYear === CURRENT_YEAR
+
+              return (
+                <div
+                  key={game}
+                  className={`rounded-xl border p-4 flex flex-col gap-2 ${
+                    missing
+                      ? 'bg-red-50 border-red-200'
+                      : 'bg-white border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-xs font-semibold text-gray-600 leading-tight">{game}</span>
+                    {isAlsoPB && (
+                      <Star size={12} className="text-yellow-400 fill-yellow-400 flex-shrink-0 mt-0.5" />
+                    )}
+                  </div>
+
+                  {yb ? (
+                    <>
+                      <div className="text-2xl font-black text-gray-900 leading-none tabular-nums">
+                        {yb.best_time.toFixed(3)}
+                        <span className="text-sm font-medium text-gray-400 ml-0.5">s</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-1">
+                        {level !== null && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${LEVEL_STYLES[level]}`}>
+                            L{level}
+                          </span>
+                        )}
+                        {isAlsoPB && (
+                          <span className="text-xs text-yellow-600 font-medium">PB</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className={`text-sm font-medium mt-1 ${missing ? 'text-red-400' : 'text-gray-300'}`}>
+                      No time yet
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {selectedYear === CURRENT_YEAR && Object.keys(yearBests).length < 13 && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-4 py-2.5 border border-red-100">
+              <AlertCircle size={13} className="flex-shrink-0" />
+              {13 - Object.keys(yearBests).length} game{13 - Object.keys(yearBests).length !== 1 ? 's' : ''} still missing a time this season
             </div>
           )}
         </div>
