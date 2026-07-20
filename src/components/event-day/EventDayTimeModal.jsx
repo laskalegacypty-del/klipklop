@@ -1,5 +1,5 @@
 import { Modal, Button } from '../ui'
-import { QUALIFIER_GAMES } from '../../lib/constants'
+import { QUALIFIER_GAMES, normalizeGameName } from '../../lib/constants'
 import { getLevel, computeOvercountLevel } from '../../lib/matrix'
 
 const LEVEL_STYLES = {
@@ -15,6 +15,7 @@ export default function EventDayTimeModal({
   activeEvents,
   getGameEntry,
   setGameEntry,
+  pbs = {},
   onClose,
 }) {
   if (!entry) return null
@@ -66,7 +67,14 @@ export default function EventDayTimeModal({
                   const level = getLiveLevel(event, game)
                   return (
                     <div key={game} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
-                      <div className="w-28 text-sm text-gray-700 font-medium flex-shrink-0">{game}</div>
+                      <div className="w-28 flex-shrink-0">
+                        <div className="text-sm text-gray-700 font-medium">{game}</div>
+                        {pbs[normalizeGameName(game) || game] != null && (
+                          <div className="text-[10px] text-gray-400 tabular-nums">
+                            PB {parseFloat(pbs[normalizeGameName(game) || game]).toFixed(3)}s
+                          </div>
+                        )}
+                      </div>
                       <div className="flex-1">
                         <input
                           type="number"

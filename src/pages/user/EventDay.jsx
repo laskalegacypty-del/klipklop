@@ -154,6 +154,7 @@ export default function EventDay() {
 
   const [myCombos, setMyCombos] = useState([])
   const [loadingCombos, setLoadingCombos] = useState(true)
+  const [entryPBs, setEntryPBs] = useState({})
   const [enteredTimes, setEnteredTimes] = useState({})
   const [timeModalEntry, setTimeModalEntry] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -341,6 +342,46 @@ export default function EventDay() {
     loadCombos()
     return () => { cancelled = true }
   }, [profile, isClubHead])
+
+  // ── Fetch PBs for matched combos ──────────────────────────────────────────
+  useEffect(() => {
+    if (!myCombos.length || !entries.length) return
+    let cancelled = false
+
+    async function fetchPBs() {
+      const comboMap = {}
+      for (const e of entries) {
+        const combo = findMatchingCombo(e, myCombos)
+        if (combo) comboMap[entryKey(e)] = combo.id
+      }
+      const comboIds = [...new Set(Object.values(comboMap))]
+      if (!comboIds.length) return
+
+      const { data: pbRows } = await supabase
+        .from('personal_bests')
+        .select('combo_id, game, best_time')
+        .in('combo_id', comboIds)
+
+      if (cancelled) return
+
+      const pbsByCombo = {}
+      for (const row of pbRows || []) {
+        if (!pbsByCombo[row.combo_id]) pbsByCombo[row.combo_id] = {}
+        const existing = pbsByCombo[row.combo_id][row.game]
+        if (existing == null || row.best_time < existing)
+          pbsByCombo[row.combo_id][row.game] = row.best_time
+      }
+
+      const byEntry = {}
+      for (const [ek, comboId] of Object.entries(comboMap))
+        byEntry[ek] = pbsByCombo[comboId] || {}
+
+      setEntryPBs(byEntry)
+    }
+
+    fetchPBs()
+    return () => { cancelled = true }
+  }, [myCombos, entries])
 
   // ── Restore session from localStorage (legacy per-event key) ─────────────
   useEffect(() => {
@@ -759,31 +800,11 @@ export default function EventDay() {
     if (!primaryEvent || !selectedEntries.length) return
     setCreatingHelperLink(true)
     try {
-      // Collect combo IDs for matched entries so we can bake PBs into the session
-      const comboMap = {}
-      for (const entry of selectedEntries) {
-        const combo = findMatchingCombo(entry, myCombos)
-        if (combo) comboMap[entryKey(entry)] = combo.id
-      }
-      const comboIds = [...new Set(Object.values(comboMap))]
-      const pbsByComboId = {}
-      if (comboIds.length > 0) {
-        const { data: pbRows } = await supabase
-          .from('personal_bests')
-          .select('combo_id, game, best_time')
-          .in('combo_id', comboIds)
-        for (const row of pbRows || []) {
-          if (!pbsByComboId[row.combo_id]) pbsByComboId[row.combo_id] = {}
-          const existing = pbsByComboId[row.combo_id][row.game]
-          if (existing == null || row.best_time < existing) {
-            pbsByComboId[row.combo_id][row.game] = row.best_time
-          }
-        }
-      }
-      const enrichedEntries = entries.map(entry => {
-        const comboId = comboMap[entryKey(entry)]
-        return { ...entry, pbs: comboId ? (pbsByComboId[comboId] || {}) : {} }
-      })
+      // PBs are already fetched into entryPBs — just embed them
+      const enrichedEntries = entries.map(entry => ({
+        ...entry,
+        pbs: entryPBs[entryKey(entry)] || {},
+      }))
 
       const result = await createEventDaySession({
         created_by: profile?.id,
@@ -1419,6 +1440,10 @@ export default function EventDay() {
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${CATEGORY_COLORS[entry.category] || 'bg-gray-100'}`}>
                           {entry.category}{entry.level}
                         </span>
+                        {matchedIds.has(entryKey(entry))
+                          ? <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded">✓ PB matched</span>
+                          : <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">No match</span>
+                        }
                         {hasHelper && (
                           <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">Helper times</span>
                         )}
@@ -1457,6 +1482,25 @@ export default function EventDay() {
                             {level !== null && !g.is_nt && (
                               <span className={`text-[10px] px-1 rounded ${LEVEL_STYLES[level]}`}>L{level}</span>
                             )}
+                          </div>
+                        )
+                      })
+                    })}
+                  </div>
+                )}
+
+                {matchedIds.has(entryKey(entry)) && Object.keys(entryPBs[entryKey(entry)] || {}).length > 0 && (
+                  <div className="border-t border-gray-100 px-4 py-2 flex flex-wrap gap-x-4 gap-y-1 bg-green-50/40">
+                    <span className="text-[10px] font-semibold text-green-700 self-center mr-1">PB:</span>
+                    {activeEvents.map(event => {
+                      const games = QUALIFIER_GAMES[event.qualifier_number] || []
+                      return games.map(game => {
+                        const pb = entryPBs[entryKey(entry)]?.[normalizeGameName(game) || game]
+                        if (pb == null) return null
+                        return (
+                          <div key={`${event.id}-${game}`} className="flex items-center gap-1 text-xs">
+                            <span className="text-gray-500">{game}:</span>
+                            <span className="font-semibold text-green-700">{parseFloat(pb).toFixed(3)}s</span>
                           </div>
                         )
                       })
@@ -1512,6 +1556,7 @@ export default function EventDay() {
         activeEvents={activeEvents}
         getGameEntry={getGameEntry}
         setGameEntry={setGameEntry}
+        pbs={timeModalEntry ? (entryPBs[entryKey(timeModalEntry)] || {}) : {}}
         onClose={() => setTimeModalEntry(null)}
       />
 
