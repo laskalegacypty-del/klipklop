@@ -344,52 +344,43 @@ export default function EventDay() {
     return () => { cancelled = true }
   }, [profile, isClubHead])
 
-  // ── Fetch PBs + year bests for matched combos ────────────────────────────
+  // ── Fetch PBs + year bests for ALL entries (any user's combo) ───────────
   useEffect(() => {
-    if (!myCombos.length || !entries.length) return
+    if (!entries.length) return
     let cancelled = false
 
     async function fetchPBs() {
-      const comboMap = {}
-      for (const e of entries) {
-        const combo = findMatchingCombo(e, myCombos)
-        if (combo) comboMap[entryKey(e)] = combo.id
-      }
-      const comboIds = [...new Set(Object.values(comboMap))]
-      if (!comboIds.length) return
+      // Pass stripped names so the SQL function matches correctly
+      const entryInputs = entries.map(e => ({
+        key: entryKey(e),
+        riderName: stripDayAnnotation(e.riderName),
+        horseName: stripDayAnnotation(e.horseName),
+      }))
 
-      const { data: pbRows } = await supabase
-        .from('personal_bests')
-        .select('combo_id, game, best_time, season_year')
-        .in('combo_id', comboIds)
-
-      if (cancelled) return
+      const { data: pbData, error } = await supabase.rpc('get_event_entry_pbs', {
+        p_entries: entryInputs,
+      })
+      if (cancelled || error) return
 
       const currentYear = new Date().getFullYear()
-      const pbsByCombo = {}
-      const yearPbsByCombo = {}
-
-      for (const row of pbRows || []) {
-        // All-time best
-        if (!pbsByCombo[row.combo_id]) pbsByCombo[row.combo_id] = {}
-        const existing = pbsByCombo[row.combo_id][row.game]
-        if (existing == null || row.best_time < existing)
-          pbsByCombo[row.combo_id][row.game] = row.best_time
-
-        // Current-year best
-        if (row.season_year === currentYear) {
-          if (!yearPbsByCombo[row.combo_id]) yearPbsByCombo[row.combo_id] = {}
-          const existingYear = yearPbsByCombo[row.combo_id][row.game]
-          if (existingYear == null || row.best_time < existingYear)
-            yearPbsByCombo[row.combo_id][row.game] = row.best_time
-        }
-      }
-
       const byEntry = {}
       const yearByEntry = {}
-      for (const [ek, comboId] of Object.entries(comboMap)) {
-        byEntry[ek] = pbsByCombo[comboId] || {}
-        yearByEntry[ek] = yearPbsByCombo[comboId] || {}
+
+      for (const [ek, pbRows] of Object.entries(pbData || {})) {
+        byEntry[ek] = {}
+        yearByEntry[ek] = {}
+        for (const row of pbRows || []) {
+          // All-time best
+          const existing = byEntry[ek][row.game]
+          if (existing == null || row.best_time < existing)
+            byEntry[ek][row.game] = row.best_time
+          // Current-year best
+          if (Number(row.season_year) === currentYear) {
+            const existingYear = yearByEntry[ek][row.game]
+            if (existingYear == null || row.best_time < existingYear)
+              yearByEntry[ek][row.game] = row.best_time
+          }
+        }
       }
 
       if (cancelled) return
@@ -408,13 +399,13 @@ export default function EventDay() {
           .from('event_day_sessions')
           .update({ entries: enriched })
           .eq('token', token)
-          .then(({ error }) => error && console.error('Failed to patch session PBs', error))
+          .then(({ error: patchErr }) => patchErr && console.error('Failed to patch session PBs', patchErr))
       }
     }
 
     fetchPBs()
     return () => { cancelled = true }
-  }, [myCombos, entries])
+  }, [entries])
 
   // ── Restore session from localStorage (legacy per-event key) ─────────────
   useEffect(() => {

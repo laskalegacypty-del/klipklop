@@ -324,7 +324,9 @@ export default function EventDayHelper() {
                                   <div className="flex gap-3 text-right flex-shrink-0">
                                     {pb != null && (
                                       <div>
-                                        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">PB</div>
+                                        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                                          {yearPb != null && parseFloat(yearPb).toFixed(3) === parseFloat(pb).toFixed(3) ? 'PB (this year)' : 'PB'}
+                                        </div>
                                         <div className="text-xs font-bold tabular-nums text-gray-700">
                                           {parseFloat(pb).toFixed(3)}s
                                           {pbLevel !== null && (
@@ -333,7 +335,7 @@ export default function EventDayHelper() {
                                         </div>
                                       </div>
                                     )}
-                                    {yearPb != null && (
+                                    {yearPb != null && parseFloat(yearPb).toFixed(3) !== parseFloat(pb).toFixed(3) && (
                                       <div>
                                         <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Year best</div>
                                         <div className="text-xs font-bold tabular-nums text-gray-700">
