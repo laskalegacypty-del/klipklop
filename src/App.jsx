@@ -203,9 +203,7 @@ export default function App() {
         <Route path="/event-day" element={
           <ProtectedRoute><EventDay /></ProtectedRoute>
         } />
-        <Route path="/event-day-history" element={
-          <ProtectedRoute><EventDayHistory /></ProtectedRoute>
-        } />
+        <Route path="/event-day-history" element={<Navigate to="/event-day" replace />} />
         <Route path="/getting-started" element={
           <ProtectedRoute><GettingStarted /></ProtectedRoute>
         } />

@@ -22,6 +22,7 @@ import {
 } from '../../lib/eventDayShare'
 import { copyAndShare } from '../../lib/shareLink'
 import EventDayTimeModal from '../../components/event-day/EventDayTimeModal'
+import EventDayHistory from './EventDayHistory'
 import { Button, Card, CardContent, PageHeader, Skeleton } from '../../components/ui'
 import {
   Upload,
@@ -38,6 +39,7 @@ import {
   Download,
   Trash2,
   List,
+  History,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -154,6 +156,7 @@ export default function EventDay() {
   const [timeModalEntry, setTimeModalEntry] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveResults, setSaveResults] = useState(null)
+  const [activeMainTab, setActiveMainTab] = useState('event')
 
   const [helperSessionUrl, setHelperSessionUrl] = useState(null)
   const [helperSessionToken, setHelperSessionToken] = useState(null)
@@ -627,6 +630,11 @@ export default function EventDay() {
         localStorage.removeItem('event-day:session')
         if (primaryEvent) localStorage.removeItem(`event-day:${primaryEvent.id}`)
         localStorage.removeItem(ACTIVE_SESSION_KEY)
+        if (helperSessionToken) {
+          try { await revokeEventDaySession(helperSessionToken) } catch { /* ignore */ }
+          setHelperSessionToken(null)
+          setHelperSessionUrl(null)
+        }
         toast.success(`Saved ${totalSaved} results${totalPBs > 0 ? ` · ${totalPBs} new PB${totalPBs > 1 ? 's' : ''}` : ''}!`)
       } else {
         toast('No new times to save — enter times first.', { icon: 'ℹ️' })
@@ -735,6 +743,38 @@ export default function EventDay() {
         description="Upload the running list, find your riders, then track and save times as the day goes by."
         icon={ClipboardList}
       />
+
+      {/* ── Main tab switcher ─────────────────────────────────────────────── */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('event')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px ${
+            activeMainTab === 'event'
+              ? 'border-green-600 text-green-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <ClipboardList size={15} />
+          Event Day
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('history')}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition -mb-px ${
+            activeMainTab === 'history'
+              ? 'border-green-600 text-green-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <History size={15} />
+          History
+        </button>
+      </div>
+
+      {activeMainTab === 'history' && <EventDayHistory embedded />}
+
+      {activeMainTab === 'event' && <>
 
       <div className="flex items-center gap-1 sm:gap-2 mb-6 overflow-x-auto pb-1">
         {['Running List', 'Find Riders', 'Rider Info', 'Select & Setup', 'Track & Save'].map((label, i) => {
@@ -1359,6 +1399,8 @@ export default function EventDay() {
         setGameEntry={setGameEntry}
         onClose={() => setTimeModalEntry(null)}
       />
+
+      </> /* end activeMainTab === 'event' */}
     </div>
   )
 }

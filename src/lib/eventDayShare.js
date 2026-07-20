@@ -55,7 +55,7 @@ export function saveHelperLocalTimes(token, deviceId, enteredTimes, helperLabel)
   } catch { /* ignore */ }
 }
 
-const EXPIRE_DAYS = 2
+const EXPIRE_DAYS = 30
 
 export async function createEventDaySession(payload) {
   const token = generateToken()

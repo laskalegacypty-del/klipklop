@@ -19,7 +19,7 @@ function formatDate(dateStr) {
   })
 }
 
-export default function EventDayHistory() {
+export default function EventDayHistory({ embedded = false }) {
   const [loading, setLoading] = useState(true)
   const [sessions, setSessions] = useState([])
   const [expanded, setExpanded] = useState(new Set())
@@ -94,12 +94,14 @@ export default function EventDayHistory() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pb-24 space-y-4">
-      <PageHeader
-        title="Event Day History"
-        subtitle="Review your past event day times"
-        icon={<History size={22} className="text-green-700" />}
-      />
+    <div className={embedded ? 'space-y-4' : 'max-w-2xl mx-auto px-4 pb-24 space-y-4'}>
+      {!embedded && (
+        <PageHeader
+          title="Event Day History"
+          subtitle="Review your past event day times"
+          icon={<History size={22} className="text-green-700" />}
+        />
+      )}
 
       {loading ? (
         <div className="space-y-3">
