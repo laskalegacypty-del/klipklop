@@ -155,6 +155,7 @@ export default function EventDay() {
   const [myCombos, setMyCombos] = useState([])
   const [loadingCombos, setLoadingCombos] = useState(true)
   const [entryPBs, setEntryPBs] = useState({})
+  const [entryYearPBs, setEntryYearPBs] = useState({})
   const [enteredTimes, setEnteredTimes] = useState({})
   const [timeModalEntry, setTimeModalEntry] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -343,7 +344,7 @@ export default function EventDay() {
     return () => { cancelled = true }
   }, [profile, isClubHead])
 
-  // ── Fetch PBs for matched combos ──────────────────────────────────────────
+  // ── Fetch PBs + year bests for matched combos ────────────────────────────
   useEffect(() => {
     if (!myCombos.length || !entries.length) return
     let cancelled = false
@@ -359,31 +360,50 @@ export default function EventDay() {
 
       const { data: pbRows } = await supabase
         .from('personal_bests')
-        .select('combo_id, game, best_time')
+        .select('combo_id, game, best_time, season_year')
         .in('combo_id', comboIds)
 
       if (cancelled) return
 
+      const currentYear = new Date().getFullYear()
       const pbsByCombo = {}
+      const yearPbsByCombo = {}
+
       for (const row of pbRows || []) {
+        // All-time best
         if (!pbsByCombo[row.combo_id]) pbsByCombo[row.combo_id] = {}
         const existing = pbsByCombo[row.combo_id][row.game]
         if (existing == null || row.best_time < existing)
           pbsByCombo[row.combo_id][row.game] = row.best_time
+
+        // Current-year best
+        if (row.season_year === currentYear) {
+          if (!yearPbsByCombo[row.combo_id]) yearPbsByCombo[row.combo_id] = {}
+          const existingYear = yearPbsByCombo[row.combo_id][row.game]
+          if (existingYear == null || row.best_time < existingYear)
+            yearPbsByCombo[row.combo_id][row.game] = row.best_time
+        }
       }
 
       const byEntry = {}
-      for (const [ek, comboId] of Object.entries(comboMap))
+      const yearByEntry = {}
+      for (const [ek, comboId] of Object.entries(comboMap)) {
         byEntry[ek] = pbsByCombo[comboId] || {}
+        yearByEntry[ek] = yearPbsByCombo[comboId] || {}
+      }
 
       if (cancelled) return
       setEntryPBs(byEntry)
+      setEntryYearPBs(yearByEntry)
 
-      // Patch any existing active helper session so PBs show on the helper link
-      // without needing a revoke + recreate
+      // Patch existing active helper session with both pbs and year_pbs
       const token = helperSessionToken
       if (token && Object.keys(byEntry).length) {
-        const enriched = entries.map(e => ({ ...e, pbs: byEntry[entryKey(e)] || {} }))
+        const enriched = entries.map(e => ({
+          ...e,
+          pbs: byEntry[entryKey(e)] || {},
+          year_pbs: yearByEntry[entryKey(e)] || {},
+        }))
         supabase
           .from('event_day_sessions')
           .update({ entries: enriched })
@@ -813,11 +833,15 @@ export default function EventDay() {
     if (!primaryEvent || !selectedEntries.length) return
     setCreatingHelperLink(true)
     try {
-      // PBs are already fetched into entryPBs — just embed them
-      const enrichedEntries = entries.map(entry => ({
-        ...entry,
-        pbs: entryPBs[entryKey(entry)] || {},
-      }))
+      // PBs and year bests are already fetched — just embed them
+      const enrichedEntries = entries.map(entry => {
+        const ek = entryKey(entry)
+        return {
+          ...entry,
+          pbs: entryPBs[ek] || {},
+          year_pbs: entryYearPBs[ek] || {},
+        }
+      })
 
       const result = await createEventDaySession({
         created_by: profile?.id,

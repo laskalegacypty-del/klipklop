@@ -307,6 +307,9 @@ export default function EventDayHelper() {
                             const g = getGameEntry(entry, event, game)
                             const normGame = normalizeGameName(game) || game
                             const pb = entry.pbs?.[normGame]
+                            const yearPb = entry.year_pbs?.[normGame]
+                            const pbLevel = pb != null ? getLevel(normGame, parseFloat(pb)) : null
+                            const yearPbLevel = yearPb != null ? getLevel(normGame, parseFloat(yearPb)) : null
                             const best = g.is_nt ? null : getBestTime(g.time1, g.time2)
                             const level = best !== null ? getLevel(normGame, best) : null
                             const timeToNext = best !== null && level !== null && level < 4
@@ -314,28 +317,32 @@ export default function EventDayHelper() {
                               : null
 
                             return (
-                              <div key={game}>
-                                {/* Game name row with PB + live level */}
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                  <span className="text-xs font-semibold text-gray-700">{game}</span>
-                                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                              <div key={game} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                                {/* Game name + PB stats */}
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-xs font-bold text-gray-800 pt-0.5">{game}</span>
+                                  <div className="flex gap-3 text-right flex-shrink-0">
                                     {pb != null && (
-                                      <span className="text-[10px] text-gray-400">
-                                        PB <span className="font-semibold text-gray-600">{parseFloat(pb).toFixed(3)}s</span>
-                                      </span>
+                                      <div>
+                                        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">PB</div>
+                                        <div className="text-xs font-bold tabular-nums text-gray-700">
+                                          {parseFloat(pb).toFixed(3)}s
+                                          {pbLevel !== null && (
+                                            <span className={`ml-1 text-[10px] px-1 py-0.5 rounded ${LEVEL_STYLES[pbLevel]}`}>L{pbLevel}</span>
+                                          )}
+                                        </div>
+                                      </div>
                                     )}
-                                    {level !== null && (
-                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${LEVEL_STYLES[level]}`}>
-                                        L{level}
-                                      </span>
-                                    )}
-                                    {timeToNext !== null && (
-                                      <span className="text-[10px] font-medium text-orange-600">
-                                        -{timeToNext.toFixed(3)}s to L{level + 1}
-                                      </span>
-                                    )}
-                                    {level === 4 && (
-                                      <span className="text-[10px] font-bold text-red-600">Top level</span>
+                                    {yearPb != null && (
+                                      <div>
+                                        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Year best</div>
+                                        <div className="text-xs font-bold tabular-nums text-gray-700">
+                                          {parseFloat(yearPb).toFixed(3)}s
+                                          {yearPbLevel !== null && (
+                                            <span className={`ml-1 text-[10px] px-1 py-0.5 rounded ${LEVEL_STYLES[yearPbLevel]}`}>L{yearPbLevel}</span>
+                                          )}
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -349,7 +356,7 @@ export default function EventDayHelper() {
                                     <button
                                       type="button"
                                       onClick={() => setGameEntry(entry, event, game, { is_nt: false, time1: '', time2: '' })}
-                                      className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-2 transition"
+                                      className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-2 bg-white transition"
                                     >
                                       Clear
                                     </button>
@@ -366,7 +373,7 @@ export default function EventDayHelper() {
                                         placeholder="0.000"
                                         value={g.time1}
                                         onChange={e => setGameEntry(entry, event, game, { time1: e.target.value })}
-                                        className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+                                        className="w-full h-10 px-2 rounded-lg border border-gray-300 bg-white text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
                                       />
                                     </div>
                                     <div className="flex-1">
@@ -379,22 +386,38 @@ export default function EventDayHelper() {
                                         placeholder="0.000"
                                         value={g.time2}
                                         onChange={e => setGameEntry(entry, event, game, { time2: e.target.value })}
-                                        className="w-full h-10 px-2 rounded-lg border border-gray-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
+                                        className="w-full h-10 px-2 rounded-lg border border-gray-300 bg-white text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
                                       />
                                     </div>
-                                    {best !== null && (
-                                      <div className="flex-shrink-0 text-center pb-1">
-                                        <div className="text-[10px] text-gray-400 mb-0.5">Best</div>
-                                        <div className="text-sm font-bold text-green-700 tabular-nums">{best.toFixed(3)}s</div>
-                                      </div>
-                                    )}
                                     <button
                                       type="button"
                                       onClick={() => setGameEntry(entry, event, game, { is_nt: true, time1: '', time2: '' })}
-                                      className="flex-shrink-0 h-10 text-xs font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg px-2 transition"
+                                      className="flex-shrink-0 h-10 text-xs font-semibold text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 bg-white rounded-lg px-2 transition"
                                     >
                                       NT
                                     </button>
+                                  </div>
+                                )}
+
+                                {/* Live result */}
+                                {(best !== null || g.is_nt) && (
+                                  <div className="flex items-center gap-2 pt-0.5">
+                                    {g.is_nt ? (
+                                      <span className="text-xs font-semibold text-red-500">No time recorded</span>
+                                    ) : (
+                                      <>
+                                        <span className="text-xs font-bold text-green-700 tabular-nums">Best: {best.toFixed(3)}s</span>
+                                        {level !== null && (
+                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${LEVEL_STYLES[level]}`}>L{level}</span>
+                                        )}
+                                        {timeToNext !== null && (
+                                          <span className="text-[10px] text-orange-600 font-medium">−{timeToNext.toFixed(3)}s to L{level + 1}</span>
+                                        )}
+                                        {level === 4 && (
+                                          <span className="text-[10px] font-bold text-red-600">Top level!</span>
+                                        )}
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
