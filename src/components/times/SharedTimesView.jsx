@@ -3,7 +3,9 @@ import { supabase } from '../../lib/supabaseClient'
 import { normalizeGameName } from '../../lib/constants'
 import { getLevel, getNationalsLevel, getProjectedNationalsLevel, getTimeToNextLevel } from '../../lib/matrix'
 import { Skeleton } from '../ui'
-import { Trophy, Star, ChevronDown, TrendingUp } from 'lucide-react'
+import { Trophy, Star, ChevronDown, TrendingUp, CalendarDays, AlertCircle } from 'lucide-react'
+
+const CURRENT_YEAR = new Date().getFullYear()
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
 import {
   GAMES,
@@ -222,7 +224,7 @@ export default function SharedTimesView({
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {tab === 'times' ? 'Personal Bests' : tab === 'grid' ? 'Qualifier Grid' : tab === 'history' ? 'History' : 'Trends'}
+            {tab === 'times' ? 'Personal Bests' : tab === 'year' ? 'Year Bests' : tab === 'grid' ? 'Qualifier Grid' : tab === 'history' ? 'History' : 'Trends'}
           </button>
         ))}
       </div>
@@ -304,6 +306,71 @@ export default function SharedTimesView({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'year' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <CalendarDays size={16} className="text-green-700" />
+            <span className="text-sm font-semibold text-gray-700">
+              Best times in {selectedYear}
+            </span>
+            <span className="text-xs text-gray-400 ml-auto">
+              {Object.keys(yearBests).length}/13 games covered
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {GAMES.map(game => {
+              const yb = yearBests[game]
+              const pb = personalBests[game]
+              const level = yb ? getLevel(game, yb.best_time) : null
+              const isAlsoPB = yb && pb && yb.best_time === pb.best_time
+              const missing = !yb && selectedYear === CURRENT_YEAR
+
+              return (
+                <div
+                  key={game}
+                  className={`rounded-xl border p-4 flex flex-col gap-2 ${
+                    missing ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-xs font-semibold text-gray-600 leading-tight">{game}</span>
+                    {isAlsoPB && <Star size={12} className="text-yellow-400 fill-yellow-400 flex-shrink-0 mt-0.5" />}
+                  </div>
+                  {yb ? (
+                    <>
+                      <div className="text-2xl font-black text-gray-900 leading-none tabular-nums">
+                        {yb.best_time.toFixed(3)}
+                        <span className="text-sm font-medium text-gray-400 ml-0.5">s</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-1">
+                        {level !== null && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${LEVEL_STYLES[level]}`}>
+                            L{level}
+                          </span>
+                        )}
+                        {isAlsoPB && <span className="text-xs text-yellow-600 font-medium">PB</span>}
+                      </div>
+                    </>
+                  ) : (
+                    <div className={`text-sm font-medium mt-1 ${missing ? 'text-red-400' : 'text-gray-300'}`}>
+                      No time yet
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {selectedYear === CURRENT_YEAR && Object.keys(yearBests).length < 13 && (
+            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-lg px-4 py-2.5 border border-red-100">
+              <AlertCircle size={13} className="flex-shrink-0" />
+              {13 - Object.keys(yearBests).length} game{13 - Object.keys(yearBests).length !== 1 ? 's' : ''} still missing a time this season
+            </div>
+          )}
         </div>
       )}
 

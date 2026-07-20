@@ -1,6 +1,6 @@
 import { GAMES, normalizeGameName } from './constants'
 
-export const TIMES_VIEW_TABS = ['times', 'grid', 'history', 'trends']
+export const TIMES_VIEW_TABS = ['times', 'year', 'grid', 'history', 'trends']
 
 export const LEVEL_STYLES = {
   0: 'bg-gray-100 text-gray-600',
