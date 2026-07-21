@@ -506,6 +506,122 @@ function LinkedClubMemberCard({ link, onRemove }) {
 }
 
 // ─────────────────────────────────────────────────────────
+// SelfClubMemberCard — club_head's own combos shown as a rider
+// ─────────────────────────────────────────────────────────
+function SelfClubMemberCard({ profile }) {
+  const [expanded, setExpanded] = useState(false)
+  const [combos, setCombos] = useState([])
+  const [selectedCombo, setSelectedCombo] = useState(null)
+  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR)
+  const [loadingCombos, setLoadingCombos] = useState(false)
+
+  async function handleExpand() {
+    if (!expanded && combos.length === 0) {
+      setLoadingCombos(true)
+      try {
+        const { data } = await supabase
+          .from('horse_rider_combos')
+          .select('*')
+          .eq('user_id', profile.id)
+          .is('managed_rider_id', null)
+          .eq('is_archived', false)
+          .order('is_pinned', { ascending: false })
+        setCombos(data || [])
+        setSelectedCombo(data?.find(c => c.is_pinned) || data?.[0] || null)
+      } catch {
+        toast.error('Error loading your combos')
+      } finally {
+        setLoadingCombos(false)
+      }
+    }
+    setExpanded(v => !v)
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-green-300 overflow-hidden">
+      <div className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-full overflow-hidden border border-green-300 bg-green-100 flex items-center justify-center flex-shrink-0">
+            {profile.profile_photo_url ? (
+              <img src={profile.profile_photo_url} alt={profile.rider_name} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-sm font-bold text-green-700">{profile.rider_name?.charAt(0).toUpperCase()}</span>
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-gray-800">{profile.rider_name}</p>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">You</span>
+            </div>
+            <p className="text-xs text-gray-400">{profile.age_category || profile.province || 'Club Head'}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleExpand}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition text-sm font-medium"
+        >
+          {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          {expanded ? 'Collapse' : 'View Times'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-gray-100 px-4 pb-4">
+          {loadingCombos ? (
+            <div className="py-6 space-y-3">
+              <Skeleton className="h-10" />
+              <Skeleton className="h-32" />
+            </div>
+          ) : combos.length === 0 ? (
+            <div className="py-6 text-center text-gray-400 text-sm">You have no horse/rider combos yet.</div>
+          ) : (
+            <>
+              <div className="mt-4 flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-gray-600">Horse:</span>
+                  <div className="flex gap-2 flex-wrap">
+                    {combos.map(combo => (
+                      <button
+                        key={combo.id}
+                        onClick={() => setSelectedCombo(combo)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-1.5 ${
+                          selectedCombo?.id === combo.id
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {combo.horse_name}
+                        {combo.is_pinned && ' ★'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-sm font-medium text-gray-600">Season:</span>
+                  <div className="relative inline-block">
+                    <select
+                      value={selectedYear}
+                      onChange={e => setSelectedYear(Number(e.target.value))}
+                      className="appearance-none pl-3 pr-8 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white font-medium"
+                    >
+                      {buildYearOptions().map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+              {selectedCombo && (
+                <SharedTimesView combo={selectedCombo} selectedYear={selectedYear} />
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────
 // Main page
 // ─────────────────────────────────────────────────────────
 export default function ClubRiders() {
@@ -523,6 +639,7 @@ export default function ClubRiders() {
   const [newProvince, setNewProvince] = useState(profile?.province || '')
   const [creatingMember, setCreatingMember] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null })
+  const [hasSelfCombos, setHasSelfCombos] = useState(false)
 
   useEffect(() => {
     if (profile) {
@@ -533,10 +650,21 @@ export default function ClubRiders() {
   async function loadAll() {
     setLoading(true)
     try {
-      await Promise.all([fetchManaged(), fetchLinks()])
+      await Promise.all([fetchManaged(), fetchLinks(), checkSelfCombos()])
     } finally {
       setLoading(false)
     }
+  }
+
+  async function checkSelfCombos() {
+    const { data } = await supabase
+      .from('horse_rider_combos')
+      .select('id')
+      .eq('user_id', profile.id)
+      .is('managed_rider_id', null)
+      .eq('is_archived', false)
+      .limit(1)
+    setHasSelfCombos((data || []).length > 0)
   }
 
   async function fetchManaged() {
@@ -748,7 +876,7 @@ export default function ClubRiders() {
   const acceptedLinks = links.filter(l => l.status === 'accepted')
   const pendingLinks = links.filter(l => l.status === 'pending')
   const rejectedLinks = links.filter(l => l.status === 'rejected')
-  const hasMembers = managedRiders.length > 0 || acceptedLinks.length > 0
+  const hasMembers = hasSelfCombos || managedRiders.length > 0 || acceptedLinks.length > 0
 
   return (
     <div className="space-y-6">
@@ -896,6 +1024,18 @@ export default function ClubRiders() {
         />
       ) : (
         <div className="space-y-6">
+
+          {hasSelfCombos && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Star size={16} className="text-green-600" />
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                  My Times
+                </h2>
+              </div>
+              <SelfClubMemberCard profile={profile} />
+            </div>
+          )}
 
           {managedRiders.length > 0 && (
             <div>
