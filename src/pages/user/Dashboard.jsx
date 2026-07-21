@@ -793,7 +793,8 @@ export default function Dashboard() {
         await Promise.all([
           fetchAnnouncements(),
           fetchUpcomingEvents(),
-          fetchClubMemberSummaries()
+          fetchClubMemberSummaries(),
+          fetchAllCombosStats(),
         ])
       } else {
         // 'user' and 'club_member' — show own combo stats
@@ -1051,7 +1052,7 @@ export default function Dashboard() {
     </div>
   )
 
-  const showRiderStats = !isSupporter && !isClubHead
+  const showRiderStats = !isSupporter && (!isClubHead || comboStats.length > 0)
   const primaryCombo = showRiderStats ? (comboStats.find(c => c.is_pinned) || comboStats[0]) : null
   const isEligibilityAtRisk = primaryCombo && (
     primaryCombo.qualifiersAttended < 2 ||

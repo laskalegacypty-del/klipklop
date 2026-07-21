@@ -337,6 +337,9 @@ export default function MyTimes() {
   const [selectedRider, setSelectedRider] = useState(null)
   const [loadingRiders, setLoadingRiders] = useState(false)
 
+  // Sentinel entry used when a club_head also has their own combos
+  const SELF_RIDER = { id: '__self__', rider_name: 'My Times', isSelf: true }
+
   const effectiveUserId = profile?.id
 
   useEffect(() => {
@@ -355,7 +358,7 @@ export default function MyTimes() {
       setCombos([])
       setSelectedCombo(null)
     }
-  }, [selectedRider])
+  }, [selectedRider?.id])
 
   useEffect(() => {
     if (selectedCombo) {
@@ -373,9 +376,21 @@ export default function MyTimes() {
   async function fetchLinkedRiders() {
     setLoadingRiders(true)
     try {
-      const riderList = await fetchClubHeadRoster(profile.id)
-      setLinkedRiders(riderList)
-      if (riderList.length > 0) setSelectedRider(riderList[0])
+      const [riderList, { data: ownCombos }] = await Promise.all([
+        fetchClubHeadRoster(profile.id),
+        supabase
+          .from('horse_rider_combos')
+          .select('id')
+          .eq('user_id', profile.id)
+          .is('managed_rider_id', null)
+          .eq('is_archived', false)
+          .limit(1),
+      ])
+      // If this club_head was previously a rider, prepend a "My Times" self-entry
+      const hasSelfCombos = (ownCombos || []).length > 0
+      const fullList = hasSelfCombos ? [SELF_RIDER, ...riderList] : riderList
+      setLinkedRiders(fullList)
+      if (fullList.length > 0) setSelectedRider(fullList[0])
       else {
         setLoadingRiders(false)
         setLoading(false)
@@ -390,14 +405,15 @@ export default function MyTimes() {
   }
 
   async function fetchCombosForSelected() {
-    if (isClubHead) {
-      if (!selectedRider) return
+    if (isClubHead && selectedRider && !selectedRider.isSelf) {
       const data = await fetchCombosForRider(selectedRider)
       setCombos(data)
       setSelectedCombo(data.find(c => c.is_pinned) || data[0] || null)
       setLoading(false)
       return
     }
+    if (isClubHead && !selectedRider) return
+    // Own combos path — used by regular riders and club_head with "My Times" selected
     if (!profile?.id) return
     const { data } = await supabase
       .from('horse_rider_combos')
@@ -819,7 +835,7 @@ export default function MyTimes() {
   if (isClubHead && linkedRiders.length === 0) return (
     <EmptyState
       title="No riders linked yet"
-      description="Go to My Riders to add club members first."
+      description="Go to My Riders to add club members, or add your own horse/rider combo on your profile."
       action={
         <a href="/my-club-riders" className="text-sm font-semibold text-green-800 hover:underline">
           Go to My Riders →
