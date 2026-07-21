@@ -844,6 +844,7 @@ export default function Dashboard() {
         .from('horse_rider_combos')
         .select('*')
         .eq('user_id', profile.id)
+        .is('managed_rider_id', null)
         .eq('is_archived', false)
         .order('is_pinned', { ascending: false }),
       supabase
