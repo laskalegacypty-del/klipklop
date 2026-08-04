@@ -206,6 +206,8 @@ export function AuthProvider({ children }) {
     isApproved: profile?.status === 'approved',
     isPending: profile?.status === 'pending',
     isSuspended: profile?.status === 'suspended',
+    isSubscribed: profile?.role === 'admin' || profile?.subscription_status === 'active',
+    subscriptionStatus: profile?.subscription_status ?? 'none',
     refreshProfile: () => user && fetchProfile(user.id)
   }
 

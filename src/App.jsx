@@ -33,6 +33,8 @@ import FriendsLeaderboard from './pages/user/FriendsLeaderboard'
 import EventDay from './pages/user/EventDay'
 import EventDayHistory from './pages/user/EventDayHistory'
 import GettingStarted from './pages/user/GettingStarted'
+import Subscribe from './pages/Subscribe'
+import Legal from './pages/Legal'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
 const Assistant = lazy(() => import('./pages/user/Assistant'))
@@ -77,8 +79,26 @@ function ProtectedRoute({ children }) {
   }
   if (profile?.status === 'pending') return <Navigate to="/pending" />
   if (profile?.status === 'suspended') return <Navigate to="/suspended" />
+  if (profile?.role !== 'admin' && profile?.subscription_status !== 'active') {
+    return <Navigate to="/subscribe" />
+  }
 
   return <Layout>{children}</Layout>
+}
+
+function SubscribeRoute({ children }) {
+  const { user, profile, loading, profileLoaded, isSubscribed } = useAuth()
+
+  if (loading || (user && !profileLoaded)) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-gray-500">Loading...</div>
+    </div>
+  )
+  if (!user) return <Navigate to="/login" />
+  if (!profile || profile.status === 'pending') return <Navigate to="/pending" />
+  if (profile.status === 'suspended') return <Navigate to="/suspended" />
+  if (isSubscribed) return <Navigate to="/dashboard" />
+  return children
 }
 
 function AdminRoute({ children }) {
@@ -124,6 +144,8 @@ export default function App() {
         {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/subscribe" element={<SubscribeRoute><Subscribe /></SubscribeRoute>} />
+        <Route path="/legal" element={<Legal />} />
         <Route path="/share/:token" element={<ShareTimes />} />
         <Route path="/event-day/help/:token" element={<EventDayHelper />} />
         <Route path="/pending" element={

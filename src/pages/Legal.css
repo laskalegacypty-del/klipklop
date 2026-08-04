@@ -1,0 +1,186 @@
+/* ── Legal hero ───────────────────────────────────────────────────── */
+.legal-hero {
+  background: linear-gradient(135deg, #14532d 0%, #15803d 60%, #166534 100%);
+  padding: 4rem 0 3.5rem;
+}
+
+.legal-hero-inner {
+  max-width: 52rem;
+}
+
+.legal-hero-eyebrow {
+  margin: 0 0 0.6rem;
+  color: #86efac;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.legal-hero-title {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.legal-hero-sub {
+  margin: 0.875rem 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1rem;
+  line-height: 1.7;
+  max-width: 36rem;
+}
+
+/* ── Tab strip ────────────────────────────────────────────────────── */
+.legal-tabs-wrap {
+  position: sticky;
+  top: 57px;
+  z-index: 40;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.legal-tabs {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.legal-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.legal-tab {
+  flex-shrink: 0;
+  padding: 0.875rem 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.legal-tab:hover {
+  color: #111827;
+}
+
+.legal-tab-active {
+  color: #15803d;
+  border-bottom-color: #15803d;
+}
+
+/* ── Main content area ────────────────────────────────────────────── */
+.legal-main {
+  background: #f9fafb;
+  min-height: 60vh;
+  padding: 3rem 0 5rem;
+}
+
+.legal-content {
+  max-width: 52rem;
+}
+
+/* ── Document ─────────────────────────────────────────────────────── */
+.legal-doc {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 1.25rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.legal-doc-header {
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.legal-doc-title {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  font-weight: 900;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.legal-doc-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────── */
+.legal-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.legal-h2 {
+  margin: 0 0 0.875rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+
+/* ── Prose ────────────────────────────────────────────────────────── */
+.legal-p {
+  margin: 0 0 0.875rem;
+  font-size: 0.9375rem;
+  color: #374151;
+  line-height: 1.75;
+}
+
+.legal-p:last-child {
+  margin-bottom: 0;
+}
+
+.legal-ul {
+  margin: 0.25rem 0 0.875rem 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.legal-ul li {
+  font-size: 0.9375rem;
+  color: #374151;
+  line-height: 1.7;
+  padding-left: 0.25rem;
+}
+
+.legal-ul li::marker {
+  color: #16a34a;
+}
+
+.legal-link {
+  color: #15803d;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.legal-link:hover {
+  text-decoration: underline;
+  color: #166534;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (min-width: 640px) {
+  .legal-tab {
+    padding: 0.875rem 1.5rem;
+    font-size: 0.875rem;
+  }
+}

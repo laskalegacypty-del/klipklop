@@ -459,6 +459,26 @@
   text-decoration: underline;
 }
 
+.lp-footer-links-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lp-footer-legal-links {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.35);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.lp-footer-sep {
+  color: rgba(255, 255, 255, 0.2);
+}
+
 /* ── Responsive ───────────────────────────────────────────────────── */
 @media (min-width: 640px) {
   .lp-features-grid {

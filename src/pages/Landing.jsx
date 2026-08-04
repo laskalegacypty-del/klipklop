@@ -202,13 +202,24 @@ export default function Landing() {
               <p className="lp-footer-tag">{APP_TAGLINE}</p>
             </div>
           </div>
-          <p className="lp-footer-copy">
-            Built for SAWMGA riders, supporters, and clubs.{' '}
-            <a href="mailto:support@klipklop.co.za" className="lp-footer-link">
-              <Mail size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />
-              support@klipklop.co.za
-            </a>
-          </p>
+          <div className="lp-footer-links-block">
+            <p className="lp-footer-copy">
+              Built for SAWMGA riders, supporters, and clubs.{' '}
+              <a href="mailto:support@klipklop.co.za" className="lp-footer-link">
+                <Mail size={13} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }} />
+                support@klipklop.co.za
+              </a>
+            </p>
+            <p className="lp-footer-legal-links">
+              <Link to="/legal?tab=privacy" className="lp-footer-link">Privacy Policy</Link>
+              <span className="lp-footer-sep">·</span>
+              <Link to="/legal?tab=terms" className="lp-footer-link">Terms of Service</Link>
+              <span className="lp-footer-sep">·</span>
+              <Link to="/legal?tab=refund" className="lp-footer-link">Refund Policy</Link>
+              <span className="lp-footer-sep">·</span>
+              <Link to="/legal?tab=cancellation" className="lp-footer-link">Cancellation Policy</Link>
+            </p>
+          </div>
         </div>
       </footer>
 

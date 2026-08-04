@@ -156,7 +156,20 @@ export default function AdminDashboard() {
       if (error) throw error
       await supabase.from('notifications').insert({
         user_id: userId, type: 'account_approved',
-        message: 'Your account has been approved! You can now log in to KlipKlop.', link: '/dashboard'
+        message: 'Your account has been approved! Click here to subscribe and activate your KlipKlop membership.',
+        link: '/subscribe',
+      })
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) return
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-approval-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ userId, riderName }),
+        }).catch(err => console.warn('Approval email failed:', err))
       })
       toast.success(`${riderName} approved!`)
       fetchAll()

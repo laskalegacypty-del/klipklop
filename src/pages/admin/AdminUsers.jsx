@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuth } from '../../context/AuthContext'
 import { PROVINCES } from '../../lib/constants'
 import {
   CheckCircle, XCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert
@@ -31,6 +32,7 @@ const ROLE_STYLE = {
 }
 
 export default function AdminUsers() {
+  const { user: adminUser } = useAuth()
   const [users, setUsers] = useState([])
   const [filtered, setFiltered] = useState([])
   const [loading, setLoading] = useState(true)
@@ -137,7 +139,7 @@ export default function AdminUsers() {
       const statusMap = { approve: 'approved', reject: 'rejected', suspend: 'suspended', unsuspend: 'approved' }
       const newStatus = statusMap[actionType]
       const msgMap = {
-        approve:   'Your account has been approved! You can now log in to KlipKlop.',
+        approve:   'Your account has been approved! Click here to subscribe and activate your KlipKlop membership.',
         reject:    `Your account registration was not approved. Reason: ${reason}`,
         suspend:   `Your account has been suspended. Reason: ${reason}`,
         unsuspend: 'Your account suspension has been lifted. You can now log in.',
@@ -152,8 +154,23 @@ export default function AdminUsers() {
       if (error) throw error
       await supabase.from('notifications').insert({
         user_id: selectedUser.id, type: typeMap[actionType],
-        message: msgMap[actionType], link: '/dashboard'
+        message: msgMap[actionType],
+        link: actionType === 'approve' ? '/subscribe' : '/dashboard',
       })
+      if (actionType === 'approve') {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session) return
+          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-approval-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({ userId: selectedUser.id, riderName: selectedUser.rider_name }),
+          }).catch(err => console.warn('Approval email failed:', err))
+        })
+      }
       toast.success(`User ${actionType}d successfully`)
       setShowModal(false)
       fetchUsers()
