@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { useAuth } from '../../context/AuthContext'
 import { PROVINCES } from '../../lib/constants'
 import {
-  CheckCircle, XCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert
+  CheckCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader, Skeleton } from '../../components/ui'
@@ -32,7 +31,6 @@ const ROLE_STYLE = {
 }
 
 export default function AdminUsers() {
-  const { user: adminUser } = useAuth()
   const [users, setUsers] = useState([])
   const [filtered, setFiltered] = useState([])
   const [loading, setLoading] = useState(true)
@@ -130,24 +128,19 @@ export default function AdminUsers() {
   }
 
   async function handleAction() {
-    if ((actionType === 'suspend' || actionType === 'reject') && !reason.trim()) {
+    if (actionType === 'suspend' && !reason.trim()) {
       toast.error('Please enter a reason')
       return
     }
     setActionLoading(true)
     try {
-      const statusMap = { approve: 'approved', reject: 'rejected', suspend: 'suspended', unsuspend: 'approved' }
+      const statusMap = { suspend: 'suspended', unsuspend: 'approved' }
       const newStatus = statusMap[actionType]
       const msgMap = {
-        approve:   'Your account has been approved! Click here to subscribe and activate your KlipKlop membership.',
-        reject:    `Your account registration was not approved. Reason: ${reason}`,
         suspend:   `Your account has been suspended. Reason: ${reason}`,
         unsuspend: 'Your account suspension has been lifted. You can now log in.',
       }
-      const typeMap = {
-        approve: 'account_approved', reject: 'account_rejected',
-        suspend: 'account_suspended', unsuspend: 'account_unsuspended',
-      }
+      const typeMap = { suspend: 'account_suspended', unsuspend: 'account_unsuspended' }
       const updateData = { status: newStatus }
       if (reason) updateData.suspension_reason = reason
       const { error } = await supabase.from('profiles').update(updateData).eq('id', selectedUser.id)
@@ -155,22 +148,8 @@ export default function AdminUsers() {
       await supabase.from('notifications').insert({
         user_id: selectedUser.id, type: typeMap[actionType],
         message: msgMap[actionType],
-        link: actionType === 'approve' ? '/subscribe' : '/dashboard',
+        link: '/dashboard',
       })
-      if (actionType === 'approve') {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!session) return
-          fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-approval-email`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${session.access_token}`,
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({ userId: selectedUser.id, riderName: selectedUser.rider_name }),
-          }).catch(err => console.warn('Approval email failed:', err))
-        })
-      }
       toast.success(`User ${actionType}d successfully`)
       setShowModal(false)
       fetchUsers()
@@ -189,14 +168,12 @@ export default function AdminUsers() {
     </div>
   )
 
-  const pendingCount = users.filter(u => u.status === 'pending').length
-
   return (
     <div className="space-y-6">
 
       <PageHeader
         title="User Management"
-        description={`${users.length} total · ${pendingCount} pending approval`}
+        description={`${users.length} members registered`}
       />
 
       {/* Filters */}
@@ -285,17 +262,6 @@ export default function AdminUsers() {
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${ss.pill}`}>
                     {user.status}
                   </span>
-
-                  {user.status === 'pending' && (<>
-                    <button onClick={() => openAction(user, 'approve')}
-                      className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition">
-                      <CheckCircle size={13} /> Approve
-                    </button>
-                    <button onClick={() => openAction(user, 'reject')}
-                      className="flex items-center gap-1.5 bg-red-50 text-red-600 border border-red-100 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-100 transition">
-                      <XCircle size={13} /> Reject
-                    </button>
-                  </>)}
 
                   {user.status === 'approved' && (<>
                     <button onClick={() => openEditModal(user)}
@@ -422,8 +388,6 @@ export default function AdminUsers() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold text-gray-900">
-                {actionType === 'approve'   && `Approve ${selectedUser.rider_name}?`}
-                {actionType === 'reject'    && `Reject ${selectedUser.rider_name}?`}
                 {actionType === 'suspend'   && `Suspend ${selectedUser.rider_name}?`}
                 {actionType === 'unsuspend' && `Unsuspend ${selectedUser.rider_name}?`}
               </h3>
@@ -433,13 +397,11 @@ export default function AdminUsers() {
             </div>
 
             <p className="text-sm text-gray-500 mb-4">
-              {actionType === 'approve'   && 'This user will be able to log in and use the app.'}
-              {actionType === 'reject'    && 'This user will be notified that their account was not approved.'}
               {actionType === 'suspend'   && 'This user will no longer be able to log in.'}
               {actionType === 'unsuspend' && 'This user will be able to log in again.'}
             </p>
 
-            {(actionType === 'reject' || actionType === 'suspend') && (
+            {actionType === 'suspend' && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Reason <span className="text-red-500">*</span>
@@ -460,9 +422,9 @@ export default function AdminUsers() {
               </button>
               <button onClick={handleAction} disabled={actionLoading}
                 className={`px-4 py-2 text-sm text-white rounded-xl transition disabled:opacity-50 ${
-                  actionType === 'approve' || actionType === 'unsuspend'
+                  actionType === 'unsuspend'
                     ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-red-600 hover:bg-red-700'
+                    : 'bg-orange-600 hover:bg-orange-700'
                 }`}>
                 {actionLoading ? 'Processing...' : 'Confirm'}
               </button>

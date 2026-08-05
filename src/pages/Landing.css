@@ -682,6 +682,28 @@
   color: #9ca3af;
 }
 
+.lp-pricing-note-link {
+  color: #6b7280;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.lp-pricing-note-link:hover {
+  color: #15803d;
+  text-decoration: underline;
+}
+
+.lp-price-annual-note {
+  font-size: 0.775rem;
+  color: #6b7280;
+  margin: 0 0 0.875rem;
+  font-weight: 500;
+}
+
+.lp-price-annual-note-white {
+  color: rgba(255, 255, 255, 0.75);
+}
+
 @media (min-width: 768px) {
   .lp-pricing-grid {
     grid-template-columns: repeat(3, 1fr);

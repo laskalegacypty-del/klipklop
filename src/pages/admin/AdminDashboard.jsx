@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import {
-  Users, Calendar, Clock, CheckCircle, XCircle, Bell,
-  ArrowRight, X, Shield, Megaphone, Activity, MapPin,
+  Users, Calendar, Clock,
+  ArrowRight, Shield, Megaphone, Activity, MapPin,
   BarChart2, Pin
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -35,19 +35,15 @@ function formatRelativeTime(dateStr) {
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
-    totalUsers: 0, pendingUsers: 0, weekResults: 0,
+    totalUsers: 0, weekResults: 0,
     totalCombos: 0, activeAnnouncements: 0
   })
-  const [pendingUsers, setPendingUsers] = useState([])
   const [upcomingEvents, setUpcomingEvents] = useState([])
   const [qualifierEvents, setQualifierEvents] = useState([])
   const [resultsByEvent, setResultsByEvent] = useState({})
   const [provinceData, setProvinceData] = useState([])
   const [activityFeed, setActivityFeed] = useState([])
   const [activeAnnouncements, setActiveAnnouncements] = useState([])
-  const [rejectModal, setRejectModal] = useState(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [rejectLoading, setRejectLoading] = useState(false)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -60,10 +56,8 @@ export default function AdminDashboard() {
 
       const [
         { count: totalUsers },
-        { count: pendingCount },
         { count: weekResultsCount },
         { count: totalCombos },
-        pendingRes,
         upcomingRes,
         qualifierRes,
         resultIdsRes,
@@ -72,10 +66,8 @@ export default function AdminDashboard() {
         announcementsRes
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('qualifier_results').select('*', { count: 'exact', head: true }).gte('created_at', weekAgo.toISOString()),
         supabase.from('horse_rider_combos').select('*', { count: 'exact', head: true }),
-        supabase.from('profiles').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
         supabase.from('qualifier_events').select('*').gte('date', today).order('date', { ascending: true }).limit(5),
         supabase.from('qualifier_events').select('*').eq('event_type', 'qualifier')
           .gte('date', yearStart).lte('date', yearEnd).order('date', { ascending: true }),
@@ -133,12 +125,10 @@ export default function AdminDashboard() {
 
       setStats({
         totalUsers: totalUsers || 0,
-        pendingUsers: pendingCount || 0,
         weekResults: weekResultsCount || 0,
         totalCombos: totalCombos || 0,
         activeAnnouncements: active.length
       })
-      setPendingUsers(pendingRes.data || [])
       setUpcomingEvents(upcomingRes.data || [])
       setQualifierEvents(qualifierRes.data || [])
 
@@ -148,55 +138,6 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false)
     }
-  }
-
-  async function handleApprove(userId, riderName) {
-    try {
-      const { error } = await supabase.from('profiles').update({ status: 'approved' }).eq('id', userId)
-      if (error) throw error
-      await supabase.from('notifications').insert({
-        user_id: userId, type: 'account_approved',
-        message: 'Your account has been approved! Click here to subscribe and activate your KlipKlop membership.',
-        link: '/subscribe',
-      })
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) return
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-approval-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({ userId, riderName }),
-        }).catch(err => console.warn('Approval email failed:', err))
-      })
-      toast.success(`${riderName} approved!`)
-      fetchAll()
-    } catch { toast.error('Error approving user') }
-  }
-
-  function openReject(userId, riderName) {
-    setRejectModal({ id: userId, name: riderName })
-    setRejectReason('')
-  }
-
-  async function handleConfirmReject() {
-    if (!rejectReason.trim()) { toast.error('Please enter a reason'); return }
-    setRejectLoading(true)
-    try {
-      const { error } = await supabase.from('profiles')
-        .update({ status: 'rejected', suspension_reason: rejectReason }).eq('id', rejectModal.id)
-      if (error) throw error
-      await supabase.from('notifications').insert({
-        user_id: rejectModal.id, type: 'account_rejected',
-        message: `Your account registration was not approved. Reason: ${rejectReason}`, link: '/login'
-      })
-      toast.success(`${rejectModal.name} rejected`)
-      setRejectModal(null)
-      fetchAll()
-    } catch { toast.error('Error rejecting user') }
-    finally { setRejectLoading(false) }
   }
 
   const nextEvent = upcomingEvents[0]
@@ -237,13 +178,6 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 pl-10 sm:pl-0">
-          {stats.pendingUsers > 0 && (
-            <Link to="/admin/users"
-              className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2 hover:bg-amber-100 transition">
-              <Bell size={13} className="text-amber-600" />
-              <span className="text-xs font-semibold text-amber-700">{stats.pendingUsers} pending approval</span>
-            </Link>
-          )}
           {nextEvent && nextEventDays !== null && nextEventDays <= 7 && (
             <Link to="/admin/events"
               className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl px-3.5 py-2 hover:bg-blue-100 transition">
@@ -257,56 +191,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard icon={Users}     label="Approved Users"     value={stats.totalUsers}          color="blue"   />
-        <StatCard icon={Bell}      label="Pending Approval"   value={stats.pendingUsers}         color="amber"  alert={stats.pendingUsers > 0} />
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard icon={Users}     label="Active Members"     value={stats.totalUsers}          color="blue"   />
         <StatCard icon={Clock}     label="Results This Week"  value={stats.weekResults}          color="green"  />
         <StatCard icon={BarChart2} label="Active Combos"      value={stats.totalCombos}          color="purple" />
         <StatCard icon={Megaphone} label="Live Notices"       value={stats.activeAnnouncements}  color="rose"   />
       </div>
-
-      {/* Pending Approvals — only shown when there are some */}
-      {pendingUsers.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-amber-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell size={14} className="text-amber-600" />
-              <h2 className="font-semibold text-amber-900 text-sm">Pending Approvals</h2>
-              <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">
-                {pendingUsers.length}
-              </span>
-            </div>
-            <Link to="/admin/users" className="text-xs text-amber-700 font-medium hover:underline flex items-center gap-1">
-              Manage all <ArrowRight size={11} />
-            </Link>
-          </div>
-          <div className="divide-y divide-amber-100">
-            {pendingUsers.map(user => (
-              <div key={user.id} className="px-5 py-3.5 flex items-center gap-3">
-                <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-green-700 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <span className="text-white font-bold text-sm">{user.rider_name?.charAt(0).toUpperCase()}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 text-sm truncate">{user.rider_name}</p>
-                  <p className="text-xs text-gray-500">
-                    {user.province}{user.age_category ? ` · ${user.age_category}` : ''} · {new Date(user.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="flex gap-1.5 flex-shrink-0">
-                  <button onClick={() => handleApprove(user.id, user.rider_name)}
-                    className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-700 transition">
-                    <CheckCircle size={13} /> Approve
-                  </button>
-                  <button onClick={() => openReject(user.id, user.rider_name)}
-                    className="flex items-center gap-1.5 bg-white text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 transition">
-                    <XCircle size={13} /> Reject
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Season Overview + Upcoming Events */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -557,41 +447,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Reject Modal */}
-      {rejectModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="font-bold text-gray-900">Reject {rejectModal.name}?</h3>
-              <button onClick={() => setRejectModal(null)} className="text-gray-400 hover:text-gray-600 transition">
-                <X size={20} />
-              </button>
-            </div>
-            <p className="text-sm text-gray-500 mb-4">This user will be notified their account was not approved.</p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reason <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={rejectReason}
-                onChange={e => setRejectReason(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 text-sm resize-none"
-                placeholder="Enter reason for rejection..."
-              />
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setRejectModal(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition">
-                Cancel
-              </button>
-              <button onClick={handleConfirmReject} disabled={rejectLoading}
-                className="px-4 py-2 text-sm text-white bg-red-600 rounded-xl hover:bg-red-700 transition disabled:opacity-50">
-                {rejectLoading ? 'Rejecting...' : 'Confirm Reject'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

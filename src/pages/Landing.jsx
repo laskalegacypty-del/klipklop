@@ -186,73 +186,76 @@ export default function Landing() {
           <div className="lp-section-header">
             <h2 className="lp-section-title">Simple, transparent pricing</h2>
             <p className="lp-section-sub">
-              One flat monthly rate — no setup fees, no hidden costs. Cancel any time.
+              One flat monthly rate — no setup fees, no hidden costs. Save 2 months with an annual plan. Cancel any time.
             </p>
           </div>
           <div className="lp-pricing-grid">
 
             <article className="lp-price-card">
-              <div className="lp-price-badge">Rider</div>
+              <div className="lp-price-badge">Supporter</div>
               <div className="lp-price-amount">
                 <span className="lp-price-currency">R</span>
-                <span className="lp-price-number">50</span>
+                <span className="lp-price-number">29</span>
                 <span className="lp-price-period">/month</span>
               </div>
               <p className="lp-price-desc">
-                Perfect for individual riders who want to track their own horses, times, and nationals eligibility.
+                Follow the riders you cheer for and stay updated throughout the season.
               </p>
               <ul className="lp-price-list">
-                <li><CheckCircle2 size={15} className="lp-price-check" />Unlimited horse profiles</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Full qualifier history</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Personal bests &amp; time trends</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Nationals eligibility tracker</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />AI rules assistant</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Follow riders you support</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />View qualifier progress &amp; times</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />See level progression at a glance</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Stay updated through the season</li>
               </ul>
+              <p className="lp-price-annual-note">R290/year — 2 months free</p>
               <Link to="/register" className="lp-price-btn lp-price-btn-outline">Get started</Link>
             </article>
 
             <article className="lp-price-card lp-price-card-featured">
               <div className="lp-price-popular">Most popular</div>
-              <div className="lp-price-badge lp-price-badge-white">Club / Family Head</div>
+              <div className="lp-price-badge lp-price-badge-white">Rider</div>
               <div className="lp-price-amount">
                 <span className="lp-price-currency">R</span>
-                <span className="lp-price-number">250</span>
+                <span className="lp-price-number">49</span>
                 <span className="lp-price-period">/month</span>
               </div>
               <p className="lp-price-desc">
-                Manage your entire club or family stable under one account — perfect for coaches and yard managers.
+                Track your horses, times, and nationals eligibility — everything you need to compete.
               </p>
               <ul className="lp-price-list">
-                <li><CheckCircle2 size={15} className="lp-price-check" />Everything in Rider</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Unlimited managed riders</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Club-wide time overview</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Log times on behalf of riders</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Club leaderboard &amp; rankings</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Unlimited horse profiles</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Full qualifier history &amp; personal bests</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Nationals eligibility tracker</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />AI rules assistant</li>
               </ul>
+              <p className="lp-price-annual-note lp-price-annual-note-white">R490/year — 2 months free</p>
               <Link to="/register" className="lp-price-btn lp-price-btn-white">Get started</Link>
             </article>
 
             <article className="lp-price-card">
-              <div className="lp-price-badge">Federation</div>
-              <div className="lp-price-amount lp-price-amount-custom">
-                <span className="lp-price-custom-label">Custom pricing</span>
+              <div className="lp-price-badge">Club / Family Head</div>
+              <div className="lp-price-amount">
+                <span className="lp-price-currency">R</span>
+                <span className="lp-price-number">249</span>
+                <span className="lp-price-period">/month</span>
               </div>
               <p className="lp-price-desc">
-                Association-level access for provinces or governing bodies who need full oversight and reporting.
+                Manage your entire club or family stable under one account — for coaches and yard managers.
               </p>
               <ul className="lp-price-list">
-                <li><CheckCircle2 size={15} className="lp-price-check" />Everything in Club</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Province-wide analytics</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Bulk member management</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Official results integration</li>
-                <li><CheckCircle2 size={15} className="lp-price-check" />Priority support</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Everything in Rider</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Unlimited managed riders</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Log times on behalf of riders</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Club leaderboard &amp; overview</li>
               </ul>
-              <a href="mailto:support@klipklop.co.za" className="lp-price-btn lp-price-btn-outline">Contact us</a>
+              <p className="lp-price-annual-note">R2,490/year — 2 months free</p>
+              <Link to="/register" className="lp-price-btn lp-price-btn-outline">Get started</Link>
             </article>
 
           </div>
           <p className="lp-pricing-note">
-            All subscriptions are billed monthly in ZAR · Cancel any time · Secure payments via Paystack
+            All subscriptions in ZAR · Cancel any time · Secure payments via Paystack ·{' '}
+            <a href="mailto:support@klipklop.co.za" className="lp-pricing-note-link">Federation pricing? Contact us</a>
           </p>
         </div>
       </section>

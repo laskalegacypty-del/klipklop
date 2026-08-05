@@ -142,28 +142,12 @@ export function AuthProvider({ children }) {
           province: profileData.province || null,
           age_category: needsAgeCategory ? (profileData.age_category || null) : null,
           role: storedRole,
-          status: 'pending'
+          status: 'approved'
         })
 
       if (profileError) {
         console.error('Profile insert error:', profileError)
         return { data, error: profileError }
-      }
-
-      // Notify admin
-      const { data: adminData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .maybeSingle()
-
-      if (adminData) {
-        await supabase.from('notifications').insert({
-          user_id: adminData.id,
-          type: 'new_registration',
-          message: `New user ${profileData.rider_name} has registered and is pending approval.`,
-          link: '/admin/users'
-        })
       }
     }
 
