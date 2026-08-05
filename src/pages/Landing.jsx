@@ -93,6 +93,7 @@ export default function Landing() {
             <span className="lp-nav-name">{APP_NAME}</span>
           </Link>
           <nav className="lp-nav-links">
+            <a href="#pricing" className="lp-nav-pricing">Pricing</a>
             <Link to="/login" className="lp-nav-login">Log in</Link>
             <Link to="/register" className="lp-nav-register">Get started</Link>
           </nav>
@@ -119,69 +120,14 @@ export default function Landing() {
             nationals eligibility, and club oversight, all in one place.
           </p>
           <div className="lp-hero-cta">
-            <Link to="/register" className="lp-btn lp-btn-primary">Get started — it's free</Link>
+            <a href="#pricing" className="lp-btn lp-btn-primary">See plans</a>
             <Link to="/login" className="lp-btn lp-btn-ghost">Log in</Link>
           </div>
         </div>
       </section>
 
-      {/* ── Features ────────────────────────────────────────────────── */}
-      <section className="lp-section">
-        <div className="container-page">
-          <div className="lp-section-header">
-            <h2 className="lp-section-title">Everything you need to compete</h2>
-            <p className="lp-section-sub">
-              Built specifically for SAWMGA, with every feature shaped around how the season actually works.
-            </p>
-          </div>
-          <div className="lp-features-grid">
-            {features.map((f) => (
-              <article key={f.title} className="lp-feature-card">
-                <div className="lp-feature-icon">
-                  <f.icon size={22} />
-                </div>
-                <h3 className="lp-feature-title">{f.title}</h3>
-                <p className="lp-feature-desc">{f.description}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Roles ───────────────────────────────────────────────────── */}
-      <section className="lp-section lp-section-alt">
-        <div className="container-page">
-          <div className="lp-section-header">
-            <h2 className="lp-section-title">One platform, three roles</h2>
-            <p className="lp-section-sub">
-              Choose the role that fits you when you register. You can always update it later.
-            </p>
-          </div>
-          <div className="lp-roles-grid">
-            {roles.map((r) => (
-              <article key={r.title} className="lp-role-card">
-                <div className="lp-role-header">
-                  <div className="lp-role-icon">
-                    <r.icon size={20} />
-                  </div>
-                  <h3 className="lp-role-title">{r.title}</h3>
-                </div>
-                <ul className="lp-role-list">
-                  {r.points.map((p) => (
-                    <li key={p} className="lp-role-point">
-                      <CheckCircle2 size={14} className="lp-role-check" />
-                      <span>{p}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Pricing ─────────────────────────────────────────────────── */}
-      <section className="lp-section">
+      <section id="pricing" className="lp-section">
         <div className="container-page">
           <div className="lp-section-header">
             <h2 className="lp-section-title">Simple, transparent pricing</h2>
@@ -260,13 +206,68 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Features ────────────────────────────────────────────────── */}
+      <section className="lp-section lp-section-alt">
+        <div className="container-page">
+          <div className="lp-section-header">
+            <h2 className="lp-section-title">Everything you need to compete</h2>
+            <p className="lp-section-sub">
+              Built specifically for SAWMGA, with every feature shaped around how the season actually works.
+            </p>
+          </div>
+          <div className="lp-features-grid">
+            {features.map((f) => (
+              <article key={f.title} className="lp-feature-card">
+                <div className="lp-feature-icon">
+                  <f.icon size={22} />
+                </div>
+                <h3 className="lp-feature-title">{f.title}</h3>
+                <p className="lp-feature-desc">{f.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Roles ───────────────────────────────────────────────────── */}
+      <section className="lp-section">
+        <div className="container-page">
+          <div className="lp-section-header">
+            <h2 className="lp-section-title">One platform, three roles</h2>
+            <p className="lp-section-sub">
+              Choose the role that fits you when you register. You can always update it later.
+            </p>
+          </div>
+          <div className="lp-roles-grid">
+            {roles.map((r) => (
+              <article key={r.title} className="lp-role-card">
+                <div className="lp-role-header">
+                  <div className="lp-role-icon">
+                    <r.icon size={20} />
+                  </div>
+                  <h3 className="lp-role-title">{r.title}</h3>
+                </div>
+                <ul className="lp-role-list">
+                  {r.points.map((p) => (
+                    <li key={p} className="lp-role-point">
+                      <CheckCircle2 size={14} className="lp-role-check" />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Bottom CTA ──────────────────────────────────────────────── */}
       <section className="lp-cta-band">
         <div className="container-page lp-cta-inner">
           <h2 className="lp-cta-title">Ready to ride with KlipKlop?</h2>
-          <p className="lp-cta-sub">Create your free account in minutes and take control of your season.</p>
+          <p className="lp-cta-sub">Create your account in minutes and take control of your season.</p>
           <div className="lp-hero-cta">
-            <Link to="/register" className="lp-btn lp-btn-primary">Create a free account</Link>
+            <Link to="/register" className="lp-btn lp-btn-primary">Create your account</Link>
             <Link to="/login" className="lp-btn lp-btn-outline">Log in</Link>
           </div>
         </div>
