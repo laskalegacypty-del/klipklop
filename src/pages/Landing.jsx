@@ -180,6 +180,83 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Pricing ─────────────────────────────────────────────────── */}
+      <section className="lp-section">
+        <div className="container-page">
+          <div className="lp-section-header">
+            <h2 className="lp-section-title">Simple, transparent pricing</h2>
+            <p className="lp-section-sub">
+              One flat monthly rate — no setup fees, no hidden costs. Cancel any time.
+            </p>
+          </div>
+          <div className="lp-pricing-grid">
+
+            <article className="lp-price-card">
+              <div className="lp-price-badge">Rider</div>
+              <div className="lp-price-amount">
+                <span className="lp-price-currency">R</span>
+                <span className="lp-price-number">50</span>
+                <span className="lp-price-period">/month</span>
+              </div>
+              <p className="lp-price-desc">
+                Perfect for individual riders who want to track their own horses, times, and nationals eligibility.
+              </p>
+              <ul className="lp-price-list">
+                <li><CheckCircle2 size={15} className="lp-price-check" />Unlimited horse profiles</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Full qualifier history</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Personal bests &amp; time trends</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Nationals eligibility tracker</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />AI rules assistant</li>
+              </ul>
+              <Link to="/register" className="lp-price-btn lp-price-btn-outline">Get started</Link>
+            </article>
+
+            <article className="lp-price-card lp-price-card-featured">
+              <div className="lp-price-popular">Most popular</div>
+              <div className="lp-price-badge lp-price-badge-white">Club / Family Head</div>
+              <div className="lp-price-amount">
+                <span className="lp-price-currency">R</span>
+                <span className="lp-price-number">250</span>
+                <span className="lp-price-period">/month</span>
+              </div>
+              <p className="lp-price-desc">
+                Manage your entire club or family stable under one account — perfect for coaches and yard managers.
+              </p>
+              <ul className="lp-price-list">
+                <li><CheckCircle2 size={15} className="lp-price-check" />Everything in Rider</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Unlimited managed riders</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Club-wide time overview</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Log times on behalf of riders</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Club leaderboard &amp; rankings</li>
+              </ul>
+              <Link to="/register" className="lp-price-btn lp-price-btn-white">Get started</Link>
+            </article>
+
+            <article className="lp-price-card">
+              <div className="lp-price-badge">Federation</div>
+              <div className="lp-price-amount lp-price-amount-custom">
+                <span className="lp-price-custom-label">Custom pricing</span>
+              </div>
+              <p className="lp-price-desc">
+                Association-level access for provinces or governing bodies who need full oversight and reporting.
+              </p>
+              <ul className="lp-price-list">
+                <li><CheckCircle2 size={15} className="lp-price-check" />Everything in Club</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Province-wide analytics</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Bulk member management</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Official results integration</li>
+                <li><CheckCircle2 size={15} className="lp-price-check" />Priority support</li>
+              </ul>
+              <a href="mailto:support@klipklop.co.za" className="lp-price-btn lp-price-btn-outline">Contact us</a>
+            </article>
+
+          </div>
+          <p className="lp-pricing-note">
+            All subscriptions are billed monthly in ZAR · Cancel any time · Secure payments via Paystack
+          </p>
+        </div>
+      </section>
+
       {/* ── Bottom CTA ──────────────────────────────────────────────── */}
       <section className="lp-cta-band">
         <div className="container-page lp-cta-inner">
