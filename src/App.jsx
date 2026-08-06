@@ -77,7 +77,6 @@ function ProtectedRoute({ children }) {
       </div>
     )
   }
-  if (profile?.status === 'pending') return <Navigate to="/pending" />
   if (profile?.status === 'suspended') return <Navigate to="/suspended" />
   if (profile?.role !== 'admin' && profile?.subscription_status !== 'active') {
     return <Navigate to="/subscribe" />
@@ -147,23 +146,6 @@ export default function App() {
         <Route path="/legal" element={<Legal />} />
         <Route path="/share/:token" element={<ShareTimes />} />
         <Route path="/event-day/help/:token" element={<EventDayHelper />} />
-        <Route path="/pending" element={
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-            <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">
-              <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-50 shadow-sm">
-                <img src={APP_LOGO_SRC} alt={`${APP_NAME} logo`} className="h-10 w-10 object-contain" />
-              </div>
-              <p className="text-sm font-semibold text-green-900 mb-1">{APP_NAME}</p>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">
-                Account Pending Approval
-              </h2>
-              <p className="text-sm sm:text-base text-gray-600 leading-6">
-                Your account is awaiting admin approval. You will be
-                notified by email once approved.
-              </p>
-            </div>
-          </div>
-        } />
         <Route path="/suspended" element={
           <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
             <div className="text-center p-5 sm:p-8 bg-white rounded-2xl shadow w-full max-w-md">

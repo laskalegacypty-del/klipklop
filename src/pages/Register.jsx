@@ -78,7 +78,7 @@ export default function Register() {
         role,
       })
       if (error) { toast.error(error.message); return }
-      navigate('/pending')
+      navigate('/subscribe')
     } catch {
       toast.error('Something went wrong. Please try again.')
     } finally {
@@ -115,7 +115,7 @@ export default function Register() {
           </div>
 
           <h1 className="auth-form-title">Create your account</h1>
-          <p className="auth-form-sub">Free to join. Your account will be reviewed before activation.</p>
+          <p className="auth-form-sub">Create your account and subscribe to get started.</p>
 
           {/* Role selector */}
           <div className="auth-role-group">

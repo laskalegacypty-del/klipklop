@@ -84,15 +84,6 @@ export function AuthProvider({ children }) {
         .eq('id', data.user.id)
         .maybeSingle()
 
-      if (profileData?.status === 'pending') {
-        // Sign them out immediately
-        await supabase.auth.signOut()
-        return {
-          data: null,
-          error: { message: 'Your account is pending approval by the admin.' }
-        }
-      }
-
       if (profileData?.status === 'suspended') {
         await supabase.auth.signOut()
         return {
@@ -188,7 +179,6 @@ export function AuthProvider({ children }) {
     isClubHead: profile?.role === 'club_head',
     isClubMember: profile?.role === 'club_member',
     isApproved: profile?.status === 'approved',
-    isPending: profile?.status === 'pending',
     isSuspended: profile?.status === 'suspended',
     isSubscribed: profile?.role === 'admin' || profile?.subscription_status === 'active',
     subscriptionStatus: profile?.subscription_status ?? 'none',

@@ -7,7 +7,7 @@ import {
 import toast from 'react-hot-toast'
 import { PageHeader, Skeleton } from '../../components/ui'
 
-const STATUS_FILTERS   = ['all', 'pending', 'approved', 'suspended', 'rejected']
+const STATUS_FILTERS   = ['all', 'approved', 'suspended', 'rejected']
 const ROLE_FILTERS     = ['all', 'user', 'supporter', 'club_head']
 const AGE_CATEGORIES   = ['Junior', 'Senior', 'Children', 'Veteran']
 
