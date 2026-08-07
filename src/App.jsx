@@ -78,7 +78,7 @@ function ProtectedRoute({ children }) {
     )
   }
   if (profile?.status === 'suspended') return <Navigate to="/suspended" />
-  if (profile?.role !== 'admin' && profile?.subscription_status !== 'active') {
+  if (profile?.role !== 'admin' && profile?.subscription_status !== 'active' && !profile?.paygate_exempt) {
     return <Navigate to="/subscribe" />
   }
 
@@ -95,7 +95,7 @@ function SubscribeRoute({ children }) {
   )
   if (!user) return <Navigate to="/login" />
   if (!profile || profile.status === 'suspended') return <Navigate to="/suspended" />
-  if (isSubscribed) return <Navigate to="/dashboard" />
+  if (isSubscribed || profile?.paygate_exempt) return <Navigate to="/dashboard" />
   return children
 }
 

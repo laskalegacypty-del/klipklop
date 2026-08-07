@@ -180,7 +180,7 @@ export function AuthProvider({ children }) {
     isClubMember: profile?.role === 'club_member',
     isApproved: profile?.status === 'approved',
     isSuspended: profile?.status === 'suspended',
-    isSubscribed: profile?.role === 'admin' || profile?.subscription_status === 'active',
+    isSubscribed: profile?.role === 'admin' || profile?.subscription_status === 'active' || profile?.paygate_exempt === true,
     subscriptionStatus: profile?.subscription_status ?? 'none',
     refreshProfile: () => user && fetchProfile(user.id)
   }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { PROVINCES } from '../../lib/constants'
 import {
-  CheckCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert
+  CheckCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert, Gift, Lock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader, Skeleton } from '../../components/ui'
@@ -127,6 +127,21 @@ export default function AdminUsers() {
     }
   }
 
+  async function toggleFreeAccess(user) {
+    const newVal = !user.paygate_exempt
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ paygate_exempt: newVal })
+        .eq('id', user.id)
+      if (error) throw error
+      toast.success(newVal ? `Free access granted to ${user.rider_name}` : `Paygate restored for ${user.rider_name}`)
+      fetchUsers()
+    } catch {
+      toast.error('Error updating free access')
+    }
+  }
+
   async function handleAction() {
     if (actionType === 'suspend' && !reason.trim()) {
       toast.error('Please enter a reason')
@@ -244,6 +259,11 @@ export default function AdminUsers() {
                       <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${ROLE_STYLE[user.role] || 'bg-gray-100 text-gray-600'}`}>
                         {ROLE_LABEL[user.role] || user.role}
                       </span>
+                      {user.paygate_exempt && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-violet-100 text-violet-700 flex-shrink-0 flex items-center gap-1">
+                          <Gift size={11} /> Free
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-500 truncate">
                       {user.province}{user.age_category ? ` · ${user.age_category}` : ''}
@@ -267,6 +287,14 @@ export default function AdminUsers() {
                     <button onClick={() => openEditModal(user)}
                       className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
                       <User size={13} /> Edit
+                    </button>
+                    <button onClick={() => toggleFreeAccess(user)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+                        user.paygate_exempt
+                          ? 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'
+                          : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                      }`}>
+                      {user.paygate_exempt ? <><Gift size={13} /> Free Access</> : <><Lock size={13} /> Paygate</>}
                     </button>
                     <button onClick={() => openAction(user, 'suspend')}
                       className="flex items-center gap-1.5 bg-orange-50 text-orange-600 border border-orange-100 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-orange-100 transition">
