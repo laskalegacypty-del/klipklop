@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { loadDomain, searchDomain, buildDomainContext } from 'rules-engine/core'
-import { BookOpen, ChevronDown, Send, Trash2, Zap } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronDown, Send, Zap } from 'lucide-react'
 import { wmg } from '../lib/rulesDomains/wmg'
 import { MATRIX, getLevel } from '../lib/matrix'
 import { APP_LOGO_SRC } from '../constants/branding'
@@ -537,27 +537,29 @@ export default function Klippies() {
 
         {/* Quick chips row (active chat) */}
         {!isEmpty && (
-          <div className="flex items-center gap-2 py-2 border-t border-white/10 overflow-x-auto">
-            <div className="flex gap-1.5 flex-1 min-w-0 flex-wrap">
-              {QUICK_QUESTIONS.slice(0, 5).map(q => (
+          <div className="flex items-center gap-2 py-2 border-t border-white/10">
+            {/* Back to home */}
+            <button
+              onClick={() => setMessages([])}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white transition disabled:opacity-40 flex-shrink-0"
+            >
+              <ArrowLeft size={13} />
+              Home
+            </button>
+            {/* Quick chips — horizontal scroll */}
+            <div className="flex gap-1.5 flex-1 min-w-0 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+              {QUICK_QUESTIONS.slice(0, 8).map(q => (
                 <button
                   key={q.query}
                   onClick={() => handleSend(q.query)}
                   disabled={loading}
-                  className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/10 text-green-200 hover:bg-white/20 hover:text-white transition disabled:opacity-50 whitespace-nowrap"
+                  className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/10 text-green-200 hover:bg-white/20 hover:text-white transition disabled:opacity-50 whitespace-nowrap flex-shrink-0"
                 >
                   {q.label}
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setMessages([])}
-              disabled={loading}
-              title="Clear chat"
-              className="p-1.5 rounded-full text-green-500 hover:text-green-300 hover:bg-white/10 transition disabled:opacity-40 flex-shrink-0"
-            >
-              <Trash2 size={14} />
-            </button>
           </div>
         )}
 
