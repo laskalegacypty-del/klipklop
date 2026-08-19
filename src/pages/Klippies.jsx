@@ -116,25 +116,27 @@ function LevelChecker({ onAsk }) {
   }
 
   return (
-    <div className="w-full max-w-xl mb-6">
-      <div className="bg-white/10 border border-white/20 rounded-2xl p-4 sm:p-5">
+    <div className="w-full mb-4">
+      <div className="bg-white/10 border border-white/20 rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <Zap size={16} className="text-yellow-400" />
+          <Zap size={15} className="text-yellow-400" />
           <span className="text-white font-bold text-sm">Level Checker</span>
-          <span className="text-green-400 text-xs ml-auto">instant · no AI needed</span>
+          <span className="text-green-400 text-xs ml-auto">instant</span>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <select
-            value={game}
-            onChange={e => { setGame(e.target.value); setResult(null) }}
-            className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-400/50 appearance-none"
-            style={{ colorScheme: 'dark' }}
-          >
-            <option value="">Select a game…</option>
-            {Object.keys(MATRIX).sort().map(g => (
-              <option key={g} value={g} className="bg-green-900">{g}</option>
-            ))}
-          </select>
+        {/* Game select — always full width */}
+        <select
+          value={game}
+          onChange={e => { setGame(e.target.value); setResult(null) }}
+          className="w-full rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-400/50 appearance-none mb-2"
+          style={{ colorScheme: 'dark' }}
+        >
+          <option value="">Select a game…</option>
+          {Object.keys(MATRIX).sort().map(g => (
+            <option key={g} value={g} className="bg-green-900">{g}</option>
+          ))}
+        </select>
+        {/* Time + button always on same row */}
+        <div className="flex gap-2">
           <input
             type="number"
             step="0.001"
@@ -143,13 +145,13 @@ function LevelChecker({ onAsk }) {
             value={time}
             onChange={e => { setTime(e.target.value); setResult(null) }}
             onKeyDown={handleKeyDown}
-            placeholder="Time (e.g. 14.823)"
+            placeholder="Your time (e.g. 14.823)"
             className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-sm text-white placeholder-green-400/60 focus:outline-none focus:ring-2 focus:ring-green-400/50"
           />
           <button
             onClick={check}
             disabled={!game || !time}
-            className="px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
           >
             Check
           </button>
@@ -420,12 +422,12 @@ export default function Klippies() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pb-4" style={{ minHeight: 0 }}>
 
           {isEmpty ? (
-            /* ── Empty / hero state — two-column ───────────────────────── */
-            <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 lg:gap-12 py-6 px-2">
+            /* ── Empty / hero state ─────────────────────────────────────── */
+            <div className="flex flex-row items-start gap-4 sm:gap-8 lg:gap-12 py-4 sm:py-6">
 
-              {/* ── LEFT: Mascot ─────────────────────────────────────────── */}
-              <div className="flex flex-col items-center lg:items-start flex-shrink-0 lg:sticky lg:top-8">
-                <div className="relative">
+              {/* ── LEFT: Mascot — scales from compact mobile to large desktop */}
+              <div className="flex flex-col items-center flex-shrink-0" style={{ width: 'clamp(90px, 24vw, 300px)' }}>
+                <div className="relative w-full">
                   <div
                     className="absolute rounded-full pointer-events-none"
                     style={{
@@ -433,52 +435,55 @@ export default function Klippies() {
                       top: '50%', left: '50%',
                       transform: 'translate(-50%, -50%)',
                       background: 'radial-gradient(ellipse, rgba(74,222,128,0.2) 0%, transparent 70%)',
-                      filter: 'blur(28px)',
+                      filter: 'blur(20px)',
                     }}
                   />
                   <img
                     src={MASCOT_SRC}
                     alt="Klippies mascot"
-                    className="relative object-contain"
+                    className="relative object-contain w-full"
                     style={{
-                      width: 'clamp(220px, 28vw, 340px)',
-                      filter: 'drop-shadow(0 16px 48px rgba(0,0,0,0.5)) drop-shadow(0 0 32px rgba(74,222,128,0.2))',
+                      filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(74,222,128,0.2))',
                       animation: 'klippies-float 4s ease-in-out infinite',
                     }}
                   />
                 </div>
-                <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mt-2 text-center lg:text-left">
+                <h1 className="font-black text-white tracking-tight mt-1 text-center leading-tight"
+                  style={{ fontSize: 'clamp(1.1rem, 4vw, 3rem)' }}>
                   Klippies
                 </h1>
-                <p className="text-green-400 text-sm font-semibold mt-1 text-center lg:text-left">
-                  SAWMGA AI Rules Guide
+                <p className="text-green-400 font-semibold text-center leading-tight"
+                  style={{ fontSize: 'clamp(0.6rem, 1.8vw, 0.875rem)' }}>
+                  SAWMGA AI Guide
                 </p>
-                <p className="text-green-600 text-xs mt-2 text-center lg:text-left">
-                  No sign-up · Free to use
+                <p className="text-green-600 text-center mt-1 hidden sm:block"
+                  style={{ fontSize: 'clamp(0.55rem, 1.5vw, 0.75rem)' }}>
+                  No sign-up · Free
                 </p>
               </div>
 
               {/* ── RIGHT: Level checker + prompts ───────────────────────── */}
-              <div className="flex-1 min-w-0 w-full lg:w-auto">
-                <p className="text-green-300/80 text-sm leading-relaxed mb-5 text-center lg:text-left">
-                  Ask me anything about <strong className="text-white">SAWMGA rules</strong>, nationals, game regulations — or drop a time and game below and I'll tell you your level instantly.
+              <div className="flex-1 min-w-0">
+                <p className="text-green-300/80 text-xs sm:text-sm leading-relaxed mb-3 hidden sm:block">
+                  Ask me anything about <strong className="text-white">SAWMGA rules</strong>, nationals, game regulations — or check your level instantly below.
                 </p>
 
                 {/* Level Checker */}
                 <LevelChecker onAsk={q => handleSend(q)} />
 
-                {/* Quick question chips */}
+                {/* Quick chips — horizontal scroll on mobile, wrap on desktop */}
                 <div className="w-full">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-green-500 mb-3">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-green-500 mb-2">
                     Ask Klippies…
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex gap-2 overflow-x-auto pb-2 sm:flex-wrap sm:overflow-x-visible"
+                    style={{ scrollbarWidth: 'none' }}>
                     {QUICK_QUESTIONS.map(q => (
                       <button
                         key={q.query}
                         onClick={() => handleSend(q.query)}
                         disabled={loading}
-                        className="px-3.5 py-2 rounded-full text-sm font-medium bg-white/10 text-green-100 border border-white/20 hover:bg-white/20 hover:text-white transition disabled:opacity-50"
+                        className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-white/10 text-green-100 border border-white/20 hover:bg-white/20 hover:text-white transition disabled:opacity-50 whitespace-nowrap flex-shrink-0 sm:flex-shrink"
                       >
                         {q.label}
                       </button>
