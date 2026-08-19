@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path'
 import chatHandler from '../api/rules/chat.js'
 import shareCreateHandler from '../api/share/create.js'
 import shareTokenHandler from '../api/share/[token].js'
+import klippiesWaitlistHandler from '../api/klippies/waitlist.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
@@ -98,6 +99,11 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === '/api/share/create' && req.method === 'POST') {
     await invokeHandler(shareCreateHandler, req, res, raw)
+    return
+  }
+
+  if (url.pathname === '/api/klippies/waitlist' && (req.method === 'GET' || req.method === 'POST')) {
+    await invokeHandler(klippiesWaitlistHandler, req, res, raw)
     return
   }
 
