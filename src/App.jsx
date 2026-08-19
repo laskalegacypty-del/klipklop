@@ -34,6 +34,7 @@ import EventDay from './pages/user/EventDay'
 import EventDayHistory from './pages/user/EventDayHistory'
 import GettingStarted from './pages/user/GettingStarted'
 import Subscribe from './pages/Subscribe'
+import Klippies from './pages/Klippies'
 import Legal from './pages/Legal'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
@@ -143,6 +144,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/subscribe" element={<SubscribeRoute><Subscribe /></SubscribeRoute>} />
+        <Route path="/klippies" element={<Klippies />} />
         <Route path="/legal" element={<Legal />} />
         <Route path="/share/:token" element={<ShareTimes />} />
         <Route path="/event-day/help/:token" element={<EventDayHelper />} />
