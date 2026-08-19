@@ -1,13 +1,202 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { loadDomain, searchDomain, buildDomainContext } from 'rules-engine/core'
-import { BookOpen, ChevronDown, Send, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronDown, Send, Trash2, Zap } from 'lucide-react'
 import { wmg } from '../lib/rulesDomains/wmg'
+import { MATRIX, getLevel } from '../lib/matrix'
 import { APP_LOGO_SRC } from '../constants/branding'
 
 const MASCOT_SRC = '/klippies-mascot.png'
 
-// ── System prompt (rules-only — no rider-data section) ───────────────────────
+const LEVEL_LABELS = ['Beginner', 'Novice', 'Intermediate', 'Advanced', 'Elite']
+const LEVEL_COLORS = [
+  'text-gray-300 border-gray-400/40 bg-gray-400/10',
+  'text-yellow-300 border-yellow-400/40 bg-yellow-400/10',
+  'text-blue-300 border-blue-400/40 bg-blue-400/10',
+  'text-orange-300 border-orange-400/40 bg-orange-400/10',
+  'text-green-300 border-green-400/40 bg-green-400/10',
+]
+const LEVEL_EMOJI = ['🐢', '🌱', '⚡', '🔥', '🏆']
+
+// ── Game name lookup for chat detection ──────────────────────────────────────
+const GAME_LOOKUP_SORTED = [
+  ['speed barrels', 'Speed Barrels'],
+  ['speed barrel', 'Speed Barrels'],
+  ['hurry scurry', 'Hurry Scurry'],
+  ['hurry-scurry', 'Hurry Scurry'],
+  ['single stake', 'Single Stake'],
+  ['fig 8 flags', 'Fig 8 Flags'],
+  ['fig8 flags', 'Fig 8 Flags'],
+  ['fig8flags', 'Fig 8 Flags'],
+  ['fig 8 stake', 'Fig 8 Stake'],
+  ['fig8 stake', 'Fig 8 Stake'],
+  ['fig8stake', 'Fig 8 Stake'],
+  ['barrel race', 'Barrel Race'],
+  ['poles i', 'Poles I'],
+  ['poles 1', 'Poles I'],
+  ['poles ii', 'Poles II'],
+  ['poles 2', 'Poles II'],
+  ['big t', 'Big T'],
+  ['speed ball', 'Speedball'],
+  ['birangle', 'Birangle'],
+  ['keyhole', 'Keyhole'],
+  ['quadrangle', 'Quadrangle'],
+  ['speedball', 'Speedball'],
+  ['barrels', 'Barrel Race'],
+  ['barrel', 'Barrel Race'],
+  ['flags', 'Fig 8 Flags'],
+  ['stake', 'Single Stake'],
+  ['poles', 'Poles I'],
+  ['hurry', 'Hurry Scurry'],
+  ['scurry', 'Hurry Scurry'],
+  ['quad', 'Quadrangle'],
+  ['bigt', 'Big T'],
+]
+
+function parseTimeLevelQuery(message) {
+  const msg = message.toLowerCase()
+  const timeMatch = msg.match(/\b(\d{1,2}\.?\d{0,3})\b/)
+  if (!timeMatch) return null
+  const time = parseFloat(timeMatch[1])
+  if (time < 5 || time > 70) return null
+
+  for (const [alias, gameName] of GAME_LOOKUP_SORTED) {
+    if (msg.includes(alias)) return { game: gameName, time }
+  }
+  return null
+}
+
+function buildLevelResponse(game, time, level) {
+  const thresholds = MATRIX[game]
+  if (level === null || !thresholds) {
+    return `I couldn't determine the level for ${game} with a time of ${time.toFixed(3)}s. Please check the SAWMGA rating matrix.`
+  }
+
+  let out = `**${game}: ${time.toFixed(3)}s = Level ${level} ${LEVEL_EMOJI[level]} (${LEVEL_LABELS[level]})**\n\n`
+
+  if (level < 4) {
+    const nextMax = thresholds[level + 1][1]
+    const needed = (time - nextMax).toFixed(3)
+    out += `You're **${needed}s away from Level ${level + 1}** (${LEVEL_LABELS[level + 1]}).\n\n`
+  } else {
+    out += `You're at the **top level — Elite!** Outstanding work! 🔥\n\n`
+  }
+
+  out += `**${game} level ranges:**\n`
+  for (let l = 4; l >= 0; l--) {
+    const [min, max] = thresholds[l]
+    const maxStr = max === Infinity ? '+' : max.toFixed(3) + 's'
+    const marker = l === level ? ' ◀ your time' : ''
+    out += `- Level ${l} ${LEVEL_EMOJI[l]}: ${min.toFixed(3)}s – ${maxStr}${marker}\n`
+  }
+
+  return out
+}
+
+// ── Inline level checker widget ──────────────────────────────────────────────
+function LevelChecker({ onAsk }) {
+  const [game, setGame] = useState('')
+  const [time, setTime] = useState('')
+  const [result, setResult] = useState(null)
+
+  function check() {
+    const t = parseFloat(time)
+    if (!game || isNaN(t) || t < 5 || t > 70) return
+    const level = getLevel(game, t)
+    setResult({ game, time: t, level })
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') check()
+  }
+
+  function askKlippies() {
+    if (!game || !time) return
+    onAsk(`What level is ${time} seconds in ${game}?`)
+  }
+
+  return (
+    <div className="w-full max-w-xl mb-6">
+      <div className="bg-white/10 border border-white/20 rounded-2xl p-4 sm:p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Zap size={16} className="text-yellow-400" />
+          <span className="text-white font-bold text-sm">Level Checker</span>
+          <span className="text-green-400 text-xs ml-auto">instant · no AI needed</span>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            value={game}
+            onChange={e => { setGame(e.target.value); setResult(null) }}
+            className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-green-400/50 appearance-none"
+            style={{ colorScheme: 'dark' }}
+          >
+            <option value="">Select a game…</option>
+            {Object.keys(MATRIX).sort().map(g => (
+              <option key={g} value={g} className="bg-green-900">{g}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            step="0.001"
+            min="5"
+            max="70"
+            value={time}
+            onChange={e => { setTime(e.target.value); setResult(null) }}
+            onKeyDown={handleKeyDown}
+            placeholder="Time (e.g. 14.823)"
+            className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2.5 text-sm text-white placeholder-green-400/60 focus:outline-none focus:ring-2 focus:ring-green-400/50"
+          />
+          <button
+            onClick={check}
+            disabled={!game || !time}
+            className="px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Check
+          </button>
+        </div>
+
+        {result && result.level !== null && (
+          <div className={`mt-3 rounded-xl border px-4 py-3 ${LEVEL_COLORS[result.level]}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-2xl">{LEVEL_EMOJI[result.level]}</span>
+              <div>
+                <p className="font-black text-lg leading-tight">Level {result.level} · {LEVEL_LABELS[result.level]}</p>
+                <p className="text-xs opacity-80">{result.game} · {result.time.toFixed(3)}s</p>
+              </div>
+            </div>
+            {result.level < 4 && (() => {
+              const thresholds = MATRIX[result.game]
+              const nextMax = thresholds[result.level + 1][1]
+              const needed = (result.time - nextMax).toFixed(3)
+              return (
+                <p className="text-xs opacity-70 mt-1">
+                  Cut <strong>{needed}s</strong> to reach Level {result.level + 1} {LEVEL_EMOJI[result.level + 1]} ({LEVEL_LABELS[result.level + 1]})
+                </p>
+              )
+            })()}
+            <button
+              onClick={askKlippies}
+              className="mt-2 text-xs underline opacity-60 hover:opacity-100 transition"
+            >
+              Ask Klippies for tips →
+            </button>
+          </div>
+        )}
+
+        {result && result.level === null && (
+          <p className="mt-3 text-xs text-red-300">
+            Couldn't determine level — check that the time is realistic for that game.
+          </p>
+        )}
+      </div>
+      <p className="text-center text-green-600 text-xs mt-2">
+        Or just type in chat: <span className="text-green-400">"11.234 flags"</span>, <span className="text-green-400">"hurry scurry 14.5"</span>…
+      </p>
+    </div>
+  )
+}
+
+// ── System prompt ────────────────────────────────────────────────────────────
 const KLIPPIES_SYSTEM_PROMPT = `You are Klippies, the friendly AI assistant for South African Western Mounted Games (SAWMGA).
 You answer questions about SAWMGA rules, games, nationals eligibility, competition regulations, equipment, levels, and the rating matrix.
 
@@ -30,23 +219,23 @@ Rules:
 - Times are in seconds; lower is better. Levels run 0 (slowest) to 4 (fastest).
 - Nationals eligibility typically requires 2+ qualifiers, 2+ in the rider's province, and 11+ of 13 games covered.`
 
-// ── Quick questions (rules-only) ─────────────────────────────────────────────
+// ── Quick questions ──────────────────────────────────────────────────────────
 const QUICK_QUESTIONS = [
-  { label: 'Nationals 2026 dates',  query: 'When and where is Nationals 2026?' },
+  { label: 'Nationals 2026 dates',     query: 'When and where is Nationals 2026?' },
   { label: 'Silver vs Gold Nationals', query: 'What is the difference between Silver and Gold Nationals?' },
-  { label: 'Nationals entry fees', query: 'What are the entry fees for Nationals 2026?' },
-  { label: 'Trot-up requirements', query: 'What are the trot-up requirements for Nationals 2026?' },
-  { label: 'Bumping at Nationals', query: 'How does bumping work at Nationals 2026?' },
-  { label: 'Overcount rule',        query: 'How does the SAWMGA overcount rule work?' },
-  { label: 'Nationals eligibility', query: 'What are the requirements to qualify for Nationals?' },
-  { label: 'Barrel penalty',        query: 'What is the penalty for knocking over a barrel?' },
-  { label: 'Qualifier games',       query: 'What games are included in each qualifier?' },
-  { label: 'WMG levels',            query: 'What levels are there in Western Mounted Games?' },
-  { label: 'Horse marking rules',   query: 'What are the horse marking rules for Nationals?' },
-  { label: 'Stabling at Nationals', query: 'What are the stabling and paddock options at Nationals 2026?' },
+  { label: 'Nationals entry fees',     query: 'What are the entry fees for Nationals 2026?' },
+  { label: 'Trot-up requirements',     query: 'What are the trot-up requirements for Nationals 2026?' },
+  { label: 'Bumping at Nationals',     query: 'How does bumping work at Nationals 2026?' },
+  { label: 'Overcount rule',           query: 'How does the SAWMGA overcount rule work?' },
+  { label: 'Nationals eligibility',    query: 'What are the requirements to qualify for Nationals?' },
+  { label: 'Barrel penalty',           query: 'What is the penalty for knocking over a barrel?' },
+  { label: 'Qualifier games',          query: 'What games are included in each qualifier?' },
+  { label: 'WMG levels',              query: 'What levels are there in Western Mounted Games?' },
+  { label: 'Horse marking rules',      query: 'What are the horse marking rules for Nationals?' },
+  { label: 'Stabling at Nationals',    query: 'What are the stabling and paddock options at Nationals 2026?' },
 ]
 
-// ── Tiny markdown renderer (bold + bullet lists) ─────────────────────────────
+// ── Markdown renderer ────────────────────────────────────────────────────────
 function renderRichText(text) {
   const lines = String(text || '').split(/\r?\n/)
   const blocks = []
@@ -90,7 +279,6 @@ function renderRichText(text) {
   return blocks
 }
 
-// ── Citations accordion ───────────────────────────────────────────────────────
 function Citations({ citations }) {
   if (!citations?.length) return null
   return (
@@ -114,7 +302,6 @@ function Citations({ citations }) {
   )
 }
 
-// ── Message ID generator ──────────────────────────────────────────────────────
 let seq = 0
 function nextId() { seq += 1; return `m${Date.now()}_${seq}` }
 
@@ -128,9 +315,7 @@ export default function Klippies() {
   const inputRef = useRef(null)
 
   useEffect(() => {
-    loadDomain(wmg)
-      .then(ok => setReady(Boolean(ok)))
-      .catch(() => {})
+    loadDomain(wmg).then(ok => setReady(Boolean(ok))).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -143,13 +328,25 @@ export default function Klippies() {
     if (!query || loading) return
     setInput('')
 
+    const userMsg = { id: nextId(), role: 'user', content: query }
+    setMessages(prev => [...prev, userMsg])
+
+    // ── Instant local level-check (no AI call needed) ────────────────────
+    const levelQuery = parseTimeLevelQuery(query)
+    if (levelQuery) {
+      const level = getLevel(levelQuery.game, levelQuery.time)
+      const response = buildLevelResponse(levelQuery.game, levelQuery.time, level)
+      setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: response, citations: [] }])
+      inputRef.current?.focus()
+      return
+    }
+
+    // ── AI call ──────────────────────────────────────────────────────────
     const historySnapshot = messages
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .map(m => ({ role: m.role, content: m.content }))
 
-    setMessages(prev => [...prev, { id: nextId(), role: 'user', content: query }])
     setLoading(true)
-
     try {
       const citations = searchDomain(wmg, query, 6)
       const rulesContext = buildDomainContext(wmg, query, 6000, 12)
@@ -161,9 +358,7 @@ export default function Klippies() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query,
-            context: rulesContext
-              ? `Official SAWMGA Rules (excerpts):\n${rulesContext}`
-              : '',
+            context: rulesContext ? `Official SAWMGA Rules (excerpts):\n${rulesContext}` : '',
             systemPrompt: KLIPPIES_SYSTEM_PROMPT,
             model: wmg.ai.model,
             history: historySnapshot,
@@ -173,7 +368,7 @@ export default function Klippies() {
           const data = await res.json().catch(() => ({}))
           if (!data.fallback && data.response) response = String(data.response)
         }
-      } catch { /* AI offline — fall through to citation fallback */ }
+      } catch { /* fallback to citations */ }
 
       if (!response) {
         if (citations.length) {
@@ -184,10 +379,7 @@ export default function Klippies() {
         }
       }
 
-      setMessages(prev => [
-        ...prev,
-        { id: nextId(), role: 'assistant', content: response, citations },
-      ])
+      setMessages(prev => [...prev, { id: nextId(), role: 'assistant', content: response, citations }])
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -201,9 +393,9 @@ export default function Klippies() {
   const isEmpty = messages.length === 0
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-950 to-green-900 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-b from-green-950 via-green-950 to-green-900 flex flex-col">
 
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
+      {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-green-800/60">
         <div className="flex items-center gap-2.5">
           <img src={APP_LOGO_SRC} alt="KlipKlop" className="h-8 w-8 object-contain" />
@@ -213,16 +405,10 @@ export default function Klippies() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            to="/login"
-            className="text-green-300 hover:text-white text-xs font-medium transition"
-          >
+          <Link to="/login" className="text-green-300 hover:text-white text-xs font-medium transition">
             Sign in
           </Link>
-          <Link
-            to="/register"
-            className="bg-white text-green-900 text-xs font-bold px-3.5 py-1.5 rounded-full hover:bg-green-50 transition"
-          >
+          <Link to="/register" className="bg-white text-green-900 text-xs font-bold px-3.5 py-1.5 rounded-full hover:bg-green-50 transition">
             Create account
           </Link>
         </div>
@@ -231,31 +417,57 @@ export default function Klippies() {
       {/* ── Chat area ────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col max-w-3xl w-full mx-auto px-4 sm:px-6 pb-0 pt-4 min-h-0">
 
-        {/* Messages / empty state */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto space-y-4 pb-4"
-          style={{ minHeight: 0 }}
-        >
+        <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pb-4" style={{ minHeight: 0 }}>
+
           {isEmpty ? (
-            <div className="flex flex-col items-center text-center pt-4 pb-4 px-2">
-              {/* Mascot */}
-              <img
-                src={MASCOT_SRC}
-                alt="Klippies mascot"
-                className="w-48 sm:w-64 object-contain mb-2 drop-shadow-2xl"
-                style={{ filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.4))' }}
-              />
-              <p className="text-green-300 text-sm sm:text-base max-w-md leading-relaxed mb-1">
-                Ask me anything about <strong className="text-white">SAWMGA rules</strong>, nationals eligibility,
-                game regulations, levels, or the rating matrix.
+            /* ── Empty / hero state ─────────────────────────────────────── */
+            <div className="flex flex-col items-center text-center pb-4 px-2">
+
+              {/* ── Mascot hero ───────────────────────────────────────────── */}
+              <div className="relative mt-2 mb-1">
+                {/* Glow rings */}
+                <div
+                  className="absolute rounded-full"
+                  style={{
+                    width: '140%', height: '140%',
+                    top: '50%', left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'radial-gradient(ellipse, rgba(74,222,128,0.18) 0%, transparent 70%)',
+                    filter: 'blur(24px)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <img
+                  src={MASCOT_SRC}
+                  alt="Klippies mascot"
+                  className="relative object-contain drop-shadow-2xl"
+                  style={{
+                    width: 'clamp(260px, 40vw, 380px)',
+                    filter: 'drop-shadow(0 16px 48px rgba(0,0,0,0.5)) drop-shadow(0 0 32px rgba(74,222,128,0.2))',
+                    animation: 'klippies-float 4s ease-in-out infinite',
+                  }}
+                />
+              </div>
+
+              {/* Name + tagline */}
+              <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-1">
+                Klippies
+              </h1>
+              <p className="text-green-400 text-sm sm:text-base font-semibold mb-2">
+                SAWMGA Rules Guide · Instant Level Checker
               </p>
-              <p className="text-green-500 text-xs mb-8">No sign-up needed · Free to use</p>
+              <p className="text-green-300/70 text-sm max-w-sm leading-relaxed mb-1">
+                Ask me anything about rules, nationals, games — or drop a time and game and I'll tell you your level instantly.
+              </p>
+              <p className="text-green-600 text-xs mb-8">No sign-up needed · Free to use</p>
+
+              {/* Level Checker widget */}
+              <LevelChecker onAsk={q => handleSend(q)} />
 
               {/* Quick question chips */}
               <div className="w-full max-w-xl text-left">
                 <p className="text-xs font-semibold uppercase tracking-widest text-green-500 mb-3 px-1">
-                  Try asking…
+                  Or ask Klippies…
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {QUICK_QUESTIONS.map(q => (
@@ -272,21 +484,17 @@ export default function Klippies() {
               </div>
             </div>
           ) : (
+            /* ── Messages ───────────────────────────────────────────────── */
             messages.map(m => (
               <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                {/* Avatar */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${
-                  m.role === 'user'
-                    ? 'bg-white text-green-900 font-bold text-xs'
-                    : 'bg-green-800'
+                  m.role === 'user' ? 'bg-white text-green-900 font-bold text-xs' : 'bg-green-800'
                 }`}>
                   {m.role === 'user'
                     ? <span className="text-xs font-bold">You</span>
                     : <img src={MASCOT_SRC} alt="Klippies" className="w-8 h-8 object-cover object-top scale-150 translate-y-1" />
                   }
                 </div>
-
-                {/* Bubble */}
                 <div className={`max-w-[85%] sm:max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   m.role === 'user'
                     ? 'bg-white text-green-900 font-medium'
@@ -318,7 +526,7 @@ export default function Klippies() {
           )}
         </div>
 
-        {/* Quick chips row (when conversation is active) */}
+        {/* Quick chips row (active chat) */}
         {!isEmpty && (
           <div className="flex items-center gap-2 py-2 border-t border-white/10 overflow-x-auto">
             <div className="flex gap-1.5 flex-1 min-w-0 flex-wrap">
@@ -353,8 +561,8 @@ export default function Klippies() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={ready ? 'Ask Klippies about SAWMGA rules…' : 'Loading rules…'}
-              className="flex-1 resize-none max-h-32 rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-sm text-white placeholder-green-400 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400/50"
+              placeholder={ready ? 'Ask Klippies about rules, or type "14.823 flags"…' : 'Loading rules…'}
+              className="flex-1 resize-none max-h-32 rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-sm text-white placeholder-green-400/60 focus:outline-none focus:ring-2 focus:ring-green-400/50 focus:border-green-400/50"
             />
             <button
               onClick={() => handleSend()}
@@ -374,7 +582,7 @@ export default function Klippies() {
         </div>
       </div>
 
-      {/* ── Footer CTA ────────────────────────────────────────────────── */}
+      {/* ── Footer ──────────────────────────────────────────────────────── */}
       <div className="border-t border-green-800/60 bg-green-950/80 px-4 py-4 text-center">
         <p className="text-green-400 text-xs">
           Want to track your own times, horses and eligibility?{' '}
@@ -383,6 +591,14 @@ export default function Klippies() {
           </Link>
         </p>
       </div>
+
+      {/* ── Float animation ──────────────────────────────────────────────── */}
+      <style>{`
+        @keyframes klippies-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-12px); }
+        }
+      `}</style>
     </div>
   )
 }
