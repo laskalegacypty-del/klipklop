@@ -423,72 +423,73 @@ export default function Klippies() {
 
           {isEmpty ? (
             /* ── Empty / hero state ─────────────────────────────────────── */
-            <div className="flex flex-row items-start gap-4 sm:gap-8 lg:gap-12 py-4 sm:py-6">
+            <div className="flex flex-col py-4 sm:py-6">
 
-              {/* ── LEFT: Mascot — scales from compact mobile to large desktop */}
-              <div className="flex flex-col items-center flex-shrink-0" style={{ width: 'clamp(90px, 24vw, 300px)' }}>
-                <div className="relative w-full">
-                  <div
-                    className="absolute rounded-full pointer-events-none"
-                    style={{
-                      width: '130%', height: '130%',
-                      top: '50%', left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      background: 'radial-gradient(ellipse, rgba(74,222,128,0.2) 0%, transparent 70%)',
-                      filter: 'blur(20px)',
-                    }}
-                  />
-                  <img
-                    src={MASCOT_SRC}
-                    alt="Klippies mascot"
-                    className="relative object-contain w-full"
-                    style={{
-                      filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(74,222,128,0.2))',
-                      animation: 'klippies-float 4s ease-in-out infinite',
-                    }}
-                  />
+              {/* ── Top row: mascot left, level checker right ────────────── */}
+              <div className="flex flex-row items-start gap-4 sm:gap-8 lg:gap-12 mb-5">
+
+                {/* LEFT: Mascot */}
+                <div className="flex flex-col items-center flex-shrink-0" style={{ width: 'clamp(90px, 24vw, 300px)' }}>
+                  <div className="relative w-full">
+                    <div
+                      className="absolute rounded-full pointer-events-none"
+                      style={{
+                        width: '130%', height: '130%',
+                        top: '50%', left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        background: 'radial-gradient(ellipse, rgba(74,222,128,0.2) 0%, transparent 70%)',
+                        filter: 'blur(20px)',
+                      }}
+                    />
+                    <img
+                      src={MASCOT_SRC}
+                      alt="Klippies mascot"
+                      className="relative object-contain w-full"
+                      style={{
+                        filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.5)) drop-shadow(0 0 20px rgba(74,222,128,0.2))',
+                        animation: 'klippies-float 4s ease-in-out infinite',
+                      }}
+                    />
+                  </div>
+                  <h1 className="font-black text-white tracking-tight mt-1 text-center leading-tight"
+                    style={{ fontSize: 'clamp(1.1rem, 4vw, 3rem)' }}>
+                    Klippies
+                  </h1>
+                  <p className="text-green-400 font-semibold text-center leading-tight"
+                    style={{ fontSize: 'clamp(0.6rem, 1.8vw, 0.875rem)' }}>
+                    SAWMGA AI Guide
+                  </p>
+                  <p className="text-green-600 text-center mt-1 hidden sm:block"
+                    style={{ fontSize: 'clamp(0.55rem, 1.5vw, 0.75rem)' }}>
+                    No sign-up · Free
+                  </p>
                 </div>
-                <h1 className="font-black text-white tracking-tight mt-1 text-center leading-tight"
-                  style={{ fontSize: 'clamp(1.1rem, 4vw, 3rem)' }}>
-                  Klippies
-                </h1>
-                <p className="text-green-400 font-semibold text-center leading-tight"
-                  style={{ fontSize: 'clamp(0.6rem, 1.8vw, 0.875rem)' }}>
-                  SAWMGA AI Guide
-                </p>
-                <p className="text-green-600 text-center mt-1 hidden sm:block"
-                  style={{ fontSize: 'clamp(0.55rem, 1.5vw, 0.75rem)' }}>
-                  No sign-up · Free
-                </p>
+
+                {/* RIGHT: Level checker */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-green-300/80 text-xs sm:text-sm leading-relaxed mb-3 hidden sm:block">
+                    Ask me anything about <strong className="text-white">SAWMGA rules</strong>, nationals, game regulations — or check your level instantly below.
+                  </p>
+                  <LevelChecker onAsk={q => handleSend(q)} />
+                </div>
               </div>
 
-              {/* ── RIGHT: Level checker + prompts ───────────────────────── */}
-              <div className="flex-1 min-w-0">
-                <p className="text-green-300/80 text-xs sm:text-sm leading-relaxed mb-3 hidden sm:block">
-                  Ask me anything about <strong className="text-white">SAWMGA rules</strong>, nationals, game regulations — or check your level instantly below.
+              {/* ── Full-width chips row ──────────────────────────────────── */}
+              <div className="w-full">
+                <p className="text-xs font-semibold uppercase tracking-widest text-green-500 mb-2">
+                  Ask Klippies…
                 </p>
-
-                {/* Level Checker */}
-                <LevelChecker onAsk={q => handleSend(q)} />
-
-                {/* Quick chips — horizontal scroll on mobile, wrap on desktop */}
-                <div className="w-full">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-green-500 mb-2">
-                    Ask Klippies…
-                  </p>
-                  <div className="flex gap-2 overflow-x-auto pb-2 sm:flex-wrap sm:overflow-x-visible"
-                    style={{ scrollbarWidth: 'none' }}>
-                    {QUICK_QUESTIONS.map(q => (
-                      <button
-                        key={q.query}
-                        onClick={() => handleSend(q.query)}
-                        disabled={loading}
-                        className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-white/10 text-green-100 border border-white/20 hover:bg-white/20 hover:text-white transition disabled:opacity-50 whitespace-nowrap flex-shrink-0 sm:flex-shrink"
-                      >
-                        {q.label}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_QUESTIONS.map(q => (
+                    <button
+                      key={q.query}
+                      onClick={() => handleSend(q.query)}
+                      disabled={loading}
+                      className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium bg-white/10 text-green-100 border border-white/20 hover:bg-white/20 hover:text-white transition disabled:opacity-50"
+                    >
+                      {q.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
