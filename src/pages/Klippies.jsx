@@ -5,6 +5,8 @@ import { BookOpen, ChevronDown, Send, Trash2 } from 'lucide-react'
 import { wmg } from '../lib/rulesDomains/wmg'
 import { APP_LOGO_SRC } from '../constants/branding'
 
+const MASCOT_SRC = '/klippies-mascot.png'
+
 // ── System prompt (rules-only — no rider-data section) ───────────────────────
 const KLIPPIES_SYSTEM_PROMPT = `You are Klippies, the friendly AI assistant for South African Western Mounted Games (SAWMGA).
 You answer questions about SAWMGA rules, games, nationals eligibility, competition regulations, equipment, levels, and the rating matrix.
@@ -30,16 +32,18 @@ Rules:
 
 // ── Quick questions (rules-only) ─────────────────────────────────────────────
 const QUICK_QUESTIONS = [
-  { label: 'Overcount rule',       query: 'How does the SAWMGA overcount rule work?' },
+  { label: 'Nationals 2026 dates',  query: 'When and where is Nationals 2026?' },
+  { label: 'Silver vs Gold Nationals', query: 'What is the difference between Silver and Gold Nationals?' },
+  { label: 'Nationals entry fees', query: 'What are the entry fees for Nationals 2026?' },
+  { label: 'Trot-up requirements', query: 'What are the trot-up requirements for Nationals 2026?' },
+  { label: 'Bumping at Nationals', query: 'How does bumping work at Nationals 2026?' },
+  { label: 'Overcount rule',        query: 'How does the SAWMGA overcount rule work?' },
   { label: 'Nationals eligibility', query: 'What are the requirements to qualify for Nationals?' },
-  { label: 'Barrel penalty',       query: 'What is the penalty for knocking over a barrel?' },
-  { label: 'Qualifier games',      query: 'What games are included in each qualifier?' },
-  { label: 'Flag Race rules',      query: 'Explain the rules for the Flag Race game.' },
-  { label: 'WMG levels',           query: 'What levels are there in Western Mounted Games?' },
-  { label: 'Equipment rules',      query: 'What equipment and tack rules apply in SAWMGA competitions?' },
-  { label: 'Rating matrix',        query: 'How does the SAWMGA rating matrix work?' },
-  { label: 'Provincial colours',   query: 'How do riders earn provincial colours?' },
-  { label: 'Code of conduct',      query: 'What does the SAWMGA code of conduct cover?' },
+  { label: 'Barrel penalty',        query: 'What is the penalty for knocking over a barrel?' },
+  { label: 'Qualifier games',       query: 'What games are included in each qualifier?' },
+  { label: 'WMG levels',            query: 'What levels are there in Western Mounted Games?' },
+  { label: 'Horse marking rules',   query: 'What are the horse marking rules for Nationals?' },
+  { label: 'Stabling at Nationals', query: 'What are the stabling and paddock options at Nationals 2026?' },
 ]
 
 // ── Tiny markdown renderer (bold + bullet lists) ─────────────────────────────
@@ -234,14 +238,14 @@ export default function Klippies() {
           style={{ minHeight: 0 }}
         >
           {isEmpty ? (
-            <div className="flex flex-col items-center text-center pt-8 pb-4 px-2">
-              {/* Avatar */}
-              <div className="w-20 h-20 rounded-3xl bg-white/10 border border-white/20 flex items-center justify-center text-4xl mb-4 shadow-lg">
-                🐎
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mb-2">
-                Hi! I'm Klippies
-              </h1>
+            <div className="flex flex-col items-center text-center pt-4 pb-4 px-2">
+              {/* Mascot */}
+              <img
+                src={MASCOT_SRC}
+                alt="Klippies mascot"
+                className="w-48 sm:w-64 object-contain mb-2 drop-shadow-2xl"
+                style={{ filter: 'drop-shadow(0 8px 32px rgba(0,0,0,0.4))' }}
+              />
               <p className="text-green-300 text-sm sm:text-base max-w-md leading-relaxed mb-1">
                 Ask me anything about <strong className="text-white">SAWMGA rules</strong>, nationals eligibility,
                 game regulations, levels, or the rating matrix.
@@ -271,12 +275,15 @@ export default function Klippies() {
             messages.map(m => (
               <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                 {/* Avatar */}
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-base ${
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${
                   m.role === 'user'
                     ? 'bg-white text-green-900 font-bold text-xs'
-                    : 'bg-white/10 border border-white/20'
+                    : 'bg-green-800'
                 }`}>
-                  {m.role === 'user' ? 'You' : '🐎'}
+                  {m.role === 'user'
+                    ? <span className="text-xs font-bold">You</span>
+                    : <img src={MASCOT_SRC} alt="Klippies" className="w-8 h-8 object-cover object-top scale-150 translate-y-1" />
+                  }
                 </div>
 
                 {/* Bubble */}
@@ -297,8 +304,8 @@ export default function Klippies() {
           {/* Typing indicator */}
           {loading && (
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-base flex-shrink-0">
-                🐎
+              <div className="w-8 h-8 rounded-full bg-green-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <img src={MASCOT_SRC} alt="Klippies" className="w-8 h-8 object-cover object-top scale-150 translate-y-1" />
               </div>
               <div className="bg-white/10 border border-white/15 rounded-2xl px-4 py-3">
                 <div className="flex gap-1 items-center h-4">
