@@ -102,7 +102,7 @@ export default function KlippiesWaitlist() {
     <div className="min-h-screen bg-gradient-to-b from-green-950 via-green-950 to-green-900 flex flex-col">
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-green-800/60">
+      <header className="flex items-center px-4 sm:px-6 py-3 border-b border-green-800/60">
         <div className="flex items-center gap-2.5">
           <img src={APP_LOGO_SRC} alt="KlipKlop" className="h-8 w-8 object-contain" />
           <div>
@@ -110,9 +110,6 @@ export default function KlippiesWaitlist() {
             <span className="text-green-400 text-xs font-medium ml-1.5">by KlipKlop</span>
           </div>
         </div>
-        <Link to="/klippies" className="text-green-300 hover:text-white text-xs font-medium transition">
-          Try the demo →
-        </Link>
       </header>
 
       <div className="flex-1 flex flex-col items-center w-full max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
