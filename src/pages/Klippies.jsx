@@ -415,71 +415,75 @@ export default function Klippies() {
       </header>
 
       {/* ── Chat area ────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col max-w-3xl w-full mx-auto px-4 sm:px-6 pb-0 pt-4 min-h-0">
+      <div className={`flex-1 flex flex-col w-full mx-auto px-4 sm:px-6 pb-0 pt-4 min-h-0 ${isEmpty ? 'max-w-5xl' : 'max-w-3xl'}`}>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 pb-4" style={{ minHeight: 0 }}>
 
           {isEmpty ? (
-            /* ── Empty / hero state ─────────────────────────────────────── */
-            <div className="flex flex-col items-center text-center pb-4 px-2">
+            /* ── Empty / hero state — two-column ───────────────────────── */
+            <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 lg:gap-12 py-6 px-2">
 
-              {/* ── Mascot hero ───────────────────────────────────────────── */}
-              <div className="relative mt-2 mb-1">
-                {/* Glow rings */}
-                <div
-                  className="absolute rounded-full"
-                  style={{
-                    width: '140%', height: '140%',
-                    top: '50%', left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    background: 'radial-gradient(ellipse, rgba(74,222,128,0.18) 0%, transparent 70%)',
-                    filter: 'blur(24px)',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <img
-                  src={MASCOT_SRC}
-                  alt="Klippies mascot"
-                  className="relative object-contain drop-shadow-2xl"
-                  style={{
-                    width: 'clamp(260px, 40vw, 380px)',
-                    filter: 'drop-shadow(0 16px 48px rgba(0,0,0,0.5)) drop-shadow(0 0 32px rgba(74,222,128,0.2))',
-                    animation: 'klippies-float 4s ease-in-out infinite',
-                  }}
-                />
+              {/* ── LEFT: Mascot ─────────────────────────────────────────── */}
+              <div className="flex flex-col items-center lg:items-start flex-shrink-0 lg:sticky lg:top-8">
+                <div className="relative">
+                  <div
+                    className="absolute rounded-full pointer-events-none"
+                    style={{
+                      width: '130%', height: '130%',
+                      top: '50%', left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      background: 'radial-gradient(ellipse, rgba(74,222,128,0.2) 0%, transparent 70%)',
+                      filter: 'blur(28px)',
+                    }}
+                  />
+                  <img
+                    src={MASCOT_SRC}
+                    alt="Klippies mascot"
+                    className="relative object-contain"
+                    style={{
+                      width: 'clamp(220px, 28vw, 340px)',
+                      filter: 'drop-shadow(0 16px 48px rgba(0,0,0,0.5)) drop-shadow(0 0 32px rgba(74,222,128,0.2))',
+                      animation: 'klippies-float 4s ease-in-out infinite',
+                    }}
+                  />
+                </div>
+                <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mt-2 text-center lg:text-left">
+                  Klippies
+                </h1>
+                <p className="text-green-400 text-sm font-semibold mt-1 text-center lg:text-left">
+                  SAWMGA AI Rules Guide
+                </p>
+                <p className="text-green-600 text-xs mt-2 text-center lg:text-left">
+                  No sign-up · Free to use
+                </p>
               </div>
 
-              {/* Name + tagline */}
-              <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-1">
-                Klippies
-              </h1>
-              <p className="text-green-400 text-sm sm:text-base font-semibold mb-2">
-                SAWMGA Rules Guide · Instant Level Checker
-              </p>
-              <p className="text-green-300/70 text-sm max-w-sm leading-relaxed mb-1">
-                Ask me anything about rules, nationals, games — or drop a time and game and I'll tell you your level instantly.
-              </p>
-              <p className="text-green-600 text-xs mb-8">No sign-up needed · Free to use</p>
-
-              {/* Level Checker widget */}
-              <LevelChecker onAsk={q => handleSend(q)} />
-
-              {/* Quick question chips */}
-              <div className="w-full max-w-xl text-left">
-                <p className="text-xs font-semibold uppercase tracking-widest text-green-500 mb-3 px-1">
-                  Or ask Klippies…
+              {/* ── RIGHT: Level checker + prompts ───────────────────────── */}
+              <div className="flex-1 min-w-0 w-full lg:w-auto">
+                <p className="text-green-300/80 text-sm leading-relaxed mb-5 text-center lg:text-left">
+                  Ask me anything about <strong className="text-white">SAWMGA rules</strong>, nationals, game regulations — or drop a time and game below and I'll tell you your level instantly.
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {QUICK_QUESTIONS.map(q => (
-                    <button
-                      key={q.query}
-                      onClick={() => handleSend(q.query)}
-                      disabled={loading}
-                      className="px-3.5 py-2 rounded-full text-sm font-medium bg-white/10 text-green-100 border border-white/20 hover:bg-white/20 hover:text-white transition disabled:opacity-50"
-                    >
-                      {q.label}
-                    </button>
-                  ))}
+
+                {/* Level Checker */}
+                <LevelChecker onAsk={q => handleSend(q)} />
+
+                {/* Quick question chips */}
+                <div className="w-full">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-green-500 mb-3">
+                    Ask Klippies…
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {QUICK_QUESTIONS.map(q => (
+                      <button
+                        key={q.query}
+                        onClick={() => handleSend(q.query)}
+                        disabled={loading}
+                        className="px-3.5 py-2 rounded-full text-sm font-medium bg-white/10 text-green-100 border border-white/20 hover:bg-white/20 hover:text-white transition disabled:opacity-50"
+                      >
+                        {q.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
