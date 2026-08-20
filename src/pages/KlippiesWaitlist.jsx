@@ -1,9 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Users, CheckCircle2 } from 'lucide-react'
+import { Users, CheckCircle2, Zap, BookOpen, Trophy, MessageCircle } from 'lucide-react'
 import { APP_LOGO_SRC } from '../constants/branding'
 
 const MASCOT_SRC = '/klippies-mascot.png'
+
+const FEATURES = [
+  {
+    icon: Zap,
+    title: 'Instant level checker',
+    description: 'Pop in your game and your time — get your SAWMGA level straight away, no waiting.',
+  },
+  {
+    icon: MessageCircle,
+    title: 'Ask anything, anytime',
+    description: 'Chat with Klippies about rules, games, equipment and levels, just like texting a friend who knows the rulebook.',
+  },
+  {
+    icon: BookOpen,
+    title: 'Answers straight from the rulebook',
+    description: 'Every answer is grounded in the official SAWMGA rules, with the exact section cited so you can double-check it.',
+  },
+  {
+    icon: Trophy,
+    title: 'Nationals made simple',
+    description: 'Eligibility, the overcount rule, entry fees, trot-ups, stabling — all the Nationals questions, answered clearly.',
+  },
+]
 
 // Launch is one week out from when this page shipped.
 const LAUNCH_AT = new Date('2026-08-26T00:00:00+02:00').getTime()
@@ -224,6 +247,27 @@ export default function KlippiesWaitlist() {
               </button>
             </form>
           )}
+        </div>
+
+        {/* ── What Klippies does ───────────────────────────────────────────── */}
+        <div className="w-full mt-10">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest text-green-500 mb-4">
+            What Klippies can do
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
+              <div key={title} className="bg-white/10 border border-white/20 rounded-2xl p-4">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center mb-2.5">
+                  <Icon size={16} className="text-green-400" />
+                </div>
+                <p className="text-white font-bold text-sm">{title}</p>
+                <p className="text-green-300/80 text-xs leading-relaxed mt-1">{description}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-green-600 text-xs mt-4">
+            Free to use, no sign-up required.
+          </p>
         </div>
       </div>
 
