@@ -96,7 +96,8 @@ function SubscribeRoute({ children }) {
     </div>
   )
   if (!user) return <Navigate to="/login" />
-  if (!profile || profile.status === 'suspended') return <Navigate to="/suspended" />
+  if (profile?.status === 'suspended') return <Navigate to="/suspended" />
+  if (!profile) return <Navigate to="/dashboard" />
   if (isSubscribed || profile?.paygate_exempt) return <Navigate to="/dashboard" />
   return children
 }
