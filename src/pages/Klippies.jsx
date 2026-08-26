@@ -369,8 +369,178 @@ function Citations({ citations }) {
 let seq = 0
 function nextId() { seq += 1; return `m${Date.now()}_${seq}` }
 
+// ── Access Gate ───────────────────────────────────────────────────────────────
+function AccessGate({ onApproved }) {
+  const [gateState, setGateState] = useState('checking') // checking|form|submitting|pending|rejected
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('klippies_access_email')
+    if (saved) {
+      checkAccess(saved)
+    } else {
+      setGateState('form')
+    }
+  }, [])
+
+  async function checkAccess(emailToCheck) {
+    setGateState('checking')
+    try {
+      const res = await fetch('/api/klippies/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToCheck }),
+      })
+      const data = await res.json()
+      if (data.status === 'approved') {
+        localStorage.setItem('klippies_access_email', emailToCheck)
+        onApproved()
+      } else if (data.status === 'pending' || data.status === 'rejected') {
+        setGateState(data.status)
+      } else {
+        setGateState('form')
+      }
+    } catch {
+      setGateState('form')
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    if (!name.trim() || !email.trim()) { setError('Please fill in both fields.'); return }
+    setGateState('submitting')
+    try {
+      const res = await fetch('/api/klippies/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), email: email.trim() }),
+      })
+      const data = await res.json()
+      localStorage.setItem('klippies_access_email', email.trim().toLowerCase())
+      if (data.status === 'approved') {
+        onApproved()
+      } else {
+        setGateState(data.status || 'pending')
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setGateState('form')
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-950 via-green-950 to-green-900 flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        {/* Mascot */}
+        <div className="flex flex-col items-center mb-8">
+          <img
+            src={MASCOT_SRC}
+            alt="Klippies"
+            className="w-32 h-32 object-contain"
+            style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.4))', animation: 'klippies-float 4s ease-in-out infinite' }}
+          />
+          <h1 className="text-white font-black text-3xl mt-3 tracking-tight">Klippies</h1>
+          <p className="text-green-400 text-sm mt-1">SAWMGA AI Rules Guide</p>
+        </div>
+
+        {/* Gate card */}
+        <div className="bg-white/10 border border-white/20 rounded-2xl p-6 backdrop-blur">
+
+          {gateState === 'checking' && (
+            <div className="text-center py-4">
+              <div className="w-6 h-6 border-2 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-green-300 text-sm">Checking your access…</p>
+            </div>
+          )}
+
+          {(gateState === 'form' || gateState === 'submitting') && (
+            <>
+              <h2 className="text-white font-bold text-lg mb-1">Request Access</h2>
+              <p className="text-green-300 text-sm mb-5 leading-relaxed">
+                Klippies is currently invite-only. Fill in your details and the admin will review your request.
+              </p>
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  disabled={gateState === 'submitting'}
+                  className="w-full rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-sm text-white placeholder-green-400/60 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50"
+                />
+                <input
+                  type="email"
+                  placeholder="Your email address"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  disabled={gateState === 'submitting'}
+                  className="w-full rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-sm text-white placeholder-green-400/60 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50"
+                />
+                {error && <p className="text-red-300 text-xs">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={gateState === 'submitting'}
+                  className="w-full py-3 rounded-xl bg-green-500 hover:bg-green-400 text-white font-bold text-sm transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {gateState === 'submitting' ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Submitting…</>
+                  ) : 'Request Access'}
+                </button>
+              </form>
+            </>
+          )}
+
+          {gateState === 'pending' && (
+            <div className="text-center py-2">
+              <div className="w-12 h-12 bg-amber-400/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">⏳</span>
+              </div>
+              <h2 className="text-white font-bold text-base mb-2">Request Submitted</h2>
+              <p className="text-green-300 text-sm leading-relaxed">
+                Your request is under review. You'll be able to access Klippies once the admin approves it.
+              </p>
+              <p className="text-green-500 text-xs mt-4">
+                Come back and refresh this page to check your status.
+              </p>
+              <button
+                onClick={() => { const e = localStorage.getItem('klippies_access_email'); if (e) checkAccess(e) }}
+                className="mt-4 text-xs text-green-400 underline hover:text-green-300 transition"
+              >
+                Check again
+              </button>
+            </div>
+          )}
+
+          {gateState === 'rejected' && (
+            <div className="text-center py-2">
+              <div className="w-12 h-12 bg-red-400/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl">❌</span>
+              </div>
+              <h2 className="text-white font-bold text-base mb-2">Access Not Approved</h2>
+              <p className="text-green-300 text-sm leading-relaxed">
+                Your request was not approved. Please contact the admin if you believe this is a mistake.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes klippies-float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Klippies() {
+  const [accessGranted, setAccessGranted] = useState(false)
   const [view, setView] = useState('home')          // 'home' | 'chat'
   const [messages, setMessages] = useState([])
   const [sessionId, setSessionId] = useState(null)
@@ -387,7 +557,9 @@ export default function Klippies() {
   const visitorId = useRef(null)
 
   // Load rules + saved sessions on mount; generate/persist visitor ID; log visit
+  // Only runs once access is granted (gate shows first)
   useEffect(() => {
+    if (!accessGranted) return
     loadDomain(wmg).then(ok => setReady(Boolean(ok))).catch(() => {})
     setSessions(loadSessions())
 
@@ -404,7 +576,7 @@ export default function Klippies() {
         body: JSON.stringify({ visitorId: vid, eventType: 'visit' }),
       }).catch(() => {})
     } catch {}
-  }, [])
+  }, [accessGranted])
 
   // Auto-save current session whenever messages change
   useEffect(() => {
@@ -531,6 +703,11 @@ export default function Klippies() {
     setSessions(loadSessions())
     // If we're currently viewing this session, go home
     if (id === sessionId) handleGoHome()
+  }
+
+  // Show gate until access is confirmed — all hooks are already declared above
+  if (!accessGranted) {
+    return <AccessGate onApproved={() => setAccessGranted(true)} />
   }
 
   const savedCount = sessions.length

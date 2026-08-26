@@ -15,6 +15,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminEvents from './pages/admin/AdminEvents'
 import AdminMatrix from './pages/admin/AdminMatrix'
+import AdminKlippies from './pages/admin/AdminKlippies'
 
 // User pages
 import Dashboard from './pages/user/Dashboard'
@@ -235,6 +236,9 @@ export default function App() {
         } />
         <Route path="/admin/matrix" element={
           <AdminRoute><AdminMatrix /></AdminRoute>
+        } />
+        <Route path="/admin/klippies" element={
+          <AdminRoute><AdminKlippies /></AdminRoute>
         } />
 
         {/* Default redirect */}

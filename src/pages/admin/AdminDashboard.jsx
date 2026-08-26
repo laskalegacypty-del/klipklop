@@ -469,10 +469,11 @@ export default function AdminDashboard() {
       {/* Quick Actions */}
       <div>
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Quick Actions</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <ActionTile to="/admin/users"  icon={Users}     label="Manage Users"           description="Approve, suspend, and edit member accounts"    color="blue"   />
-          <ActionTile to="/admin/events" icon={Calendar}  label="Manage Events"          description="Add or update qualifier and event dates"        color="green"  />
-          <ActionTile to="/admin/matrix" icon={Megaphone} label="Announcements & Matrix" description="Post notices and manage level time thresholds"  color="purple" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <ActionTile to="/admin/users"     icon={Users}         label="Manage Users"           description="Approve, suspend, and edit member accounts"    color="blue"   />
+          <ActionTile to="/admin/events"    icon={Calendar}      label="Manage Events"          description="Add or update qualifier and event dates"        color="green"  />
+          <ActionTile to="/admin/matrix"    icon={Megaphone}     label="Announcements & Matrix" description="Post notices and manage level time thresholds"  color="purple" />
+          <ActionTile to="/admin/klippies"  icon={MessageSquare} label="Klippies Access"        description="Approve or reject Klippies demo access requests" color="amber"  />
         </div>
       </div>
 
