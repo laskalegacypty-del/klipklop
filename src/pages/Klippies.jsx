@@ -751,6 +751,14 @@ export default function Klippies() {
               <span className="hidden sm:inline">New</span>
             </button>
           )}
+          {/* Report a problem — general, not tied to a specific answer */}
+          <button
+            onClick={() => setReportContext({ source: 'klippies_page', category: 'bug' })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-400/15 text-amber-300 border border-amber-400/40 hover:bg-amber-400/25 hover:text-amber-200 transition"
+          >
+            <Flag size={13} />
+            <span>Report a problem</span>
+          </button>
         </div>
       </header>
 
@@ -876,6 +884,7 @@ export default function Klippies() {
                         <button
                           onClick={() => setReportContext({
                             source: 'klippies_chat',
+                            category: 'incorrect_info',
                             question: messages[i - 1]?.role === 'user' ? messages[i - 1].content : null,
                             answer: m.content,
                             citations: (m.citations || []).map(c => ({ title: c.title, section: c.section })),
@@ -1006,7 +1015,7 @@ export default function Klippies() {
       <ReportProblemModal
         open={!!reportContext}
         onClose={() => setReportContext(null)}
-        defaultCategory="incorrect_info"
+        defaultCategory={reportContext?.category || 'bug'}
         context={reportContext}
         visitorId={visitorId.current}
         defaultEmail={(() => { try { return localStorage.getItem('klippies_access_email') || '' } catch { return '' } })()}
