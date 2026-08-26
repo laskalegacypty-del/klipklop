@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient'
 import {
   Users, Calendar, Clock,
   ArrowRight, Shield, Megaphone, Activity, MapPin,
-  BarChart2, Pin
+  BarChart2, Pin, MessageSquare, Eye, Bot
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Skeleton } from '../../components/ui'
@@ -38,6 +38,9 @@ export default function AdminDashboard() {
     totalUsers: 0, weekResults: 0,
     totalCombos: 0, activeAnnouncements: 0
   })
+  const [klippiesStats, setKlippiesStats] = useState({
+    uniqueVisitors: 0, totalVisits: 0, aiQueries: 0, visitsThisWeek: 0
+  })
   const [upcomingEvents, setUpcomingEvents] = useState([])
   const [qualifierEvents, setQualifierEvents] = useState([])
   const [resultsByEvent, setResultsByEvent] = useState({})
@@ -63,7 +66,8 @@ export default function AdminDashboard() {
         resultIdsRes,
         provincesRes,
         recentResultsRes,
-        announcementsRes
+        announcementsRes,
+        klippiesRes
       ] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
         supabase.from('qualifier_results').select('*', { count: 'exact', head: true }).gte('created_at', weekAgo.toISOString()),
@@ -76,7 +80,8 @@ export default function AdminDashboard() {
         supabase.from('qualifier_results').select(
           'combo_id, event_id, created_at, horse_rider_combos(rider_name, horse_name), qualifier_events(qualifier_number, province, date)'
         ).order('created_at', { ascending: false }).limit(60),
-        supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(10)
+        supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(10),
+        supabase.from('klippies_events').select('visitor_id, event_type, created_at')
       ])
 
       // Results by event
@@ -128,6 +133,17 @@ export default function AdminDashboard() {
         weekResults: weekResultsCount || 0,
         totalCombos: totalCombos || 0,
         activeAnnouncements: active.length
+      })
+
+      // Klippies usage metrics
+      const kRows = klippiesRes.data || []
+      const weekAgoMs = weekAgo.getTime()
+      const kWeekRows = kRows.filter(r => new Date(r.created_at).getTime() >= weekAgoMs)
+      setKlippiesStats({
+        uniqueVisitors: new Set(kRows.map(r => r.visitor_id)).size,
+        totalVisits: kRows.filter(r => r.event_type === 'visit').length,
+        aiQueries: kRows.filter(r => r.event_type === 'ai_query').length,
+        visitsThisWeek: kWeekRows.filter(r => r.event_type === 'visit').length,
       })
       setUpcomingEvents(upcomingRes.data || [])
       setQualifierEvents(qualifierRes.data || [])
@@ -196,6 +212,19 @@ export default function AdminDashboard() {
         <StatCard icon={Clock}     label="Results This Week"  value={stats.weekResults}          color="green"  />
         <StatCard icon={BarChart2} label="Active Combos"      value={stats.totalCombos}          color="purple" />
         <StatCard icon={Megaphone} label="Live Notices"       value={stats.activeAnnouncements}  color="rose"   />
+      </div>
+
+      {/* Klippies Usage */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2.5">
+          Klippies AI — Public Demo Usage
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard icon={Users}         label="Unique Visitors"   value={klippiesStats.uniqueVisitors}  color="green"  />
+          <StatCard icon={Eye}           label="Total Visits"      value={klippiesStats.totalVisits}     color="blue"   />
+          <StatCard icon={Bot}           label="AI Queries"        value={klippiesStats.aiQueries}       color="purple" />
+          <StatCard icon={MessageSquare} label="Visits This Week"  value={klippiesStats.visitsThisWeek} color="amber"  />
+        </div>
       </div>
 
       {/* Season Overview + Upcoming Events */}

@@ -384,11 +384,26 @@ export default function Klippies() {
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
   const sessionCreatedAt = useRef(null)
+  const visitorId = useRef(null)
 
-  // Load rules + saved sessions on mount
+  // Load rules + saved sessions on mount; generate/persist visitor ID; log visit
   useEffect(() => {
     loadDomain(wmg).then(ok => setReady(Boolean(ok))).catch(() => {})
     setSessions(loadSessions())
+
+    try {
+      let vid = localStorage.getItem('klippies_visitor_id')
+      if (!vid) {
+        vid = newSessionId()
+        localStorage.setItem('klippies_visitor_id', vid)
+      }
+      visitorId.current = vid
+      fetch('/api/klippies/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId: vid, eventType: 'visit' }),
+      }).catch(() => {})
+    } catch {}
   }, [])
 
   // Auto-save current session whenever messages change
@@ -460,6 +475,7 @@ export default function Klippies() {
             systemPrompt: KLIPPIES_SYSTEM_PROMPT,
             model: wmg.ai.model,
             history: historySnapshot,
+            visitorId: visitorId.current,
           }),
         })
         if (res.ok) {

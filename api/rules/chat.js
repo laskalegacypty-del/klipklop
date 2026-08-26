@@ -4,6 +4,7 @@
 //   CF_ACCOUNT_ID   - Cloudflare account id
 //   CF_API_TOKEN    - Cloudflare API token with Workers AI permission
 //   CF_MODEL        - optional, defaults to @cf/meta/llama-3.3-70b-instruct-fp8-fast
+import { createAdminClient } from '../_lib/supabaseAdmin.js'
 
 const DEFAULT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
 const MAX_CONTEXT_CHARS = 16000
@@ -96,6 +97,15 @@ export default async function handler(req, res) {
     }
 
     const response = (data?.result?.response || '').trim()
+    // Fire-and-forget usage log — never await so it can't slow or break the response
+    if (body.visitorId) {
+      try {
+        createAdminClient()
+          .from('klippies_events')
+          .insert({ visitor_id: body.visitorId, event_type: 'ai_query', query_len: query.length })
+          .then(() => {})
+      } catch {}
+    }
     res.status(200).json({ response, used_ai: true, fallback: false })
   } catch (error) {
     res.status(200).json({
