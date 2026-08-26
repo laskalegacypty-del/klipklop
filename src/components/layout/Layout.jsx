@@ -25,11 +25,13 @@ import {
   PanelLeftOpen,
   ClipboardList,
   History,
+  Flag,
 } from 'lucide-react'
 import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE_SIDEBAR } from '../../constants/branding'
 import OnboardingTour from '../onboarding/OnboardingTour'
 import { START_TUTORIAL_EVENT } from '../onboarding/OnboardingTour'
 import NationalsCountdown from './NationalsCountdown'
+import ReportProblemModal from '../ReportProblemModal'
 
 const APP_TAGLINE_ADMIN = 'Admin Panel'
 
@@ -87,6 +89,7 @@ const adminNavItems = [
   { path: '/admin/events',    label: 'Events',                 icon: Calendar,      group: 'manage' },
   { path: '/admin/matrix',    label: 'Matrix & Announcements', icon: Settings,       group: 'manage' },
   { path: '/admin/klippies',  label: 'Klippies Access',        icon: MessageSquare,  group: 'manage' },
+  { path: '/admin/reports',   label: 'Problem Reports',        icon: Flag,           group: 'manage' },
   { path: '/assistant',       label: 'Assistant',              icon: MessageCircle,  group: 'tools' },
 ]
 
@@ -112,6 +115,7 @@ export default function Layout({ children }) {
     try { return localStorage.getItem('sidebar_collapsed') === 'true' } catch { return false }
   })
   const [unreadCount, setUnreadCount] = useState(0)
+  const [reportOpen, setReportOpen] = useState(false)
   const { profile, isAdmin, isSupporter, isClubHead, isClubMember } = useAuth()
   const location = useLocation()
   const mainRef  = useRef(null)
@@ -284,6 +288,17 @@ export default function Layout({ children }) {
               <span className={`text-sm font-medium ${col ? 'lg:hidden' : ''}`}>Getting Started</span>
             </Link>
           )}
+
+          <button
+            type="button"
+            onClick={() => { setReportOpen(true); setSidebarOpen(false) }}
+            title={col ? 'Report a problem' : undefined}
+            className={`mt-1 w-full flex items-center gap-3 py-2.5 rounded-lg transition text-white/80 hover:bg-white/10 hover:text-white
+              ${col ? 'lg:justify-center lg:px-0' : 'px-4'}`}
+          >
+            <Flag size={20} />
+            <span className={`text-sm font-medium ${col ? 'lg:hidden' : ''}`}>Report a problem</span>
+          </button>
         </nav>
 
         {/* ── Profile footer ────────────────────────────────────────── */}
@@ -389,6 +404,12 @@ export default function Layout({ children }) {
       </div>
 
       <OnboardingTour />
+
+      <ReportProblemModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        defaultCategory="bug"
+      />
     </div>
   )
 }

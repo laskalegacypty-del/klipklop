@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { loadDomain, searchDomain, buildDomainContext } from 'rules-engine/core'
-import { ArrowLeft, BookOpen, ChevronDown, Clock, MessageSquarePlus, Send, Trash2, X, Zap } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronDown, Clock, Flag, MessageSquarePlus, Send, Trash2, X, Zap } from 'lucide-react'
 import { wmg } from '../lib/rulesDomains/wmg'
 import { MATRIX, getLevel } from '../lib/matrix'
 import { APP_LOGO_SRC } from '../constants/branding'
+import ReportProblemModal from '../components/ReportProblemModal'
 
 const MASCOT_SRC = '/klippies-mascot.png'
 const SESSIONS_KEY = 'klippies_sessions'
@@ -551,6 +552,7 @@ export default function Klippies() {
   const [ready, setReady] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [showLevelChecker, setShowLevelChecker] = useState(false)
+  const [reportContext, setReportContext] = useState(null) // null = closed, object = open with prefilled context
 
   const scrollRef = useRef(null)
   const inputRef = useRef(null)
@@ -850,7 +852,7 @@ export default function Klippies() {
             </div>
           ) : (
             /* ── Chat messages ──────────────────────────────────────── */
-            messages.map(m => (
+            messages.map((m, i) => (
               <div key={m.id} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden ${
                   m.role === 'user' ? 'bg-white' : 'bg-green-800'
@@ -867,7 +869,24 @@ export default function Klippies() {
                 }`}>
                   {m.role === 'user'
                     ? <p className="whitespace-pre-wrap">{m.content}</p>
-                    : <div>{renderRichText(m.content)}<Citations citations={m.citations} /></div>
+                    : (
+                      <div>
+                        {renderRichText(m.content)}
+                        <Citations citations={m.citations} />
+                        <button
+                          onClick={() => setReportContext({
+                            source: 'klippies_chat',
+                            question: messages[i - 1]?.role === 'user' ? messages[i - 1].content : null,
+                            answer: m.content,
+                            citations: (m.citations || []).map(c => ({ title: c.title, section: c.section })),
+                          })}
+                          className="mt-2.5 inline-flex items-center gap-1 text-xs text-green-300/70 hover:text-green-100 transition"
+                        >
+                          <Flag size={11} />
+                          Report a problem with this answer
+                        </button>
+                      </div>
+                    )
                   }
                 </div>
               </div>
@@ -983,6 +1002,15 @@ export default function Klippies() {
           onNewChat={handleNewChat}
         />
       )}
+
+      <ReportProblemModal
+        open={!!reportContext}
+        onClose={() => setReportContext(null)}
+        defaultCategory="incorrect_info"
+        context={reportContext}
+        visitorId={visitorId.current}
+        defaultEmail={(() => { try { return localStorage.getItem('klippies_access_email') || '' } catch { return '' } })()}
+      />
 
       <style>{`
         @keyframes klippies-float {

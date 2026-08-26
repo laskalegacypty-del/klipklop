@@ -16,6 +16,7 @@ import AdminUsers from './pages/admin/AdminUsers'
 import AdminEvents from './pages/admin/AdminEvents'
 import AdminMatrix from './pages/admin/AdminMatrix'
 import AdminKlippies from './pages/admin/AdminKlippies'
+import AdminReports from './pages/admin/AdminReports'
 
 // User pages
 import Dashboard from './pages/user/Dashboard'
@@ -239,6 +240,9 @@ export default function App() {
         } />
         <Route path="/admin/klippies" element={
           <AdminRoute><AdminKlippies /></AdminRoute>
+        } />
+        <Route path="/admin/reports" element={
+          <AdminRoute><AdminReports /></AdminRoute>
         } />
 
         {/* Default redirect */}

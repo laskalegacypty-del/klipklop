@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient'
 import {
   Users, Calendar, Clock,
   ArrowRight, Shield, Megaphone, Activity, MapPin,
-  BarChart2, Pin, MessageSquare, Eye, Bot
+  BarChart2, Pin, MessageSquare, Eye, Bot, Flag
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Skeleton } from '../../components/ui'
@@ -474,6 +474,7 @@ export default function AdminDashboard() {
           <ActionTile to="/admin/events"    icon={Calendar}      label="Manage Events"          description="Add or update qualifier and event dates"        color="green"  />
           <ActionTile to="/admin/matrix"    icon={Megaphone}     label="Announcements & Matrix" description="Post notices and manage level time thresholds"  color="purple" />
           <ActionTile to="/admin/klippies"  icon={MessageSquare} label="Klippies Access"        description="Approve or reject Klippies demo access requests" color="amber"  />
+          <ActionTile to="/admin/reports"   icon={Flag}          label="Problem Reports"        description="Review incorrect info, bugs, and UI problems"    color="rose"   />
         </div>
       </div>
 
