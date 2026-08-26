@@ -18,6 +18,7 @@ import {
   UsersRound,
   Trophy,
   MessageCircle,
+  MessageSquare,
   ChevronLeft,
   ChevronRight,
   PanelLeftClose,
@@ -84,8 +85,9 @@ const adminNavItems = [
   { path: '/admin/dashboard', label: 'Dashboard',              icon: Home,          group: null },
   { path: '/admin/users',     label: 'Users',                  icon: Users,         group: 'manage' },
   { path: '/admin/events',    label: 'Events',                 icon: Calendar,      group: 'manage' },
-  { path: '/admin/matrix',    label: 'Matrix & Announcements', icon: Settings,      group: 'manage' },
-  { path: '/assistant',       label: 'Assistant',              icon: MessageCircle, group: 'tools' },
+  { path: '/admin/matrix',    label: 'Matrix & Announcements', icon: Settings,       group: 'manage' },
+  { path: '/admin/klippies',  label: 'Klippies Access',        icon: MessageSquare,  group: 'manage' },
+  { path: '/assistant',       label: 'Assistant',              icon: MessageCircle,  group: 'tools' },
 ]
 
 const GROUP_LABELS = {
