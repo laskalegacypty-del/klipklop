@@ -555,12 +555,6 @@ export default function Klippies() {
               <span className="hidden sm:inline">New</span>
             </button>
           )}
-          <Link
-            to="/register"
-            className="bg-white text-green-900 text-xs font-bold px-3.5 py-1.5 rounded-full hover:bg-green-50 transition"
-          >
-            Join free
-          </Link>
         </div>
       </header>
 
