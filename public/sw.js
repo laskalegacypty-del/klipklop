@@ -1,4 +1,4 @@
-const CACHE_NAME = 'klipklop-v3'
+const CACHE_NAME = 'klipklop-v4'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -39,6 +39,14 @@ function isServiceWorkerScript(url) {
   }
 }
 
+function isRulesData(url) {
+  try {
+    return new URL(url).pathname.startsWith('/data/')
+  } catch {
+    return false
+  }
+}
+
 self.addEventListener('fetch', event => {
   const { request } = event
   const url = request.url
@@ -54,6 +62,24 @@ self.addEventListener('fetch', event => {
   if (isSupabase(url)) {
     event.respondWith(
       fetch(request).catch(() => caches.match(request))
+    )
+    return
+  }
+
+  // Rules/knowledge-base data: network-first. Klippies' answers are only as
+  // correct as this data — stale-while-revalidate would serve an outdated
+  // rule instantly and only catch up in the background on the *next* load.
+  if (isRulesData(url)) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
+          }
+          return response
+        })
+        .catch(() => caches.match(request))
     )
     return
   }
