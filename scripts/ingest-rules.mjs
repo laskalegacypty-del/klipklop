@@ -2,6 +2,10 @@
 // Heading-aware chunking: each "###" subsection becomes a searchable entry,
 // grouped under its parent "##" section. Section intros (text directly under a
 // "##" before any "###") become their own entry titled by the section.
+// Each "####" sub-subsection (e.g. one game under "2.8 Individual Event
+// Specifications") also becomes its own entry, grouped under its parent
+// "###" title — otherwise all of them would be merged into one oversized
+// chunk that risks being truncated out of the LLM's context budget.
 //
 // Usage: node scripts/ingest-rules.mjs [inputFile] [outputFile]
 
@@ -21,7 +25,7 @@ const VERSION = '2026'
 
 function cleanHeading(line) {
   return line
-    .replace(/^#{2,3}\s+/, '')
+    .replace(/^#{2,4}\s+/, '')
     .replace(/\*\*/g, '')
     .replace(/\*/g, '')
     .trim()
@@ -40,6 +44,7 @@ function ingest() {
 
   const entries = []
   let section = null
+  let subsection = null
   let current = null
   let started = false
 
@@ -48,15 +53,25 @@ function ingest() {
       // New top-level section
       flush(entries, current)
       section = cleanHeading(line)
+      subsection = null
       current = { title: section, section, lines: [] }
       started = true
       continue
     }
-    if (/^###\s+/.test(line)) {
+    if (/^###\s+/.test(line) && !/^####\s+/.test(line)) {
       // New subsection entry
       flush(entries, current)
+      subsection = cleanHeading(line)
+      current = { title: subsection, section: section || subsection, lines: [] }
+      started = true
+      continue
+    }
+    if (/^####\s+/.test(line)) {
+      // New sub-subsection entry (e.g. one game under 2.8), grouped under its
+      // parent "###" title so each stays independently searchable/citable.
+      flush(entries, current)
       const title = cleanHeading(line)
-      current = { title, section: section || title, lines: [] }
+      current = { title, section: subsection || section || title, lines: [] }
       started = true
       continue
     }

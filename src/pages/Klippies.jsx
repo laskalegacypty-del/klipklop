@@ -90,12 +90,19 @@ const GAME_LOOKUP_SORTED = [
 
 function parseTimeLevelQuery(message) {
   const msg = message.toLowerCase()
-  const timeMatch = msg.match(/\b(\d{1,2}\.?\d{0,3})\b/)
+  // Prefer a number with a decimal point — real times always have one (e.g.
+  // "14.823") — before falling back to a bare integer. Otherwise a stray
+  // digit inside the game name itself ("Fig 8 Flags", "Poles 2") gets picked
+  // up as the time instead of the number the rider actually typed.
+  const timeMatch = msg.match(/\b(\d{1,2}\.\d{1,3})\b/) || msg.match(/\b(\d{1,2})\b/)
   if (!timeMatch) return null
   const time = parseFloat(timeMatch[1])
   if (time < 5 || time > 70) return null
   for (const [alias, gameName] of GAME_LOOKUP_SORTED) {
-    if (msg.includes(alias)) return { game: gameName, time }
+    // Word-boundary match, not substring: "poles i" is a substring of "poles
+    // ii", so a plain .includes() would misclassify every Poles II query as
+    // Poles I (wrong game, wrong level, no error or warning shown).
+    if (new RegExp(`\\b${alias}\\b`).test(msg)) return { game: gameName, time }
   }
   return null
 }
@@ -294,18 +301,12 @@ Rules:
 
 // ── Quick questions ──────────────────────────────────────────────────────────
 const QUICK_QUESTIONS = [
-  { label: 'Nationals 2026 dates',     query: 'When and where is Nationals 2026?' },
-  { label: 'Silver vs Gold',           query: 'What is the difference between Silver and Gold Nationals?' },
-  { label: 'Entry fees',               query: 'What are the entry fees for Nationals 2026?' },
-  { label: 'Trot-up',                  query: 'What are the trot-up requirements for Nationals 2026?' },
-  { label: 'Bumping rules',            query: 'How does bumping work at Nationals 2026?' },
   { label: 'Overcount rule',           query: 'How does the SAWMGA overcount rule work?' },
   { label: 'Nationals eligibility',    query: 'What are the requirements to qualify for Nationals?' },
   { label: 'Barrel penalty',           query: 'What is the penalty for knocking over a barrel?' },
   { label: 'Qualifier games',          query: 'What games are included in each qualifier?' },
   { label: 'WMG levels',              query: 'What levels are there in Western Mounted Games?' },
   { label: 'Horse marking',            query: 'What are the horse marking rules for Nationals?' },
-  { label: 'Stabling',                 query: 'What are the stabling and paddock options at Nationals 2026?' },
 ]
 
 // ── Markdown renderer ────────────────────────────────────────────────────────

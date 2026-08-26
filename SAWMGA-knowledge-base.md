@@ -25,11 +25,11 @@
 | Qualifier | Games |
 |-----------|-------|
 | Q1 & Q7 | Fig 8 Flags, Hurry Scurry, Birangle, Quadrangle, Single Stake |
-| Q2 & Q8 | Barrels, Poles I, Fig 8 Stake, Keyhole, Speedball |
-| Q3 & Q9 | Figure 8 Flags, Poles II, Speedball, Speed Barrels, Big T |
+| Q2 & Q8 | Barrel Race, Poles I, Fig 8 Stake, Keyhole, Speedball |
+| Q3 & Q9 | Fig 8 Flags, Poles II, Speedball, Speed Barrels, Big T |
 | Q4 & Q10 | Birangle, Hurry Scurry, Keyhole, Quadrangle, Single Stake |
-| Q5 & Q11 | Barrels, Speedball, Keyhole, Poles I, Fig 8 Stake |
-| Q6 & Q12 | Speed Barrels, Hurry Scurry, Poles II, Figure 8 Flag, Big T |
+| Q5 & Q11 | Barrel Race, Speedball, Keyhole, Poles I, Fig 8 Stake |
+| Q6 & Q12 | Speed Barrels, Hurry Scurry, Poles II, Fig 8 Flags, Big T |
 
 ---
 
@@ -91,12 +91,13 @@
 | Dress violation | 1 second |
 | Obstacle knocked down | 2 seconds each |
 | Barrel knocked in Barrel Race | 5 seconds each |
+| Cone knocked over in Speedball (exception to "obstacle knocked down") | NT (No Time) |
 | Exceeding 120 seconds | NT (No Time) |
 | Loss of control | NT |
 | Dismount | NT |
 | Course failure | NT |
 | Cruel treatment of horse | Disqualification |
-| Bucket knocked in Fig 8 Flag | Disqualification |
+| Bucket (or barrel/drum it sits on) knocked in Fig 8 Flags | Disqualification |
 | Hoof on Keyhole chalk line | Disqualification |
 
 ### 2.5 Judges
@@ -144,12 +145,12 @@
 - Pole spacing: 13.8m apart, 45.75m total
 - Penalty: 2 seconds per obstacle
 
-#### Figure 8 Flag
+#### Fig 8 Flags
 - Reverse ride, exchange flags between 2 barrels
 - Barrel spacing: 19.1m apart
-- DQ for: dropping flag on ground or knocking bucket
+- DQ for: dropping flag on ground or knocking bucket — the bucket sits on top of the barrel/drum, so knocking the barrel/drum counts as knocking the bucket (same DQ)
 
-#### Figure 8 Stake
+#### Fig 8 Stake
 - Reverse ride, 2 poles, opposite-direction turns
 - Pole spacing: 19.1m apart
 - Penalty: 2 seconds per pole
@@ -167,26 +168,28 @@
 - Distance to centre: 27.45m
 - DQ if any hoof touches chalk line
 
-#### Pole Bending I
+#### Poles I
 - 6 poles, 6.1m spacing, 30.5m total
 - Weave pattern
 - Penalty: 2 seconds per pole
 
-#### Pole Bending II
+#### Poles II
 - 6 poles, 6.4m spacing, 38.43m total
 - Different pattern
+- Penalty: 2 seconds per pole
 - DQ for breaking timing line
 
-#### Quadrangle Stake
+#### Quadrangle
 - 4 poles (2 on each side of timing line)
 - Width: 22.88m, total distance: 48.8m
 - Penalty: 2 seconds per pole
 
-#### Speed Ball
+#### Speedball
 - Single cone at 30.5m
 - Drop golf ball into cone
-- Penalty: 2 seconds for dislodging ball
-- DQ if ball not in cone at finish
+- Penalty: 2 seconds for dislodging ball (ball moves but stays in cone, cone remains upright)
+- Cone knocked over: No Time (NT) — regardless of where the ball ends up
+- DQ if ball not in cone at finish (cone still upright)
 
 #### Speed Barrels
 - 3 barrels in line at 18.25m and 18.3m spacing
@@ -463,7 +466,7 @@ The overcount principle tracks how many levels above your current level you achi
 | 0 | 0 | 1 | 0 | 2 | 3 | 6 | 1 |
 | 0 | 3 | 3 | 0 | 0 | 0 | 6 | 2 |
 | 1 | 3 | 2 | 1 | 3 | 0 | 5 | 2 |
-| 2 | 3 | 4 | 4 | 2 | 1 | 4 | 3 |
+| 2 | 3 | 4 | 4 | 2 | 1 | 5 | 3 |
 | 3 | 4 | 4 | 4 | 4 | 2 | 4 | 4 |
 | 2 | 2 | 3 | 1 | 2 | 3 | 2 | 2 |
 
@@ -478,7 +481,7 @@ Times are in seconds (hundredths). Level 0 = slowest; Level 4 = fastest.
 | Event | Level 0 (≥) | Level 1 (from–to) | Level 2 (from–to) | Level 3 (from–to) | Level 4 (≤) |
 |-------|-------------|-------------------|-------------------|-------------------|-------------|
 | Barrel Race | 28.971 | 24.361–28.970 | 22.213–24.360 | 21.155–22.212 | 21.154 |
-| Bi-Rangle | 20.642 | 18.088–20.641 | 16.756–18.087 | 15.589–16.755 | 15.588 |
+| Birangle | 20.642 | 18.088–20.641 | 16.756–18.087 | 15.589–16.755 | 15.588 |
 | Big T | 22.767 | 19.893–22.766 | 18.043–19.892 | 16.794–18.042 | 16.793 |
 | Fig 8 Flags | 27.610 | 21.107–27.609 | 17.498–21.106 | 14.726–17.497 | 14.725 |
 | Fig 8 Stake | 16.472 | 14.198–16.471 | 13.182–14.197 | 12.395–13.181 | 12.394 |
@@ -487,8 +490,8 @@ Times are in seconds (hundredths). Level 0 = slowest; Level 4 = fastest.
 | Poles I | 16.811 | 14.814–16.810 | 13.105–14.813 | 12.057–13.104 | 12.056 |
 | Poles II | 34.667 | 29.954–34.666 | 27.358–29.953 | 25.386–27.357 | 25.385 |
 | Quadrangle | 29.838 | 26.006–29.837 | 23.886–26.005 | 22.344–23.885 | 22.343 |
-| Single Stake Race | 14.677 | 12.338–14.676 | 11.414–12.337 | 10.594–11.413 | 10.593 |
-| Speed Ball | 13.906 | 10.891–13.905 | 9.439–10.890 | 8.635–9.438 | 8.634 |
+| Single Stake | 14.677 | 12.338–14.676 | 11.414–12.337 | 10.594–11.413 | 10.593 |
+| Speedball | 13.906 | 10.891–13.905 | 9.439–10.890 | 8.635–9.438 | 8.634 |
 | Speed Barrels | 15.557 | 12.853–15.556 | 11.910–12.852 | 11.048–11.909 | 11.047 |
 
 ---

@@ -2,8 +2,8 @@
   "source": "SAWMGA Knowledge Base",
   "sourceUrl": "https://www.sawmga.co.za",
   "version": "2026",
-  "generatedAt": "2026-06-10T12:06:27.567Z",
-  "entryCount": 57,
+  "generatedAt": "2026-08-26T12:39:07.696Z",
+  "entryCount": 59,
   "entries": [
     {
       "title": "CONTACT & LEADERSHIP",
@@ -13,7 +13,7 @@
     {
       "title": "SECTION 1: GAMES PER QUALIFIER SCHEDULE",
       "section": "SECTION 1: GAMES PER QUALIFIER SCHEDULE",
-      "text": "*(Updated: 23/11/2024)*\n\n| Qualifier | Games |\n|-----------|-------|\n| Q1 & Q7 | Fig 8 Flags, Hurry Scurry, Birangle, Quadrangle, Single Stake |\n| Q2 & Q8 | Barrels, Poles I, Fig 8 Stake, Keyhole, Speedball |\n| Q3 & Q9 | Figure 8 Flags, Poles II, Speedball, Speed Barrels, Big T |\n| Q4 & Q10 | Birangle, Hurry Scurry, Keyhole, Quadrangle, Single Stake |\n| Q5 & Q11 | Barrels, Speedball, Keyhole, Poles I, Fig 8 Stake |\n| Q6 & Q12 | Speed Barrels, Hurry Scurry, Poles II, Figure 8 Flag, Big T |"
+      "text": "*(Updated: 23/11/2024)*\n\n| Qualifier | Games |\n|-----------|-------|\n| Q1 & Q7 | Fig 8 Flags, Hurry Scurry, Birangle, Quadrangle, Single Stake |\n| Q2 & Q8 | Barrel Race, Poles I, Fig 8 Stake, Keyhole, Speedball |\n| Q3 & Q9 | Fig 8 Flags, Poles II, Speedball, Speed Barrels, Big T |\n| Q4 & Q10 | Birangle, Hurry Scurry, Keyhole, Quadrangle, Single Stake |\n| Q5 & Q11 | Barrel Race, Speedball, Keyhole, Poles I, Fig 8 Stake |\n| Q6 & Q12 | Speed Barrels, Hurry Scurry, Poles II, Fig 8 Flags, Big T |"
     },
     {
       "title": "2.1 Divisions / Age Categories",
@@ -33,7 +33,7 @@
     {
       "title": "2.4 Penalties Summary",
       "section": "SECTION 2: RULEBOOK (January 2026)",
-      "text": "| Offence | Penalty |\n|---------|---------|\n| Dress violation | 1 second |\n| Obstacle knocked down | 2 seconds each |\n| Barrel knocked in Barrel Race | 5 seconds each |\n| Exceeding 120 seconds | NT (No Time) |\n| Loss of control | NT |\n| Dismount | NT |\n| Course failure | NT |\n| Cruel treatment of horse | Disqualification |\n| Bucket knocked in Fig 8 Flag | Disqualification |\n| Hoof on Keyhole chalk line | Disqualification |"
+      "text": "| Offence | Penalty |\n|---------|---------|\n| Dress violation | 1 second |\n| Obstacle knocked down | 2 seconds each |\n| Barrel knocked in Barrel Race | 5 seconds each |\n| Cone knocked over in Speedball (exception to \"obstacle knocked down\") | NT (No Time) |\n| Exceeding 120 seconds | NT (No Time) |\n| Loss of control | NT |\n| Dismount | NT |\n| Course failure | NT |\n| Cruel treatment of horse | Disqualification |\n| Bucket (or barrel/drum it sits on) knocked in Fig 8 Flags | Disqualification |\n| Hoof on Keyhole chalk line | Disqualification |"
     },
     {
       "title": "2.5 Judges",
@@ -51,9 +51,69 @@
       "text": "- Minimum size: 37m × 76m\n- Ideal size: 40m × 80m\n- Running start: 24.4m\n- Minimum 4.5m from obstacles to fence (Keyhole: 7.5m)"
     },
     {
-      "title": "2.8 Individual Event Specifications",
-      "section": "SECTION 2: RULEBOOK (January 2026)",
-      "text": "#### Barrel Race\n- Cloverleaf pattern\n- Barrel spacing: 18.3m and 27.5m\n- Penalty: 5 seconds per barrel knocked\n\n#### Big T\n- 3 poles + 2 barrels\n- Pole spacing: 6.4m apart\n- Barrel spacing: 13.8m apart\n- Penalty: 2 seconds per obstacle\n\n#### Birangle\n- 2 poles, same-direction turns\n- Pole spacing: 13.8m apart, 45.75m total\n- Penalty: 2 seconds per obstacle\n\n#### Figure 8 Flag\n- Reverse ride, exchange flags between 2 barrels\n- Barrel spacing: 19.1m apart\n- DQ for: dropping flag on ground or knocking bucket\n\n#### Figure 8 Stake\n- Reverse ride, 2 poles, opposite-direction turns\n- Pole spacing: 19.1m apart\n- Penalty: 2 seconds per pole\n\n#### Hurry Scurry\n- 3 jumps + 1 pole\n- Jump heights: Level 0+1: 30cm; Level 2+: 45cm\n- Obstacle spacing: 15.25m intervals\n- Penalty: 2 seconds per obstacle\n- DQ if all 3 jumps knocked down\n\n#### Keyhole\n- Run into circle, turn inside, return\n- Circle: 6.1m diameter (3.05m radius)\n- Distance to centre: 27.45m\n- DQ if any hoof touches chalk line\n\n#### Pole Bending I\n- 6 poles, 6.1m spacing, 30.5m total\n- Weave pattern\n- Penalty: 2 seconds per pole\n\n#### Pole Bending II\n- 6 poles, 6.4m spacing, 38.43m total\n- Different pattern\n- DQ for breaking timing line\n\n#### Quadrangle Stake\n- 4 poles (2 on each side of timing line)\n- Width: 22.88m, total distance: 48.8m\n- Penalty: 2 seconds per pole\n\n#### Speed Ball\n- Single cone at 30.5m\n- Drop golf ball into cone\n- Penalty: 2 seconds for dislodging ball\n- DQ if ball not in cone at finish\n\n#### Speed Barrels\n- 3 barrels in line at 18.25m and 18.3m spacing\n- Weave pattern\n- Penalty: 2 seconds per barrel\n\n#### Single Stake\n- 1 pole at 45.75m\n- Penalty: 2 seconds"
+      "title": "Barrel Race",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- Cloverleaf pattern\n- Barrel spacing: 18.3m and 27.5m\n- Penalty: 5 seconds per barrel knocked"
+    },
+    {
+      "title": "Big T",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 3 poles + 2 barrels\n- Pole spacing: 6.4m apart\n- Barrel spacing: 13.8m apart\n- Penalty: 2 seconds per obstacle"
+    },
+    {
+      "title": "Birangle",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 2 poles, same-direction turns\n- Pole spacing: 13.8m apart, 45.75m total\n- Penalty: 2 seconds per obstacle"
+    },
+    {
+      "title": "Fig 8 Flags",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- Reverse ride, exchange flags between 2 barrels\n- Barrel spacing: 19.1m apart\n- DQ for: dropping flag on ground or knocking bucket — the bucket sits on top of the barrel/drum, so knocking the barrel/drum counts as knocking the bucket (same DQ)"
+    },
+    {
+      "title": "Fig 8 Stake",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- Reverse ride, 2 poles, opposite-direction turns\n- Pole spacing: 19.1m apart\n- Penalty: 2 seconds per pole"
+    },
+    {
+      "title": "Hurry Scurry",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 3 jumps + 1 pole\n- Jump heights: Level 0+1: 30cm; Level 2+: 45cm\n- Obstacle spacing: 15.25m intervals\n- Penalty: 2 seconds per obstacle\n- DQ if all 3 jumps knocked down"
+    },
+    {
+      "title": "Keyhole",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- Run into circle, turn inside, return\n- Circle: 6.1m diameter (3.05m radius)\n- Distance to centre: 27.45m\n- DQ if any hoof touches chalk line"
+    },
+    {
+      "title": "Poles I",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 6 poles, 6.1m spacing, 30.5m total\n- Weave pattern\n- Penalty: 2 seconds per pole"
+    },
+    {
+      "title": "Poles II",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 6 poles, 6.4m spacing, 38.43m total\n- Different pattern\n- Penalty: 2 seconds per pole\n- DQ for breaking timing line"
+    },
+    {
+      "title": "Quadrangle",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 4 poles (2 on each side of timing line)\n- Width: 22.88m, total distance: 48.8m\n- Penalty: 2 seconds per pole"
+    },
+    {
+      "title": "Speedball",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- Single cone at 30.5m\n- Drop golf ball into cone\n- Penalty: 2 seconds for dislodging ball (ball moves but stays in cone, cone remains upright)\n- Cone knocked over: No Time (NT) — regardless of where the ball ends up\n- DQ if ball not in cone at finish (cone still upright)"
+    },
+    {
+      "title": "Speed Barrels",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 3 barrels in line at 18.25m and 18.3m spacing\n- Weave pattern\n- Penalty: 2 seconds per barrel"
+    },
+    {
+      "title": "Single Stake",
+      "section": "2.8 Individual Event Specifications",
+      "text": "- 1 pole at 45.75m\n- Penalty: 2 seconds"
     },
     {
       "title": "2.9 Team Events",
@@ -193,12 +253,12 @@
     {
       "title": "SECTION 6: OVERCOUNT PRINCIPLE",
       "section": "SECTION 6: OVERCOUNT PRINCIPLE",
-      "text": "*(Published: 10 February 2026)*\n\nThe overcount principle tracks how many levels above your current level you achieve in a qualifier.\n\n**How it works:** For each game in a qualifier, if you achieve a time that places you in a level higher than the level you entered, the difference counts as an overcount. Overcounts across all games in a qualifier are totalled to determine your new level.\n\n**Example table (5-game qualifier):**\n\n| Level Entered | Game 1 Achieved | Game 2 Achieved | Game 3 Achieved | Game 4 Achieved | Game 5 Achieved | Total Overcount | New Level |\n|---|---|---|---|---|---|---|---|\n| 0 | 0 | 1 | 0 | 2 | 3 | 6 | 1 |\n| 0 | 3 | 3 | 0 | 0 | 0 | 6 | 2 |\n| 1 | 3 | 2 | 1 | 3 | 0 | 5 | 2 |\n| 2 | 3 | 4 | 4 | 2 | 1 | 4 | 3 |\n| 3 | 4 | 4 | 4 | 4 | 2 | 4 | 4 |\n| 2 | 2 | 3 | 1 | 2 | 3 | 2 | 2 |\n\n*(Note: The \"overcount\" per game = Level Achieved minus Level Entered, if positive; zero if not.)*"
+      "text": "*(Published: 10 February 2026)*\n\nThe overcount principle tracks how many levels above your current level you achieve in a qualifier.\n\n**How it works:** For each game in a qualifier, if you achieve a time that places you in a level higher than the level you entered, the difference counts as an overcount. Overcounts across all games in a qualifier are totalled to determine your new level.\n\n**Example table (5-game qualifier):**\n\n| Level Entered | Game 1 Achieved | Game 2 Achieved | Game 3 Achieved | Game 4 Achieved | Game 5 Achieved | Total Overcount | New Level |\n|---|---|---|---|---|---|---|---|\n| 0 | 0 | 1 | 0 | 2 | 3 | 6 | 1 |\n| 0 | 3 | 3 | 0 | 0 | 0 | 6 | 2 |\n| 1 | 3 | 2 | 1 | 3 | 0 | 5 | 2 |\n| 2 | 3 | 4 | 4 | 2 | 1 | 5 | 3 |\n| 3 | 4 | 4 | 4 | 4 | 2 | 4 | 4 |\n| 2 | 2 | 3 | 1 | 2 | 3 | 2 | 2 |\n\n*(Note: The \"overcount\" per game = Level Achieved minus Level Entered, if positive; zero if not.)*"
     },
     {
       "title": "SECTION 7: RATING MATRIX (TIME STANDARDS PER LEVEL)",
       "section": "SECTION 7: RATING MATRIX (TIME STANDARDS PER LEVEL)",
-      "text": "Times are in seconds (hundredths). Level 0 = slowest; Level 4 = fastest.\n\n| Event | Level 0 (≥) | Level 1 (from–to) | Level 2 (from–to) | Level 3 (from–to) | Level 4 (≤) |\n|-------|-------------|-------------------|-------------------|-------------------|-------------|\n| Barrel Race | 28.971 | 24.361–28.970 | 22.213–24.360 | 21.155–22.212 | 21.154 |\n| Bi-Rangle | 20.642 | 18.088–20.641 | 16.756–18.087 | 15.589–16.755 | 15.588 |\n| Big T | 22.767 | 19.893–22.766 | 18.043–19.892 | 16.794–18.042 | 16.793 |\n| Fig 8 Flags | 27.610 | 21.107–27.609 | 17.498–21.106 | 14.726–17.497 | 14.725 |\n| Fig 8 Stake | 16.472 | 14.198–16.471 | 13.182–14.197 | 12.395–13.181 | 12.394 |\n| Hurry Scurry | 19.736 | 14.814–19.735 | 12.855–14.813 | 11.474–12.854 | 11.473 |\n| Keyhole | 13.183 | 10.497–13.182 | 9.251–10.496 | 8.493–9.250 | 8.492 |\n| Poles I | 16.811 | 14.814–16.810 | 13.105–14.813 | 12.057–13.104 | 12.056 |\n| Poles II | 34.667 | 29.954–34.666 | 27.358–29.953 | 25.386–27.357 | 25.385 |\n| Quadrangle | 29.838 | 26.006–29.837 | 23.886–26.005 | 22.344–23.885 | 22.343 |\n| Single Stake Race | 14.677 | 12.338–14.676 | 11.414–12.337 | 10.594–11.413 | 10.593 |\n| Speed Ball | 13.906 | 10.891–13.905 | 9.439–10.890 | 8.635–9.438 | 8.634 |\n| Speed Barrels | 15.557 | 12.853–15.556 | 11.910–12.852 | 11.048–11.909 | 11.047 |"
+      "text": "Times are in seconds (hundredths). Level 0 = slowest; Level 4 = fastest.\n\n| Event | Level 0 (≥) | Level 1 (from–to) | Level 2 (from–to) | Level 3 (from–to) | Level 4 (≤) |\n|-------|-------------|-------------------|-------------------|-------------------|-------------|\n| Barrel Race | 28.971 | 24.361–28.970 | 22.213–24.360 | 21.155–22.212 | 21.154 |\n| Birangle | 20.642 | 18.088–20.641 | 16.756–18.087 | 15.589–16.755 | 15.588 |\n| Big T | 22.767 | 19.893–22.766 | 18.043–19.892 | 16.794–18.042 | 16.793 |\n| Fig 8 Flags | 27.610 | 21.107–27.609 | 17.498–21.106 | 14.726–17.497 | 14.725 |\n| Fig 8 Stake | 16.472 | 14.198–16.471 | 13.182–14.197 | 12.395–13.181 | 12.394 |\n| Hurry Scurry | 19.736 | 14.814–19.735 | 12.855–14.813 | 11.474–12.854 | 11.473 |\n| Keyhole | 13.183 | 10.497–13.182 | 9.251–10.496 | 8.493–9.250 | 8.492 |\n| Poles I | 16.811 | 14.814–16.810 | 13.105–14.813 | 12.057–13.104 | 12.056 |\n| Poles II | 34.667 | 29.954–34.666 | 27.358–29.953 | 25.386–27.357 | 25.385 |\n| Quadrangle | 29.838 | 26.006–29.837 | 23.886–26.005 | 22.344–23.885 | 22.343 |\n| Single Stake | 14.677 | 12.338–14.676 | 11.414–12.337 | 10.594–11.413 | 10.593 |\n| Speedball | 13.906 | 10.891–13.905 | 9.439–10.890 | 8.635–9.438 | 8.634 |\n| Speed Barrels | 15.557 | 12.853–15.556 | 11.910–12.852 | 11.048–11.909 | 11.047 |"
     },
     {
       "title": "8.1 Qualifying Shows",
@@ -239,56 +299,6 @@
       "title": "8.8 Important Rules",
       "section": "SECTION 8: PROVINCIAL COLOURS CRITERIA 2026 (ALL PROVINCES)",
       "text": "- **Selector decisions are final.** No correspondence will be entered into after teams are selected.\n- **No substitutions** in teams after entries have closed.\n- **No horse substitutions** at Nationals — selection is for the horse-rider combination, not the individual.\n\n*Last updated: June 2026 — compiled from 8 SAWMGA/SAEF source documents*\n*To add more content, append new sections below this line.*"
-    },
-    {
-      "title": "Nationals 2026 — Overview & Venue",
-      "section": "NATIONALS 2026",
-      "text": "SAWMGA Nationals 2026 is hosted over 5 days, **28 September – 2 October 2026**, at the **Afridome in Parys**. The event runs in conjunction with SANESA WMG National.\n\n- **Entries open:** 18 August 2026\n- **Entries close:** 31 August 2026\n- **Contact:** nationaladmin@sawmga.co.za | 082 324 4196\n- **Info folder:** https://drive.google.com/drive/folders/1KshaZci9ewxa3eQ92a0kA_5FvoNi65_g"
-    },
-    {
-      "title": "Nationals 2026 — Silver Nationals (Levels 0–2)",
-      "section": "NATIONALS 2026",
-      "text": "**Silver Nationals** is for Disabled, Lead, Level 0, Level 1 & Level 2 riders.\n\n- **Dates:** 28 & 29 September 2026\n- **Games ridden:** 10 games\n- **SAWMGA entry fee:** R1 320\n- **Games:** Speed Ball, Single Stake, Barrel Race, Poles I, Poles II, Quadrangle, Keyhole, Speed Barrels, Fig 8 Flags, Fig 8 Stake\n- **Bumping rule:** Silver riders need an overcount of 7 out of 10 or more to be bumped to the next level at the Silver Event."
-    },
-    {
-      "title": "Nationals 2026 — Gold Nationals (Levels 3–4)",
-      "section": "NATIONALS 2026",
-      "text": "**Gold Nationals** is for Level 3, Level 4, SAEF teams & International teams.\n\n- **Dates:** 30 September – 2 October 2026\n- **Games ridden:** 12 games\n- **SAWMGA entry fee:** R1 540\n- **Games:** Speed Barrels, Speedball, Single Stake, Barrel Race, Poles I, Poles II, Quadrangle, Keyhole, Hurry Scurry, Fig 8 Flags, Birangle, Big T\n- **Bumping rule:** Gold riders need an overcount of 8 out of 12 or more to be bumped to a higher level at the Gold Event."
-    },
-    {
-      "title": "Nationals 2026 — How to Enter",
-      "section": "NATIONALS 2026",
-      "text": "Entries open **18 August 2026** and close **31 August 2026**. To enter:\n\n1. Login to your SAWMGA account at www.sawmga.co.za\n2. Under the Events & Entries tab, press Manage Entries\n3. If you will be riding Nationals, press Confirm Entry\n4. Check that your details are correct\n5. Submit entry (if you see a strange screen, go to Invoices to confirm your entry is there)\n\nAn invoice will then be generated. Entry fees: Silver R1 320, Gold R1 540."
-    },
-    {
-      "title": "Nationals 2026 — Trot-Up Requirements",
-      "section": "NATIONALS 2026",
-      "text": "A formal trot-up will be conducted for all horses: **25–27 September 2026**. If you cannot attend on those dates, email nationaladmin@sawmga.co.za to arrange 28 or 29 September.\n\n**Mandatory requirements:**\n- All horses must be numbered and presented in running order\n- No horse may compete without passing trot-up\n- Valid, up-to-date SAEF/FEI Group IX passport required (horse ID page, flu vaccination page, AHS vaccination page — no exceptions)\n- Handlers must wear closed shoes\n- Handlers 16 and under must wear a hard hat\n- Riders under 18 must have an adult present\n\n**Horse presentation:**\n- Clean and well-groomed\n- Wearing halter or bridle only — NO tack, boots, wraps or leg protection\n- Must be NUMBERED\n\nHorses that do not pass trot-up will forfeit entry fees. Complete the health and vaccine link: https://forms.gle/RtigzjBt3iB4qZBL6"
-    },
-    {
-      "title": "Nationals 2026 — Horse Marking Rules",
-      "section": "NATIONALS 2026",
-      "text": "Each province is responsible for arranging marking stations for province horses.\n\n- Number stencils must be **10cm in height**\n- Number must be on the **side** of the horse, not on top\n- **Black/Bay horses:** mark in yellow or white\n- **Grey/Palomino horses:** mark in black or blue\n- **Appaloosas or Paints:** mark in purple\n- **No red or orange** marking — difficult to see\n- Any other logos or images on shoulder only"
-    },
-    {
-      "title": "Nationals 2026 — Bumping Rules",
-      "section": "NATIONALS 2026",
-      "text": "All SAWMGA levels can be bumped at Nationals, as in previous years. SANESA riders will NOT be bumped for the SANESA part of the event (SANESA system does not allow level moves at a National Championship).\n\n- **Silver Nationals:** Overcount of **7 out of 10** or more → bumped to a higher level at the Silver Event\n- **Gold Nationals:** Overcount of **8 out of 12** or more → bumped to a higher level at the Gold Event\n\nThe overcount principle: for each game, overcount = max(0, level achieved - level entered). If a rider's total overcount meets the threshold, they are moved up one level for the remainder of that event."
-    },
-    {
-      "title": "Nationals 2026 — Program & Schedule",
-      "section": "NATIONALS 2026",
-      "text": "**Provisional Programme:**\n\n- **25 Sept:** Trot-up (as booked)\n- **26 Sept:** Trot-up (as booked)\n- **27 Sept:** Trot-up, Judges meeting, Fancy dress, Social gathering for all Provinces\n- **28 Sept (Silver Day 1):** Parade, Silver riders start riding, SANESA prizegiving, 18:30 Gala evening for SAEF & Protea team\n- **29 Sept (Silver Day 2):** Silver riding, Relay race per province, Line dance, SAWMGA & SANESA prizegiving in dome\n- **30 Sept (Gold Day 1):** Parade, Gold riders start riding, SANESA riders prizegiving, Night on the Town\n- **1 Oct (Gold Day 2):** Gold riders riding, SANESA prizegiving, 19:00 Auction\n- **2 Oct (Gold Day 3):** Gold riders finish, lunch & refreshments, SAWMGA & SANESA prizegiving in dome\n\nNote: No privately constructed paddocks are permitted on the premises. A fine will be imposed per horse, per day for violations."
-    },
-    {
-      "title": "Nationals 2026 — Stabling, Paddocks & Facilities",
-      "section": "NATIONALS 2026",
-      "text": "**Stabling & Paddocks:**\n- Stables and paddocks available at **R400 each** (excluding sawdust)\n- Riders must bring their own water and feed buckets — communal water troughs will NOT be available\n- Stable and paddock layout sent to Province secretaries for allocation\n\n**Grass & Shavings:**\n- Available to order and collect at the Afridome\n- Use code **PARYS26** in delivery address to add to cart\n\n**Photography:**\n- Official photographers: Denford Studios (photo packages available for purchase)\n- No other photographers permitted\n\n**Spectator boxes** available inside the dome for the full event duration (boxes do not include food/refreshments). Book via Quicket."
-    },
-    {
-      "title": "Nationals 2026 — Horse Health & Welfare Requirements",
-      "section": "NATIONALS 2026",
-      "text": "The welfare of horses is of utmost importance to SAWMGA. Veterinary and equine wellness checks will be conducted throughout the event.\n\n**Requirements for all horses:**\n- Valid SAEF Horse Passport (approved)\n- ID page completed correctly\n- AHS vaccines up to date as per SAEF regulations\n- Flu vaccines up to date as per SAEF regulations\n- Horses must be in good body condition\n- Horses must be healthy — no signs of nasal discharge, lethargy, high temperature or loss of appetite\n\nComplete the health and vaccine declaration form: https://forms.gle/RtigzjBt3iB4qZBL6\n\nIf you are worried your horse is unwell at Nationals, contact your Province secretary or Letitia at 082 324 4196."
     }
   ]
 }
