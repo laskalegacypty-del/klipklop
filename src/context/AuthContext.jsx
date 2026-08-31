@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useViewAs } from './ViewAsContext'
 
 const AuthContext = createContext({})
 
@@ -194,5 +195,26 @@ export function AuthProvider({ children }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  return useContext(AuthContext)
+  const value = useContext(AuthContext)
+  const viewAs = useViewAs()
+
+  // While an admin is browsing inside a ViewAsProvider subtree, present the
+  // target rider's profile/role-derived fields — real auth session (user,
+  // signOut, isAdmin) stays untouched, only what pages read to render as
+  // "this rider's own view" is swapped. Writes still require going through
+  // useViewAs().stage() explicitly at each call site.
+  if (!viewAs.active || !viewAs.targetProfile) return value
+
+  const target = viewAs.targetProfile
+  return {
+    ...value,
+    profile: target,
+    isSupporter: target.role === 'supporter',
+    isClubHead: target.role === 'club_head',
+    isClubMember: target.role === 'club_member',
+    isApproved: target.status === 'approved',
+    isSuspended: target.status === 'suspended',
+    isSubscribed: target.subscription_status === 'active' || target.paygate_exempt === true,
+    subscriptionStatus: target.subscription_status ?? 'none',
+  }
 }

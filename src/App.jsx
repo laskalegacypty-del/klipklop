@@ -19,6 +19,7 @@ import AdminKlippies from './pages/admin/AdminKlippies'
 import AdminReports from './pages/admin/AdminReports'
 import AdminProfileAccess from './pages/admin/AdminProfileAccess'
 import ProfileDossier from './pages/admin/ProfileDossier'
+import ViewAsShell from './pages/admin/ViewAsShell'
 
 // User pages
 import Dashboard from './pages/user/Dashboard'
@@ -251,6 +252,9 @@ export default function App() {
         } />
         <Route path="/admin/profile-dossier/:userId" element={
           <AdminRoute><ProfileDossier /></AdminRoute>
+        } />
+        <Route path="/admin/view-as/:userId/*" element={
+          <AdminRoute><ViewAsShell /></AdminRoute>
         } />
 
         {/* Default redirect */}

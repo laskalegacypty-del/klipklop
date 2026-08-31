@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import {
-  ShieldOff, ShieldCheck, Clock, HeartPulse, Trophy, CreditCard, Users, Bell, Flag, ArrowLeft
+  ShieldOff, ShieldCheck, Clock, HeartPulse, Trophy, CreditCard, Users, Bell, Flag, ArrowLeft, Eye
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Card, CardContent, PageHeader, Skeleton, Badge } from '../../components/ui'
@@ -154,6 +154,12 @@ export default function ProfileDossier() {
           <span className="font-semibold">Active access grant</span> — expires {formatDateTime(grant.expires_at)}.
           The rider can revoke this at any time.
         </div>
+        <button
+          onClick={() => navigate(`/admin/view-as/${userId}/dashboard`)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-800 text-white text-xs font-semibold transition flex-shrink-0"
+        >
+          <Eye size={13} /> Enter View As
+        </button>
       </div>
 
       {/* Profile fields */}

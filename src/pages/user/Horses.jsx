@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
+import { useViewAs } from '../../context/ViewAsContext'
 import toast from 'react-hot-toast'
 import { Plus, Search, Bell, ChevronRight, X } from 'lucide-react'
 import { Button, EmptyState, Input, PageHeader, Skeleton } from '../../components/ui'
@@ -71,6 +72,7 @@ function isMissingNextDueDateError(error) {
 
 export default function Horses() {
   const { profile, isClubHead } = useAuth()
+  const viewAs = useViewAs()
   const [loading, setLoading] = useState(true)
   const [horses, setHorses] = useState([])
   const [reminders, setReminders] = useState([])
@@ -103,8 +105,9 @@ export default function Horses() {
 
       if (horsesRes.error) throw horsesRes.error
 
-      setHorses(horsesRes.data || [])
-      setReminders((remindersRes.data || []).map(r => ({ ...r, next_due_date: r.next_due_date || r.due_date || null })))
+      setHorses(viewAs.mergeStaged('horses', horsesRes.data))
+      const mergedReminders = viewAs.mergeStaged('horse_reminders', remindersRes.data)
+      setReminders(mergedReminders.map(r => ({ ...r, next_due_date: r.next_due_date || r.due_date || null })))
     } catch (e) {
       console.error(e)
       toast.error('Error loading horses')
@@ -139,9 +142,11 @@ export default function Horses() {
     if (!name) { toast.error('Please enter a horse name'); return }
     setCreating(true)
     try {
-      const { error } = await supabase.from('horses').insert({ user_id: profile.id, name })
+      const { error } = viewAs.active
+        ? await viewAs.stage('horses', 'insert', { name })
+        : await supabase.from('horses').insert({ user_id: profile.id, name })
       if (error) throw error
-      toast.success('Horse added')
+      toast.success(viewAs.active ? 'New horse staged' : 'Horse added')
       setShowAddModal(false)
       setNewHorseName('')
       await fetchData(profile.id)
@@ -265,7 +270,7 @@ export default function Horses() {
             if (horse.sex && horse.sex !== 'unknown') ageParts.push(horse.sex.charAt(0).toUpperCase() + horse.sex.slice(1))
 
             return (
-              <Link key={horse.id} to={`/horses/${horse.id}`} className="group block">
+              <Link key={horse.id} to={viewAs.active ? `${horse.id}` : `/horses/${horse.id}`} className="group block">
                 <div className="bg-white rounded-2xl border border-gray-200 hover:border-green-300 hover:shadow-md transition-all duration-200 flex overflow-hidden">
 
                   {/* Square avatar — fixed 80×full, object-cover so any photo looks clean */}

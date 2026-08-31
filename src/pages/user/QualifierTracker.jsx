@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
+import { useViewAs } from '../../context/ViewAsContext'
 import { PROVINCES, QUALIFIER_GAMES, canonicalizeGameLabel, normalizeGameName } from '../../lib/constants'
 import { getLevel } from '../../lib/matrix'
 import {
@@ -61,6 +62,7 @@ function isPdfLikeFile(file) {
 
 export default function QualifierTracker() {
   const { profile, isClubHead } = useAuth()
+  const viewAs = useViewAs()
   const [events, setEvents] = useState([])
   const [combos, setCombos] = useState([])
   const [selectedEvent, setSelectedEvent] = useState(null)
@@ -239,7 +241,7 @@ export default function QualifierTracker() {
       .is('managed_rider_id', null)
       .eq('is_archived', false)
 
-    setCombos(data || [])
+    setCombos(viewAs.mergeStaged('horse_rider_combos', data).filter(c => !c.is_archived))
   }
 
   async function fetchSavedSessions() {
@@ -283,9 +285,20 @@ export default function QualifierTracker() {
 
     const { data } = await query
 
+    // Staged results (this View As session's own entries) don't come back
+    // from the joined query above — enrich them with event/combo info we
+    // already have client-side so they display the same as real sessions.
+    const stagedEvents = viewAs.mergeStaged('qualifier_events', [])
+    const mergedResults = viewAs.mergeStaged('qualifier_results', data).map(result => {
+      if (result.qualifier_events && result.horse_rider_combos) return result
+      const evt = events.find(e => e.id === result.event_id) || stagedEvents.find(e => e.id === result.event_id) || null
+      const combo = combos.find(c => c.id === result.combo_id) || null
+      return { ...result, qualifier_events: evt, horse_rider_combos: combo ? { horse_name: combo.horse_name } : null }
+    })
+
     // Group by event + combo
     const grouped = {}
-    data?.forEach(result => {
+    mergedResults.forEach(result => {
       const key = `${result.event_id}_${result.combo_id}`
       if (!grouped[key]) {
         grouped[key] = {
@@ -335,6 +348,25 @@ export default function QualifierTracker() {
 
     if (existingError) throw existingError
     if (existingEvent) return existingEvent.id
+
+    if (viewAs.active) {
+      const stagedMatch = viewAs.mergeStaged('qualifier_events', []).find(e =>
+        e.event_type === 'historical_import' && e.date === eventDate && e.venue === venue &&
+        e.province === province && (e.qualifier_number ?? null) === (qualifierNumber ?? null)
+      )
+      if (stagedMatch) return stagedMatch.id
+
+      const { data: staged, error } = await viewAs.stage('qualifier_events', 'insert', {
+        date: eventDate,
+        venue,
+        province,
+        event_type: 'historical_import',
+        qualifier_number: qualifierNumber,
+        notes: notes || `Auto-created historical import event for ${year}`,
+      })
+      if (error) throw error
+      return staged.id
+    }
 
     const { data: createdEvent, error: createError } = await supabase
       .from('qualifier_events')
@@ -564,24 +596,34 @@ export default function QualifierTracker() {
       }
     })
 
-    const { error: resultsError } = await supabase
-      .from('qualifier_results')
-      .insert(resultsToInsert)
+    if (viewAs.active) {
+      for (const row of resultsToInsert) {
+        const { error } = await viewAs.stage('qualifier_results', 'insert', row)
+        if (error) throw error
+      }
+    } else {
+      const { error: resultsError } = await supabase
+        .from('qualifier_results')
+        .insert(resultsToInsert)
 
-    if (resultsError) throw resultsError
+      if (resultsError) throw resultsError
+    }
 
     const pbGames = Object.keys(pbBestByGame)
     let pbUpdates = []
 
     if (pbGames.length > 0) {
-      const { data: existingPbs, error: existingPbError } = await supabase
+      const { data: existingPbsRaw, error: existingPbError } = await supabase
         .from('personal_bests')
-        .select('id, game, best_time')
+        .select('combo_id, game, best_time, season_year')
         .eq('combo_id', combo.id)
         .eq('season_year', year)
         .in('game', pbGames)
 
       if (existingPbError) throw existingPbError
+      const existingPbs = viewAs.active
+        ? viewAs.mergeStaged('personal_bests', existingPbsRaw).filter(pb => pb.combo_id === combo.id && pb.season_year === year)
+        : existingPbsRaw
 
       const existingByGame = (existingPbs || []).reduce((acc, row) => {
         acc[row.game] = row.best_time
@@ -606,14 +648,21 @@ export default function QualifierTracker() {
     }
 
     if (pbUpdates.length > 0) {
-      const { error: pbError } = await supabase
-        .from('personal_bests')
-        .upsert(pbUpdates, {
-          onConflict: 'combo_id,game,season_year',
-          ignoreDuplicates: false,
-        })
+      if (viewAs.active) {
+        for (const row of pbUpdates) {
+          const { error } = await viewAs.stage('personal_bests', 'upsert', row, { combo_id: row.combo_id, game: row.game, season_year: row.season_year })
+          if (error) throw error
+        }
+      } else {
+        const { error: pbError } = await supabase
+          .from('personal_bests')
+          .upsert(pbUpdates, {
+            onConflict: 'combo_id,game,season_year',
+            ignoreDuplicates: false,
+          })
 
-      if (pbError) throw pbError
+        if (pbError) throw pbError
+      }
     }
 
     return {
@@ -1055,13 +1104,17 @@ export default function QualifierTracker() {
 
         // Check if this is a new PB for this year
         if (finalTime !== null) {
-          const { data: existingPB } = await supabase
+          const { data: existingPBRaw } = await supabase
             .from('personal_bests')
             .select('*')
             .eq('combo_id', selectedCombo.id)
             .eq('game', normalizedGame)
             .eq('season_year', eventYear)
             .maybeSingle()
+          const existingPB = viewAs.active
+            ? viewAs.mergeStaged('personal_bests', existingPBRaw ? [existingPBRaw] : [])
+                .find(pb => pb.combo_id === selectedCombo.id && pb.game === normalizedGame && pb.season_year === eventYear) || null
+            : existingPBRaw
 
           if (!existingPB || finalTime < existingPB.best_time) {
             pbUpdates.push({
@@ -1077,35 +1130,50 @@ export default function QualifierTracker() {
       }
 
       // Insert results
-      const { error: resultsError } = await supabase
-        .from('qualifier_results')
-        .insert(resultsToInsert)
+      if (viewAs.active) {
+        for (const row of resultsToInsert) {
+          const { error } = await viewAs.stage('qualifier_results', 'insert', row)
+          if (error) throw error
+        }
+      } else {
+        const { error: resultsError } = await supabase
+          .from('qualifier_results')
+          .insert(resultsToInsert)
 
-      if (resultsError) throw resultsError
+        if (resultsError) throw resultsError
+      }
 
       // Upsert personal bests (per combo, game, and year)
       if (pbUpdates.length > 0) {
-        const { error: pbError } = await supabase
-          .from('personal_bests')
-          .upsert(pbUpdates, {
-            onConflict: 'combo_id,game,season_year',
-            ignoreDuplicates: false
-          })
+        if (viewAs.active) {
+          for (const row of pbUpdates) {
+            const { error } = await viewAs.stage('personal_bests', 'upsert', row, { combo_id: row.combo_id, game: row.game, season_year: row.season_year })
+            if (error) throw error
+          }
+          // Not notifying the rider yet — these times aren't real until they approve the batch.
+        } else {
+          const { error: pbError } = await supabase
+            .from('personal_bests')
+            .upsert(pbUpdates, {
+              onConflict: 'combo_id,game,season_year',
+              ignoreDuplicates: false
+            })
 
-        if (pbError) throw pbError
+          if (pbError) throw pbError
 
-        // Send notification for new PBs to the rider whose times were entered
-        if (effectiveUserId) {
-          await supabase.from('notifications').insert({
-            user_id: effectiveUserId,
-            type: 'new_pb',
-            message: `New personal best${pbUpdates.length > 1 ? 's' : ''} set for ${pbUpdates.map(p => p.game).join(', ')}!`,
-            link: '/my-times'
-          })
+          // Send notification for new PBs to the rider whose times were entered
+          if (effectiveUserId) {
+            await supabase.from('notifications').insert({
+              user_id: effectiveUserId,
+              type: 'new_pb',
+              message: `New personal best${pbUpdates.length > 1 ? 's' : ''} set for ${pbUpdates.map(p => p.game).join(', ')}!`,
+              link: '/my-times'
+            })
+          }
         }
       }
 
-      toast.success('Times saved successfully!')
+      toast.success(viewAs.active ? 'Times staged for review' : 'Times saved successfully!')
       setSelectedEvent(null)
       setSelectedCombo(null)
       setGameEntries({})
@@ -1127,14 +1195,12 @@ export default function QualifierTracker() {
       description: 'All results for this session will be permanently deleted.',
       onConfirm: async () => {
         try {
-          const { error } = await supabase
-            .from('qualifier_results')
-            .delete()
-            .eq('event_id', session.event_id)
-            .eq('combo_id', session.combo_id)
+          const { error } = viewAs.active
+            ? await viewAs.stage('qualifier_results', 'delete', null, { event_id: session.event_id, combo_id: session.combo_id })
+            : await supabase.from('qualifier_results').delete().eq('event_id', session.event_id).eq('combo_id', session.combo_id)
 
           if (error) throw error
-          toast.success('Session deleted')
+          toast.success(viewAs.active ? 'Deletion staged' : 'Session deleted')
           fetchSavedSessions()
         } catch (error) {
           toast.error('Error deleting session')
@@ -1197,20 +1263,31 @@ export default function QualifierTracker() {
     })
 
     try {
-      const updatePromises = updates.map(update =>
-        supabase
-          .from('qualifier_results')
-          .update({
+      if (viewAs.active) {
+        for (const update of updates) {
+          const { error } = await viewAs.stage('qualifier_results', 'update', {
             is_nt: update.is_nt,
             time: update.time,
             level_achieved: update.level_achieved
-          })
-          .eq('id', update.id)
-      )
+          }, { id: update.id })
+          if (error) throw error
+        }
+      } else {
+        const updatePromises = updates.map(update =>
+          supabase
+            .from('qualifier_results')
+            .update({
+              is_nt: update.is_nt,
+              time: update.time,
+              level_achieved: update.level_achieved
+            })
+            .eq('id', update.id)
+        )
 
-      const results = await Promise.all(updatePromises)
-      const failedUpdate = results.find(r => r.error)
-      if (failedUpdate?.error) throw failedUpdate.error
+        const results = await Promise.all(updatePromises)
+        const failedUpdate = results.find(r => r.error)
+        if (failedUpdate?.error) throw failedUpdate.error
+      }
 
       const seasonYear = session.event?.date
         ? new Date(session.event.date).getFullYear()
@@ -1228,9 +1305,12 @@ export default function QualifierTracker() {
         const yearEventIds = yearEvents?.map(e => e.id) || []
 
         if (yearEventIds.length > 0) {
-          const { data: seasonResults, error: seasonResultsError } = await supabase
+          const { data: seasonResultsRaw, error: seasonResultsError } = await supabase
             .from('qualifier_results')
             .select(`
+              id,
+              combo_id,
+              event_id,
               game,
               time,
               is_nt,
@@ -1241,6 +1321,13 @@ export default function QualifierTracker() {
             .in('game', affectedGames)
 
           if (seasonResultsError) throw seasonResultsError
+          const seasonResults = viewAs.active
+            ? viewAs.mergeStaged('qualifier_results', seasonResultsRaw).filter(row =>
+                row.combo_id === session.combo_id &&
+                yearEventIds.includes(row.event_id) &&
+                affectedGames.includes(normalizeGameName(row.game))
+              )
+            : seasonResultsRaw
 
           const bestByGame = {}
           ;(seasonResults || []).forEach(row => {
@@ -1266,26 +1353,37 @@ export default function QualifierTracker() {
 
           // Always clear existing PB rows first so stale/duplicate rows
           // cannot keep an old incorrect "best" time alive.
-          const { error: pbDeleteError } = await supabase
-            .from('personal_bests')
-            .delete()
-            .eq('combo_id', session.combo_id)
-            .eq('season_year', seasonYear)
-            .in('game', affectedGames)
-
-          if (pbDeleteError) throw pbDeleteError
-
-          const pbRows = Object.values(bestByGame)
-          if (pbRows.length > 0) {
-            const { error: pbInsertError } = await supabase
+          if (viewAs.active) {
+            for (const game of affectedGames) {
+              const { error } = await viewAs.stage('personal_bests', 'delete', null, { combo_id: session.combo_id, game, season_year: seasonYear })
+              if (error) throw error
+            }
+            for (const row of Object.values(bestByGame)) {
+              const { error } = await viewAs.stage('personal_bests', 'insert', row)
+              if (error) throw error
+            }
+          } else {
+            const { error: pbDeleteError } = await supabase
               .from('personal_bests')
-              .insert(pbRows)
-            if (pbInsertError) throw pbInsertError
+              .delete()
+              .eq('combo_id', session.combo_id)
+              .eq('season_year', seasonYear)
+              .in('game', affectedGames)
+
+            if (pbDeleteError) throw pbDeleteError
+
+            const pbRows = Object.values(bestByGame)
+            if (pbRows.length > 0) {
+              const { error: pbInsertError } = await supabase
+                .from('personal_bests')
+                .insert(pbRows)
+              if (pbInsertError) throw pbInsertError
+            }
           }
         }
       }
 
-      toast.success('Session updated')
+      toast.success(viewAs.active ? 'Session edits staged' : 'Session updated')
       handleCancelEditingSession()
       fetchSavedSessions()
     } catch (error) {

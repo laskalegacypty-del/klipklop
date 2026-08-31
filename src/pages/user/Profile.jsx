@@ -48,6 +48,7 @@ import {
 } from '../../lib/pwaInstall'
 import { START_TUTORIAL_EVENT } from '../../components/onboarding/OnboardingTour'
 import { isGrantActive, grantStatusLabel } from '../../lib/profileAccess'
+import { useViewAs } from '../../context/ViewAsContext'
 
 const EMPTY_COMBO = { horse_id: '', horse_name: '', current_level: 0 }
 
@@ -74,6 +75,7 @@ function AvatarCircle({ src, name, size = 'md', className = '' }) {
 
 export default function Profile() {
   const { profile, refreshProfile, signOut, isSupporter, isClubHead, isClubMember } = useAuth()
+  const viewAs = useViewAs()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [horses, setHorses] = useState([])
@@ -187,8 +189,8 @@ export default function Profile() {
       ])
       if (combosRes.error) throw combosRes.error
       if (horsesRes.error) throw horsesRes.error
-      setCombos(combosRes.data || [])
-      setHorses(horsesRes.data || [])
+      setCombos(viewAs.mergeStaged('horse_rider_combos', combosRes.data))
+      setHorses(viewAs.mergeStaged('horses', horsesRes.data))
     } catch {
       toast.error('Error loading data')
     } finally {
@@ -219,7 +221,14 @@ export default function Profile() {
     }
   }
 
+  function blockedInViewAs() {
+    if (!viewAs.active) return false
+    toast.error('Not available in View As mode')
+    return true
+  }
+
   async function handleSupporterResponse(linkId, supporterId, action) {
+    if (blockedInViewAs()) return
     try {
       const newStatus = action === 'accept' ? 'accepted' : 'rejected'
       const { error } = await supabase.from('supporter_rider_links').update({ status: newStatus }).eq('id', linkId)
@@ -240,6 +249,7 @@ export default function Profile() {
   }
 
   async function handleRemoveSupporter(linkId) {
+    if (blockedInViewAs()) return
     try {
       const { error } = await supabase.from('supporter_rider_links').delete().eq('id', linkId)
       if (error) throw error
@@ -275,6 +285,7 @@ export default function Profile() {
   }
 
   async function handleRemoveRider(linkId) {
+    if (blockedInViewAs()) return
     try {
       const { error } = await supabase.from('supporter_rider_links').delete().eq('id', linkId)
       if (error) throw error
@@ -309,6 +320,7 @@ export default function Profile() {
   }
 
   async function handleRemoveClubMember(linkId) {
+    if (blockedInViewAs()) return
     try {
       const { error } = await supabase.from('club_member_links').delete().eq('id', linkId)
       if (error) throw error
@@ -345,6 +357,7 @@ export default function Profile() {
   }
 
   async function handleClubLinkResponse(linkId, clubHeadId, action) {
+    if (blockedInViewAs()) return
     try {
       const newStatus = action === 'accept' ? 'accepted' : 'rejected'
       const { error } = await supabase.from('club_member_links').update({ status: newStatus }).eq('id', linkId)
@@ -388,6 +401,7 @@ export default function Profile() {
   }
 
   async function handleGrantResponse(grant, action) {
+    if (blockedInViewAs()) return
     try {
       const accept = action === 'accept'
       const update = accept
@@ -415,6 +429,7 @@ export default function Profile() {
   }
 
   async function handleRevokeGrant(grant) {
+    if (blockedInViewAs()) return
     try {
       const { error } = await supabase.from('profile_access_grants').update({
         status: 'revoked',
@@ -451,15 +466,21 @@ export default function Profile() {
     }
     setLoading(true)
     try {
-      const { error } = await supabase.from('profiles').update({
+      const payload = {
         rider_name: profileForm.rider_name,
         province: profileForm.province,
         age_category: profileForm.age_category,
         scoresheet_name: profileForm.scoresheet_name || null
-      }).eq('id', profile.id)
-      if (error) throw error
-      await refreshProfile()
-      toast.success('Profile updated')
+      }
+      if (viewAs.active) {
+        const { error } = await viewAs.stage('profiles', 'update', payload)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('profiles').update(payload).eq('id', profile.id)
+        if (error) throw error
+        await refreshProfile()
+      }
+      toast.success(viewAs.active ? 'Change staged — the rider will review it' : 'Profile updated')
     } catch {
       toast.error('Error updating profile')
     } finally {
@@ -470,6 +491,11 @@ export default function Profile() {
   async function handlePhotoUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (viewAs.active) {
+      e.target.value = ''
+      toast.error('Photo upload is not available in View As mode')
+      return
+    }
     setUploadingPhoto(true)
     try {
       if (!profile?.id) throw new Error('Not signed in')
@@ -489,6 +515,7 @@ export default function Profile() {
   }
 
   async function handleSavePassword() {
+    if (blockedInViewAs()) return
     if (!passwordForm.new_password || !passwordForm.confirm_password) {
       toast.error('Please fill in all fields')
       return
@@ -552,17 +579,22 @@ export default function Profile() {
       }
       const payload = { horse_name: comboForm.horse_name, horse_id: comboForm.horse_id || null, current_level: currentLevel }
       if (editingCombo) {
-        const { error } = await supabase.from('horse_rider_combos').update(payload).eq('id', editingCombo.id)
+        const { error } = viewAs.active
+          ? await viewAs.stage('horse_rider_combos', 'update', payload, { id: editingCombo.id })
+          : await supabase.from('horse_rider_combos').update(payload).eq('id', editingCombo.id)
         if (error) throw error
-        toast.success('Combo updated')
+        toast.success(viewAs.active ? 'Combo edit staged' : 'Combo updated')
       } else {
-        const { error } = await supabase.from('horse_rider_combos').insert({
-          user_id: profile.id, ...payload,
+        const fullPayload = {
+          ...payload,
           is_pinned: combos.filter(c => !c.is_archived).length === 0,
           is_archived: false
-        })
+        }
+        const { error } = viewAs.active
+          ? await viewAs.stage('horse_rider_combos', 'insert', fullPayload)
+          : await supabase.from('horse_rider_combos').insert({ user_id: profile.id, ...fullPayload })
         if (error) throw error
-        toast.success('Combo added')
+        toast.success(viewAs.active ? 'New combo staged' : 'Combo added')
       }
       setShowComboModal(false)
       fetchData()
@@ -575,9 +607,14 @@ export default function Profile() {
 
   async function handlePinCombo(comboId) {
     try {
-      await supabase.from('horse_rider_combos').update({ is_pinned: false }).eq('user_id', profile.id)
-      await supabase.from('horse_rider_combos').update({ is_pinned: true }).eq('id', comboId)
-      toast.success('Pinned to dashboard')
+      if (viewAs.active) {
+        await viewAs.stage('horse_rider_combos', 'update', { is_pinned: false }, { user_id: profile.id })
+        await viewAs.stage('horse_rider_combos', 'update', { is_pinned: true }, { id: comboId })
+      } else {
+        await supabase.from('horse_rider_combos').update({ is_pinned: false }).eq('user_id', profile.id)
+        await supabase.from('horse_rider_combos').update({ is_pinned: true }).eq('id', comboId)
+      }
+      toast.success(viewAs.active ? 'Pin change staged' : 'Pinned to dashboard')
       fetchData()
     } catch {
       toast.error('Error pinning combo')
@@ -586,9 +623,11 @@ export default function Profile() {
 
   async function handleArchiveCombo(comboId, currentArchived) {
     try {
-      const { error } = await supabase.from('horse_rider_combos').update({ is_archived: !currentArchived }).eq('id', comboId)
+      const { error } = viewAs.active
+        ? await viewAs.stage('horse_rider_combos', 'update', { is_archived: !currentArchived }, { id: comboId })
+        : await supabase.from('horse_rider_combos').update({ is_archived: !currentArchived }).eq('id', comboId)
       if (error) throw error
-      toast.success(currentArchived ? 'Combo restored' : 'Combo archived')
+      toast.success(viewAs.active ? 'Archive change staged' : (currentArchived ? 'Combo restored' : 'Combo archived'))
       fetchData()
     } catch {
       toast.error('Error archiving combo')
@@ -597,9 +636,11 @@ export default function Profile() {
 
   async function handleDeleteCombo(comboId) {
     try {
-      const { error } = await supabase.from('horse_rider_combos').delete().eq('id', comboId)
+      const { error } = viewAs.active
+        ? await viewAs.stage('horse_rider_combos', 'delete', null, { id: comboId })
+        : await supabase.from('horse_rider_combos').delete().eq('id', comboId)
       if (error) throw error
-      toast.success('Combo deleted')
+      toast.success(viewAs.active ? 'Deletion staged' : 'Combo deleted')
       setShowDeleteConfirm(null)
       fetchData()
     } catch {
@@ -632,7 +673,7 @@ export default function Profile() {
             {horses.length === 0 ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
                 No horses found.{' '}
-                <Link to="/horses" className="font-semibold underline" onClick={() => setShowComboModal(false)}>
+                <Link to={viewAs.active ? '../horses' : '/horses'} className="font-semibold underline" onClick={() => setShowComboModal(false)}>
                   Add a horse first →
                 </Link>
               </div>
@@ -764,9 +805,11 @@ export default function Profile() {
                   </span>
                 )}
               </div>
-              <label className="absolute bottom-0 right-0 bg-green-700 text-white rounded-full p-1.5 cursor-pointer hover:bg-green-800 transition border-2 border-white shadow">
+              <label className={`absolute bottom-0 right-0 text-white rounded-full p-1.5 transition border-2 border-white shadow ${
+                viewAs.active ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-700 cursor-pointer hover:bg-green-800'
+              }`}>
                 <Camera size={11} />
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" disabled={viewAs.active} />
               </label>
             </div>
 
@@ -884,7 +927,7 @@ export default function Profile() {
                 <Save size={16} />
                 {loading ? 'Saving…' : 'Save Changes'}
               </Button>
-              <Button variant="secondary" onClick={() => setShowPasswordModal(true)}>
+              <Button variant="secondary" onClick={() => setShowPasswordModal(true)} disabled={viewAs.active} title={viewAs.active ? 'Not available in View As mode' : undefined}>
                 <KeyRound size={16} />
                 Change Password
               </Button>
@@ -986,7 +1029,7 @@ export default function Profile() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-800">Horse/Rider Combos</h2>
               <div className="flex items-center gap-2">
-                <Link to="/horses" className="text-sm text-gray-500 hover:text-green-700 transition">
+                <Link to={viewAs.active ? '../horses' : '/horses'} className="text-sm text-gray-500 hover:text-green-700 transition">
                   Manage horses →
                 </Link>
                 <Button onClick={openAddCombo}>
@@ -1012,7 +1055,7 @@ export default function Profile() {
                 title="No horses yet"
                 description="Add your horses first, then link them to a rider combo."
                 action={
-                  <Link to="/horses" className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 hover:underline">
+                  <Link to={viewAs.active ? '../horses' : '/horses'} className="inline-flex items-center gap-1 text-sm font-semibold text-green-700 hover:underline">
                     Go to Horses <ChevronRight size={14} />
                   </Link>
                 }
@@ -1049,7 +1092,7 @@ export default function Profile() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-gray-800 truncate">{combo.horse_name}</p>
                           {horse && (
-                            <Link to={`/horses/${horse.id}`} className="text-xs text-green-600 hover:underline flex-shrink-0">
+                            <Link to={viewAs.active ? `../horses/${horse.id}` : `/horses/${horse.id}`} className="text-xs text-green-600 hover:underline flex-shrink-0">
                               View profile
                             </Link>
                           )}

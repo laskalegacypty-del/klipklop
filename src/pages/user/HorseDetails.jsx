@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Cropper from 'react-easy-crop'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
+import { useViewAs } from '../../context/ViewAsContext'
 import { createCroppedImageFile } from '../../lib/imageCrop'
 import { uploadImageToBucket, uploadVideoToBucket, UploadValidationError } from '../../lib/storageUploads'
 import { useTabQueryParam } from '../../lib/useTabQueryParam'
@@ -318,6 +319,13 @@ export default function HorseDetails() {
   const location = useLocation()
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const viewAs = useViewAs()
+
+  function blockedInViewAs() {
+    if (!viewAs.active) return false
+    toast.error('Not available in View As mode')
+    return true
+  }
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -494,7 +502,15 @@ export default function HorseDetails() {
       if (remindersRes.error) throw remindersRes.error
       if (vaccinationLogRes.error) throw vaccinationLogRes.error
 
-      if (!horseRes.data) {
+      // A brand-new horse staged during this View As session doesn't exist in
+      // the real table yet — fall back to the staged copy so its own detail
+      // page still works while browsing.
+      let horseData = horseRes.data
+      if (!horseData) {
+        horseData = viewAs.mergeStaged('horses', []).find(h => h.id === horseId) || null
+      }
+
+      if (!horseData) {
         setHorse(null)
         setMedical([])
         setHorseVideos([])
@@ -502,23 +518,24 @@ export default function HorseDetails() {
         return
       }
 
-      setHorse(horseRes.data)
-      setMedical(medicalRes.data || [])
+      setHorse(horseData)
+      setMedical(viewAs.mergeStaged('horse_medical_entries', medicalRes.data))
       setHorseVideos(videosRes.data || [])
-      setReminders((remindersRes.data || []).map(r => ({
+      const mergedReminders = viewAs.mergeStaged('horse_reminders', remindersRes.data)
+      setReminders(mergedReminders.map(r => ({
         ...r,
         next_due_date: r.next_due_date || r.due_date || null
       })))
-      setVaccinationLog(vaccinationLogRes.data || [])
+      setVaccinationLog(viewAs.mergeStaged('vaccination_log', vaccinationLogRes.data))
 
       setHorseForm({
-        name: horseRes.data.name || '',
-        breed: horseRes.data.breed || '',
-        sex: horseRes.data.sex || 'unknown',
-        dob: horseRes.data.dob || '',
-        birth_year: horseRes.data.birth_year ? String(horseRes.data.birth_year) : '',
-        color: horseRes.data.color || '',
-        microchip_or_passport: horseRes.data.microchip_or_passport || '',
+        name: horseData.name || '',
+        breed: horseData.breed || '',
+        sex: horseData.sex || 'unknown',
+        dob: horseData.dob || '',
+        birth_year: horseData.birth_year ? String(horseData.birth_year) : '',
+        color: horseData.color || '',
+        microchip_or_passport: horseData.microchip_or_passport || '',
       })
     } catch (e) {
       console.error(e)
@@ -616,22 +633,21 @@ export default function HorseDetails() {
 
     setSaving(true)
     try {
-      const { error } = await supabase
-        .from('horses')
-        .update({
-          name,
-          breed: horseForm.breed.trim() || null,
-          sex: horseForm.sex || 'unknown',
-          dob: horseForm.dob || null,
-          birth_year: birthYear,
-          color: horseForm.color.trim() || null,
-          microchip_or_passport: horseForm.microchip_or_passport.trim() || null,
-        })
-        .eq('id', horseId)
-        .eq('user_id', profile.id)
+      const payload = {
+        name,
+        breed: horseForm.breed.trim() || null,
+        sex: horseForm.sex || 'unknown',
+        dob: horseForm.dob || null,
+        birth_year: birthYear,
+        color: horseForm.color.trim() || null,
+        microchip_or_passport: horseForm.microchip_or_passport.trim() || null,
+      }
+      const { error } = viewAs.active
+        ? await viewAs.stage('horses', 'update', payload, { id: horseId })
+        : await supabase.from('horses').update(payload).eq('id', horseId).eq('user_id', profile.id)
 
       if (error) throw error
-      toast.success('Horse details saved')
+      toast.success(viewAs.active ? 'Change staged' : 'Horse details saved')
       await fetchAll()
       setIsEditingDetails(false)
     } catch (e) {
@@ -672,6 +688,7 @@ export default function HorseDetails() {
   }
 
   async function handleHorsePhotoUpload() {
+    if (blockedInViewAs()) return
     if (!photoCropSource || !photoCroppedAreaPixels) {
       toast.error('Please position the crop area first')
       return
@@ -722,6 +739,7 @@ export default function HorseDetails() {
   }
 
   async function handleHorseVideoUpload() {
+    if (blockedInViewAs()) return
     if (!videoFile) {
       setVideoUploadError('Please choose a video file first.')
       return
@@ -775,6 +793,7 @@ export default function HorseDetails() {
   }
 
   function handleDeleteHorseVideo(videoId) {
+    if (blockedInViewAs()) return
     setConfirmDialog({
       open: true,
       title: 'Delete video?',
@@ -809,19 +828,19 @@ export default function HorseDetails() {
 
     setAddingMedical(true)
     try {
-      const { error } = await supabase
-        .from('horse_medical_entries')
-        .insert({
-          horse_id: horseId,
-          user_id: profile.id,
-          type: medicalForm.type,
-          title: medicalForm.title.trim(),
-          date: medicalForm.date,
-          notes: medicalForm.notes.trim() || null,
-        })
+      const payload = {
+        horse_id: horseId,
+        type: medicalForm.type,
+        title: medicalForm.title.trim(),
+        date: medicalForm.date,
+        notes: medicalForm.notes.trim() || null,
+      }
+      const { error } = viewAs.active
+        ? await viewAs.stage('horse_medical_entries', 'insert', payload)
+        : await supabase.from('horse_medical_entries').insert({ ...payload, user_id: profile.id })
       if (error) throw error
 
-      toast.success('Medical entry added')
+      toast.success(viewAs.active ? 'Medical entry staged' : 'Medical entry added')
       setShowMedicalModal(false)
       setMedicalForm({ type: 'vaccination', title: '', date: todayISO(), notes: '' })
       await fetchAll()
@@ -841,13 +860,11 @@ export default function HorseDetails() {
       description: 'This cannot be undone.',
       onConfirm: async () => {
         try {
-          const { error } = await supabase
-            .from('horse_medical_entries')
-            .delete()
-            .eq('id', entryId)
-            .eq('user_id', profile.id)
+          const { error } = viewAs.active
+            ? await viewAs.stage('horse_medical_entries', 'delete', null, { id: entryId })
+            : await supabase.from('horse_medical_entries').delete().eq('id', entryId).eq('user_id', profile.id)
           if (error) throw error
-          toast.success('Entry deleted')
+          toast.success(viewAs.active ? 'Deletion staged' : 'Entry deleted')
           await fetchAll()
         } catch (e) {
           console.error(e)
@@ -902,19 +919,24 @@ export default function HorseDetails() {
         abnormal_reason: vitalCheck.abnormalReason,
       }
 
-      let { error } = await supabase.from('horse_medical_entries').insert(fullRow)
+      let error
+      if (viewAs.active) {
+        ({ error } = await viewAs.stage('horse_medical_entries', 'insert', fullRow))
+      } else {
+        ({ error } = await supabase.from('horse_medical_entries').insert(fullRow))
 
-      if (error && isMissingVitalsColumnsError(error)) {
-        const legacyRow = {
-          horse_id: horseId,
-          user_id: profile.id,
-          type: 'vitals',
-          title: legacyTitle,
-          date: entryDate,
-          notes: buildLegacyVitalNotes(vitalForm.notes, vitalCheck),
+        if (error && isMissingVitalsColumnsError(error)) {
+          const legacyRow = {
+            horse_id: horseId,
+            user_id: profile.id,
+            type: 'vitals',
+            title: legacyTitle,
+            date: entryDate,
+            notes: buildLegacyVitalNotes(vitalForm.notes, vitalCheck),
+          }
+          const retry = await supabase.from('horse_medical_entries').insert(legacyRow)
+          error = retry.error
         }
-        const retry = await supabase.from('horse_medical_entries').insert(legacyRow)
-        error = retry.error
       }
 
       if (error) {
@@ -923,7 +945,7 @@ export default function HorseDetails() {
         return
       }
 
-      toast.success('Vitals entry added')
+      toast.success(viewAs.active ? 'Vitals entry staged' : 'Vitals entry added')
       setShowVitalsModal(false)
       setVitalForm({
         vital_type: 'temperature',
@@ -969,40 +991,51 @@ export default function HorseDetails() {
     const label = vaccType === 'flu_vaccination' ? 'Flu Vaccination (Equine Influenza)' : 'AHS Vaccination (African Horse Sickness)'
     setSaving(true)
     try {
-      const fullPayload = {
-        horse_id: horseId, user_id: profile.id, reminder_type: vaccType, label,
-        last_done_date: lastDoneDate || null, next_due_date: nextDueDate, due_date: nextDueDate,
-        vet_name: formData.vet_name.trim() || null, notes: formData.notes.trim() || null,
-        is_primary_course_complete: primaryCourseComplete, is_done: false,
-        notification_days_before: 30,
-      }
-      const compactPayload = { horse_id: horseId, user_id: profile.id, reminder_type: vaccType, label, last_done_date: lastDoneDate || null, next_due_date: nextDueDate, due_date: nextDueDate, is_done: false }
-      const legacyPayload = { horse_id: horseId, user_id: profile.id, label, due_date: nextDueDate, is_done: false }
-      let error = null
-      for (const attempt of [fullPayload, compactPayload, legacyPayload]) {
-        const r = await supabase.from('horse_reminders').insert(attempt)
-        if (!r.error) { error = null; break }
-        error = r.error
-      }
-      if (error) throw error
-
       const doseRows = isAhs
         ? [{ dose: 1, date: formData.v1_date }, { dose: 2, date: formData.v2_date }]
         : [{ dose: 1, date: formData.v1_date }, { dose: 2, date: formData.v2_date }, { dose: 3, date: formData.v3_date }]
       const logRows = doseRows.filter(d => d.date).map(d => ({
-        horse_id: horseId, user_id: profile.id,
+        horse_id: horseId,
         vaccination_type: isAhs ? 'ahs' : 'flu',
         dose_number: d.dose, date_administered: d.date,
         vet_name: formData.vet_name.trim(),
       }))
       if (formData.annual_last_date) {
-        logRows.push({ horse_id: horseId, user_id: profile.id, vaccination_type: isAhs ? 'ahs' : 'flu', dose_number: null, date_administered: formData.annual_last_date, vet_name: formData.vet_name.trim() })
-      }
-      if (logRows.length > 0) {
-        await supabase.from('horse_vaccination_log').insert(logRows)
+        logRows.push({ horse_id: horseId, vaccination_type: isAhs ? 'ahs' : 'flu', dose_number: null, date_administered: formData.annual_last_date, vet_name: formData.vet_name.trim() })
       }
 
-      toast.success('Vaccination logged & reminder set!')
+      if (viewAs.active) {
+        const reminderPayload = { horse_id: horseId, reminder_type: vaccType, label, last_done_date: lastDoneDate || null, next_due_date: nextDueDate, due_date: nextDueDate, vet_name: formData.vet_name.trim() || null, notes: formData.notes.trim() || null, is_primary_course_complete: primaryCourseComplete, is_done: false }
+        const { error } = await viewAs.stage('horse_reminders', 'insert', reminderPayload)
+        if (error) throw error
+        for (const row of logRows) {
+          const { error: logError } = await viewAs.stage('vaccination_log', 'insert', row)
+          if (logError) throw logError
+        }
+      } else {
+        const fullPayload = {
+          horse_id: horseId, user_id: profile.id, reminder_type: vaccType, label,
+          last_done_date: lastDoneDate || null, next_due_date: nextDueDate, due_date: nextDueDate,
+          vet_name: formData.vet_name.trim() || null, notes: formData.notes.trim() || null,
+          is_primary_course_complete: primaryCourseComplete, is_done: false,
+          notification_days_before: 30,
+        }
+        const compactPayload = { horse_id: horseId, user_id: profile.id, reminder_type: vaccType, label, last_done_date: lastDoneDate || null, next_due_date: nextDueDate, due_date: nextDueDate, is_done: false }
+        const legacyPayload = { horse_id: horseId, user_id: profile.id, label, due_date: nextDueDate, is_done: false }
+        let error = null
+        for (const attempt of [fullPayload, compactPayload, legacyPayload]) {
+          const r = await supabase.from('horse_reminders').insert(attempt)
+          if (!r.error) { error = null; break }
+          error = r.error
+        }
+        if (error) throw error
+
+        if (logRows.length > 0) {
+          await supabase.from('vaccination_log').insert(logRows.map(r => ({ ...r, user_id: profile.id })))
+        }
+      }
+
+      toast.success(viewAs.active ? 'Vaccination logged & reminder staged' : 'Vaccination logged & reminder set!')
       await fetchAll()
       setActiveTab('vaccinations')
     } catch (e) {
@@ -1157,19 +1190,23 @@ export default function HorseDetails() {
       ]
 
       let error = null
-      for (let i = 0; i < insertAttempts.length; i += 1) {
-        const attempt = await supabase
-          .from('horse_reminders')
-          .insert(insertAttempts[i])
-        if (!attempt.error) {
-          error = null
-          break
-        }
-        if (!isReminderInsertCompatibilityError(attempt.error)) {
+      if (viewAs.active) {
+        ({ error } = await viewAs.stage('horse_reminders', 'insert', fullReminderPayload))
+      } else {
+        for (let i = 0; i < insertAttempts.length; i += 1) {
+          const attempt = await supabase
+            .from('horse_reminders')
+            .insert(insertAttempts[i])
+          if (!attempt.error) {
+            error = null
+            break
+          }
+          if (!isReminderInsertCompatibilityError(attempt.error)) {
+            error = attempt.error
+            break
+          }
           error = attempt.error
-          break
         }
-        error = attempt.error
       }
 
       if (error) throw error
@@ -1188,7 +1225,6 @@ export default function HorseDetails() {
             ]
         const logRows = doseRows.filter(d => d.date).map(d => ({
           horse_id: horseId,
-          user_id: profile.id,
           vaccination_type: vaccinationType,
           dose_number: d.dose,
           date_administered: d.date,
@@ -1199,7 +1235,6 @@ export default function HorseDetails() {
         if (reminderForm.annual_last_date) {
           logRows.push({
             horse_id: horseId,
-            user_id: profile.id,
             vaccination_type: vaccinationType,
             dose_number: null,
             date_administered: reminderForm.annual_last_date,
@@ -1209,14 +1244,21 @@ export default function HorseDetails() {
         }
 
         if (logRows.length > 0) {
-          const { error: logError } = await supabase.from('vaccination_log').insert(logRows)
-          if (logError && !isMissingColumnOrTableError(logError, 'vaccination_log')) {
-            throw logError
+          if (viewAs.active) {
+            for (const row of logRows) {
+              const { error: logError } = await viewAs.stage('vaccination_log', 'insert', row)
+              if (logError) throw logError
+            }
+          } else {
+            const { error: logError } = await supabase.from('vaccination_log').insert(logRows.map(r => ({ ...r, user_id: profile.id })))
+            if (logError && !isMissingColumnOrTableError(logError, 'vaccination_log')) {
+              throw logError
+            }
           }
         }
       }
 
-      toast.success('Reminder added')
+      toast.success(viewAs.active ? 'Reminder staged' : 'Reminder added')
       setReminderForm({
         reminder_type: 'farrier',
         custom_label: '',
@@ -1267,33 +1309,34 @@ export default function HorseDetails() {
         if (intervalUnit === 'months') nextDueDate = addMonths(today, intervalValue)
       }
 
-      const { error } = await supabase
-        .from('horse_reminders')
-        .update({
-          is_done: false,
-          last_done_date: today,
-          next_due_date: nextDueDate,
-          due_date: nextDueDate,
-        })
-        .eq('id', reminder.id)
-        .eq('user_id', profile.id)
+      const updatePayload = {
+        is_done: false,
+        last_done_date: today,
+        next_due_date: nextDueDate,
+        due_date: nextDueDate,
+      }
+      const { error } = viewAs.active
+        ? await viewAs.stage('horse_reminders', 'update', updatePayload, { id: reminder.id })
+        : await supabase.from('horse_reminders').update(updatePayload).eq('id', reminder.id).eq('user_id', profile.id)
       if (error) throw error
 
       if (isVaccination) {
-        const { error: vaccError } = await supabase.from('vaccination_log').insert({
+        const vaccPayload = {
           horse_id: horseId,
-          user_id: profile.id,
           vaccination_type: reminder.reminder_type === 'flu_vaccination' ? 'flu' : 'ahs',
           dose_number: null,
           date_administered: today,
           vet_name: reminder.vet_name || 'Registered veterinarian',
           notes: reminder.notes || null
-        })
+        }
+        const { error: vaccError } = viewAs.active
+          ? await viewAs.stage('vaccination_log', 'insert', vaccPayload)
+          : await supabase.from('vaccination_log').insert({ ...vaccPayload, user_id: profile.id })
         if (vaccError) throw vaccError
       }
 
       await fetchAll()
-      toast.success('Reminder logged as done')
+      toast.success(viewAs.active ? 'Change staged' : 'Reminder logged as done')
     } catch (e) {
       console.error(e)
       toast.error('Error updating reminder')
@@ -1307,13 +1350,11 @@ export default function HorseDetails() {
       description: 'This cannot be undone.',
       onConfirm: async () => {
         try {
-          const { error } = await supabase
-            .from('horse_reminders')
-            .delete()
-            .eq('id', reminderId)
-            .eq('user_id', profile.id)
+          const { error } = viewAs.active
+            ? await viewAs.stage('horse_reminders', 'delete', null, { id: reminderId })
+            : await supabase.from('horse_reminders').delete().eq('id', reminderId).eq('user_id', profile.id)
           if (error) throw error
-          toast.success('Reminder deleted')
+          toast.success(viewAs.active ? 'Deletion staged' : 'Reminder deleted')
           await fetchAll()
         } catch (e) {
           console.error(e)
@@ -1325,14 +1366,12 @@ export default function HorseDetails() {
 
   async function handleDeleteHorse() {
     try {
-      const { error } = await supabase
-        .from('horses')
-        .delete()
-        .eq('id', horseId)
-        .eq('user_id', profile.id)
+      const { error } = viewAs.active
+        ? await viewAs.stage('horses', 'delete', null, { id: horseId })
+        : await supabase.from('horses').delete().eq('id', horseId).eq('user_id', profile.id)
       if (error) throw error
-      toast.success('Horse deleted')
-      navigate('/horses')
+      toast.success(viewAs.active ? 'Deletion staged' : 'Horse deleted')
+      navigate(viewAs.active ? '..' : '/horses')
     } catch (e) {
       console.error(e)
       toast.error('Error deleting horse')
@@ -1356,9 +1395,9 @@ export default function HorseDetails() {
           title="Horse not found"
           description="This horse may have been deleted, or you may not have access."
           actions={
-            <Link to="/horses" className="text-sm font-semibold text-green-800 hover:underline">
+            <button onClick={() => navigate(viewAs.active ? '..' : '/horses')} className="text-sm font-semibold text-green-800 hover:underline">
               Back to horses →
-            </Link>
+            </button>
           }
         />
         <EmptyState title="Nothing here" description="Go back to your horses list." />
@@ -1372,7 +1411,7 @@ export default function HorseDetails() {
         title={horse.name}
         description="Details, medical log, and reminders"
         actions={
-          <Button variant="secondary" onClick={() => navigate('/horses')}>
+          <Button variant="secondary" onClick={() => navigate(viewAs.active ? '..' : '/horses')}>
             <ArrowLeft size={16} />
             Back
           </Button>

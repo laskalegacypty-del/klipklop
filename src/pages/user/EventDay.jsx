@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
+import { useViewAs } from '../../context/ViewAsContext'
 import { QUALIFIER_GAMES, normalizeGameName } from '../../lib/constants'
 import { getLevel } from '../../lib/matrix'
 import { extractPagesFromPDFWithCoords } from '../../lib/pdfExtract'
@@ -122,7 +123,14 @@ function StatusDot({ status }) {
 
 export default function EventDay() {
   const { profile, isClubHead } = useAuth()
+  const viewAs = useViewAs()
   const navigate = useNavigate()
+
+  function blockedInViewAs() {
+    if (!viewAs.active) return false
+    toast.error('Not available in View As mode')
+    return true
+  }
 
   // Check localStorage synchronously so we can show "resuming" before events load
   const [resumeDraft] = useState(() => {
@@ -322,7 +330,7 @@ export default function EventDay() {
 
           const byId = new Map()
           ;[...(ownCombos || []), ...allCombos].forEach(c => byId.set(c.id, c))
-          if (!cancelled) setMyCombos([...byId.values()])
+          if (!cancelled) setMyCombos(viewAs.mergeStaged('horse_rider_combos', [...byId.values()]))
         } else {
           const { data } = await supabase
             .from('horse_rider_combos')
@@ -330,7 +338,7 @@ export default function EventDay() {
             .eq('user_id', profile.id)
             .is('managed_rider_id', null)
             .eq('is_archived', false)
-          if (!cancelled) setMyCombos(data || [])
+          if (!cancelled) setMyCombos(viewAs.mergeStaged('horse_rider_combos', data))
         }
       } catch (err) {
         console.error(err)
@@ -610,7 +618,7 @@ export default function EventDay() {
 
   function handleDoneForNow() {
     toast.success('Session saved — come back anytime to resume')
-    navigate('/dashboard')
+    navigate(viewAs.active ? '../dashboard' : '/dashboard')
   }
 
   function handleEndEvent() {
@@ -738,42 +746,50 @@ export default function EventDay() {
             const normalizedGame = normalizeGameName(game)
             const levelAchieved = finalTime !== null ? getLevel(normalizedGame, finalTime) : null
 
-            const { error: upsertError } = await supabase
-              .from('event_day_results')
-              .upsert({
-                combo_id: combo.id,
-                event_id: event.id,
-                game: normalizedGame,
-                time: finalTime,
-                is_nt: g.is_nt || false,
-                level_entered: parseInt(entry.level) || 0,
-                level_achieved: levelAchieved,
-                run_number: entry.runNumber || null,
-                rider_name: stripDayAnnotation(entry.riderName) || null,
-                horse_name: entry.horseName || null,
-              }, { onConflict: 'combo_id,event_id,game' })
+            const resultPayload = {
+              combo_id: combo.id,
+              event_id: event.id,
+              game: normalizedGame,
+              time: finalTime,
+              is_nt: g.is_nt || false,
+              level_entered: parseInt(entry.level) || 0,
+              level_achieved: levelAchieved,
+              run_number: entry.runNumber || null,
+              rider_name: stripDayAnnotation(entry.riderName) || null,
+              horse_name: entry.horseName || null,
+            }
+            const { error: upsertError } = viewAs.active
+              ? await viewAs.stage('event_day_results', 'upsert', resultPayload, { combo_id: combo.id, event_id: event.id, game: normalizedGame })
+              : await supabase.from('event_day_results').upsert(resultPayload, { onConflict: 'combo_id,event_id,game' })
             if (upsertError) throw upsertError
 
             totalSaved++
 
             if (finalTime !== null) {
-              const { data: existingPB } = await supabase
+              const { data: existingPBRaw } = await supabase
                 .from('personal_bests')
-                .select('best_time')
+                .select('combo_id, game, season_year, best_time')
                 .eq('combo_id', combo.id)
                 .eq('game', normalizedGame)
                 .eq('season_year', eventYear)
                 .maybeSingle()
+              const existingPB = viewAs.active
+                ? viewAs.mergeStaged('personal_bests', existingPBRaw ? [existingPBRaw] : [])
+                    .find(pb => pb.combo_id === combo.id && pb.game === normalizedGame && pb.season_year === eventYear) || null
+                : existingPBRaw
 
               if (!existingPB || finalTime < existingPB.best_time) {
-                const { error: pbError } = await supabase.from('personal_bests').upsert({
+                const pbPayload = {
                   combo_id: combo.id,
                   game: normalizedGame,
                   best_time: finalTime,
                   season_year: eventYear,
                   achieved_at: achievedAt,
                   updated_at: new Date().toISOString(),
-                }, { onConflict: 'combo_id,game,season_year', ignoreDuplicates: false })
+                }
+                const { error: pbError } = viewAs.active
+                  ? await viewAs.stage('personal_bests', 'upsert', pbPayload, { combo_id: combo.id, game: normalizedGame, season_year: eventYear })
+                  : await supabase.from('personal_bests').upsert(pbPayload, { onConflict: 'combo_id,game,season_year', ignoreDuplicates: false })
                 if (pbError) throw pbError
                 totalPBs++
               }
@@ -825,6 +841,7 @@ export default function EventDay() {
   }, [step, helperSessionToken, refreshHelperContributions])
 
   async function handleCreateHelperLink() {
+    if (blockedInViewAs()) return
     if (!primaryEvent || !selectedEntries.length) return
     setCreatingHelperLink(true)
     try {

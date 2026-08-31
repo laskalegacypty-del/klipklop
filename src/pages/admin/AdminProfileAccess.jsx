@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { KeyRound, Search, Eye, XCircle, Clock } from 'lucide-react'
+import { KeyRound, Search, Eye, Glasses, XCircle, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Skeleton, EmptyState } from '../../components/ui'
 import { isGrantActive, grantStatusLabel } from '../../lib/profileAccess'
@@ -199,12 +199,20 @@ export default function AdminProfileAccess() {
                   </span>
 
                   {active ? (
-                    <button
-                      onClick={() => navigate(`/admin/profile-dossier/${grant.user_id}`)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition flex-shrink-0"
-                    >
-                      <Eye size={13} /> View
-                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => navigate(`/admin/profile-dossier/${grant.user_id}`)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition"
+                      >
+                        <Eye size={13} /> View
+                      </button>
+                      <button
+                        onClick={() => navigate(`/admin/view-as/${grant.user_id}/dashboard`)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-green-300 text-green-700 hover:bg-green-50 text-xs font-semibold transition"
+                      >
+                        <Glasses size={13} /> View As
+                      </button>
+                    </div>
                   ) : grant.status === 'pending' ? (
                     <span className="flex items-center gap-1.5 text-xs text-amber-600 flex-shrink-0">
                       <XCircle size={13} /> Awaiting response
