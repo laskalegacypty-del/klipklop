@@ -14,6 +14,7 @@ import {
   Save,
   Camera,
   KeyRound,
+  ShieldCheck,
   ChevronRight,
   UserCheck,
   UserX,
@@ -46,6 +47,7 @@ import {
   PWA_INSTALL_PROMPT_EVENT
 } from '../../lib/pwaInstall'
 import { START_TUTORIAL_EVENT } from '../../components/onboarding/OnboardingTour'
+import { isGrantActive, grantStatusLabel } from '../../lib/profileAccess'
 
 const EMPTY_COMBO = { horse_id: '', horse_name: '', current_level: 0 }
 
@@ -95,6 +97,8 @@ export default function Profile() {
   const [loadingClubMembers, setLoadingClubMembers] = useState(false)
   const [myClubHead, setMyClubHead] = useState(null)
   const [loadingMyClub, setLoadingMyClub] = useState(false)
+  const [accessGrants, setAccessGrants] = useState([])
+  const [loadingAccessGrants, setLoadingAccessGrants] = useState(false)
 
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState(() => getDeferredPwaInstallPrompt())
   const [pwaInstalledView, setPwaInstalledView] = useState(() => isPwaStandaloneDisplay())
@@ -125,6 +129,7 @@ export default function Profile() {
         fetchLinkedSupporters()
         fetchMyClubHead()
       }
+      fetchProfileAccessGrants()
     }
   }, [profile, isSupporter, isClubHead])
 
@@ -356,6 +361,77 @@ export default function Profile() {
       fetchMyClubHead()
     } catch {
       toast.error('Error responding to club request')
+    }
+  }
+
+  async function fetchProfileAccessGrants() {
+    setLoadingAccessGrants(true)
+    try {
+      const { data: grants, error } = await supabase
+        .from('profile_access_grants')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      if (!grants || grants.length === 0) { setAccessGrants([]); return }
+      const adminIds = [...new Set(grants.map(g => g.admin_id))]
+      const { data: adminProfiles } = await supabase
+        .from('profiles').select('id, rider_name, profile_photo_url').in('id', adminIds)
+      const profileMap = {}
+      adminProfiles?.forEach(p => { profileMap[p.id] = p })
+      setAccessGrants(grants.map(g => ({ ...g, admin: profileMap[g.admin_id] || null })))
+    } catch {
+      toast.error('Error loading access requests')
+    } finally {
+      setLoadingAccessGrants(false)
+    }
+  }
+
+  async function handleGrantResponse(grant, action) {
+    try {
+      const accept = action === 'accept'
+      const update = accept
+        ? {
+            status: 'accepted',
+            responded_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + grant.requested_hours * 3600 * 1000).toISOString(),
+          }
+        : { status: 'declined', responded_at: new Date().toISOString() }
+      const { error } = await supabase.from('profile_access_grants').update(update).eq('id', grant.id)
+      if (error) throw error
+      await supabase.from('notifications').insert({
+        user_id: grant.admin_id,
+        type: accept ? 'profile_access_accepted' : 'profile_access_declined',
+        message: accept
+          ? `${profile.rider_name} accepted your profile access request.`
+          : `${profile.rider_name} declined your profile access request.`,
+        link: '/admin/profile-access',
+      })
+      toast.success(accept ? 'Access granted' : 'Request declined')
+      fetchProfileAccessGrants()
+    } catch {
+      toast.error('Error responding to request')
+    }
+  }
+
+  async function handleRevokeGrant(grant) {
+    try {
+      const { error } = await supabase.from('profile_access_grants').update({
+        status: 'revoked',
+        revoked_at: new Date().toISOString(),
+        revoked_by: profile.id,
+      }).eq('id', grant.id)
+      if (error) throw error
+      await supabase.from('notifications').insert({
+        user_id: grant.admin_id,
+        type: 'profile_access_revoked',
+        message: `${profile.rider_name} revoked your profile access.`,
+        link: '/admin/profile-access',
+      })
+      toast.success('Access revoked')
+      fetchProfileAccessGrants()
+    } catch {
+      toast.error('Error revoking access')
     }
   }
 
@@ -814,6 +890,92 @@ export default function Profile() {
               </Button>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Profile Access Requests ─────────────────── */}
+      <Card>
+        <CardContent className="p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <ShieldCheck size={18} className="text-gray-400" />
+            Profile Access Requests
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Admins may ask for time-limited access to your full profile to help with support. You can decline, and revoke access at any time.
+          </p>
+
+          {loadingAccessGrants ? (
+            <Skeleton className="h-14 rounded-xl" />
+          ) : accessGrants.length === 0 ? (
+            <EmptyState
+              title="No access requests"
+              description="You'll see requests here if an admin asks for time-limited access to your profile."
+            />
+          ) : (
+            <div className="space-y-3">
+              {accessGrants.map(grant => (
+                <div
+                  key={grant.id}
+                  className={`flex flex-col gap-3 p-4 rounded-xl border ${
+                    grant.status === 'pending' ? 'border-yellow-200 bg-yellow-50' :
+                    isGrantActive(grant) ? 'border-green-200 bg-green-50' :
+                    'border-gray-200 bg-gray-50 opacity-75'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <AvatarCircle src={grant.admin?.profile_photo_url} name={grant.admin?.rider_name} />
+                      <div>
+                        <p className="font-medium text-gray-800 text-sm">{grant.admin?.rider_name || 'Admin'}</p>
+                        <p className="text-xs text-gray-500">
+                          {grant.status === 'pending' && `Requesting access for ${grant.requested_hours}h`}
+                          {grant.status === 'accepted' && (isGrantActive(grant) ? `Active — expires ${new Date(grant.expires_at).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'Expired')}
+                          {grant.status === 'declined' && 'You declined this request'}
+                          {grant.status === 'revoked' && 'You revoked this access'}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={
+                      grant.status === 'pending' ? 'warning' :
+                      isGrantActive(grant) ? 'success' : 'default'
+                    }>
+                      {grantStatusLabel(grant)}
+                    </Badge>
+                  </div>
+
+                  {grant.reason && (
+                    <p className="text-xs text-gray-600 bg-white/60 rounded-lg px-3 py-2 border border-gray-100">"{grant.reason}"</p>
+                  )}
+
+                  {grant.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleGrantResponse(grant, 'accept')}
+                        className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                      >
+                        <UserCheck size={13} /> Accept
+                      </button>
+                      <button
+                        onClick={() => handleGrantResponse(grant, 'decline')}
+                        className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"
+                      >
+                        <UserX size={13} /> Decline
+                      </button>
+                    </div>
+                  )}
+
+                  {isGrantActive(grant) && (
+                    <button
+                      onClick={() => handleRevokeGrant(grant)}
+                      className="self-start flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition"
+                    >
+                      <Trash2 size={13} /> Revoke access
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

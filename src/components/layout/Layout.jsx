@@ -26,6 +26,7 @@ import {
   ClipboardList,
   History,
   Flag,
+  KeyRound,
 } from 'lucide-react'
 import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE_SIDEBAR } from '../../constants/branding'
 import OnboardingTour from '../onboarding/OnboardingTour'
@@ -90,6 +91,7 @@ const adminNavItems = [
   { path: '/admin/matrix',    label: 'Matrix & Announcements', icon: Settings,       group: 'manage' },
   { path: '/admin/klippies',  label: 'Klippies Access',        icon: MessageSquare,  group: 'manage' },
   { path: '/admin/reports',   label: 'Problem Reports',        icon: Flag,           group: 'manage' },
+  { path: '/admin/profile-access', label: 'Profile Access',    icon: KeyRound,       group: 'manage' },
   { path: '/assistant',       label: 'Assistant',              icon: MessageCircle,  group: 'tools' },
 ]
 

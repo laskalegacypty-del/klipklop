@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuth } from '../../context/AuthContext'
 import { PROVINCES } from '../../lib/constants'
 import {
-  CheckCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert, Gift, Lock
+  CheckCircle, AlertCircle, Search, ChevronDown, User, X, Save, TriangleAlert, Gift, Lock, KeyRound
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PageHeader, Skeleton } from '../../components/ui'
+import RequestAccessModal from '../../components/admin/RequestAccessModal'
 
 const STATUS_FILTERS   = ['all', 'approved', 'suspended', 'rejected']
 const ROLE_FILTERS     = ['all', 'user', 'supporter', 'club_head']
@@ -31,6 +33,7 @@ const ROLE_STYLE = {
 }
 
 export default function AdminUsers() {
+  const { profile: adminProfile } = useAuth()
   const [users, setUsers] = useState([])
   const [filtered, setFiltered] = useState([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +54,9 @@ export default function AdminUsers() {
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState({ province: '', age_category: '', role: 'user' })
   const [editSaving, setEditSaving] = useState(false)
+
+  // Profile access request
+  const [accessTarget, setAccessTarget] = useState(null)
 
   useEffect(() => { fetchUsers() }, [])
   useEffect(() => { applyFilters() }, [users, search, statusFilter, provinceFilter, roleFilter])
@@ -288,6 +294,10 @@ export default function AdminUsers() {
                       className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-200 transition">
                       <User size={13} /> Edit
                     </button>
+                    <button onClick={() => setAccessTarget(user)}
+                      className="flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-100 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-100 transition">
+                      <KeyRound size={13} /> Request Access
+                    </button>
                     <button onClick={() => toggleFreeAccess(user)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
                         user.paygate_exempt
@@ -460,6 +470,13 @@ export default function AdminUsers() {
           </div>
         </div>
       )}
+
+      <RequestAccessModal
+        open={!!accessTarget}
+        onClose={() => setAccessTarget(null)}
+        adminId={adminProfile.id}
+        targetUser={accessTarget}
+      />
     </div>
   )
 }

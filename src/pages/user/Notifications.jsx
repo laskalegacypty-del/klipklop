@@ -17,7 +17,8 @@ import {
   Star,
   X,
   CheckCircle2,
-  TrendingUp
+  TrendingUp,
+  Shield
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -57,6 +58,10 @@ const NOTIFICATION_TYPES = {
   club_link_rejected: { icon: X, color: 'text-red-600', bg: 'bg-red-100' },
   horse_reminder_due: { icon: Calendar, color: 'text-orange-600', bg: 'bg-orange-100' },
   friend_overtake: { icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-100' },
+  profile_access_request: { icon: Shield, color: 'text-blue-600', bg: 'bg-blue-100' },
+  profile_access_accepted: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100' },
+  profile_access_declined: { icon: X, color: 'text-red-600', bg: 'bg-red-100' },
+  profile_access_revoked: { icon: X, color: 'text-orange-600', bg: 'bg-orange-100' },
 }
 
 const PREFERENCE_LABELS = {
