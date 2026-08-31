@@ -18,7 +18,8 @@ import {
   X,
   CheckCircle2,
   TrendingUp,
-  Shield
+  Shield,
+  FileCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -62,6 +63,9 @@ const NOTIFICATION_TYPES = {
   profile_access_accepted: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100' },
   profile_access_declined: { icon: X, color: 'text-red-600', bg: 'bg-red-100' },
   profile_access_revoked: { icon: X, color: 'text-orange-600', bg: 'bg-orange-100' },
+  profile_edits_submitted: { icon: FileCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
+  profile_edits_approved: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100' },
+  profile_edits_rejected: { icon: X, color: 'text-red-600', bg: 'bg-red-100' },
 }
 
 const PREFERENCE_LABELS = {

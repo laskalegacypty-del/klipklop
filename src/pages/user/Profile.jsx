@@ -15,6 +15,7 @@ import {
   Camera,
   KeyRound,
   ShieldCheck,
+  FileCheck,
   ChevronRight,
   UserCheck,
   UserX,
@@ -48,6 +49,7 @@ import {
 } from '../../lib/pwaInstall'
 import { START_TUTORIAL_EVENT } from '../../components/onboarding/OnboardingTour'
 import { isGrantActive, grantStatusLabel } from '../../lib/profileAccess'
+import { summarizeStagedItems } from '../../lib/stagedEdits'
 import { useViewAs } from '../../context/ViewAsContext'
 
 const EMPTY_COMBO = { horse_id: '', horse_name: '', current_level: 0 }
@@ -101,6 +103,9 @@ export default function Profile() {
   const [loadingMyClub, setLoadingMyClub] = useState(false)
   const [accessGrants, setAccessGrants] = useState([])
   const [loadingAccessGrants, setLoadingAccessGrants] = useState(false)
+  const [editBatches, setEditBatches] = useState([])
+  const [loadingEditBatches, setLoadingEditBatches] = useState(false)
+  const [decidingBatchId, setDecidingBatchId] = useState(null)
 
   const [pwaInstallPrompt, setPwaInstallPrompt] = useState(() => getDeferredPwaInstallPrompt())
   const [pwaInstalledView, setPwaInstalledView] = useState(() => isPwaStandaloneDisplay())
@@ -132,6 +137,7 @@ export default function Profile() {
         fetchMyClubHead()
       }
       fetchProfileAccessGrants()
+      fetchEditBatches()
     }
   }, [profile, isSupporter, isClubHead])
 
@@ -447,6 +453,91 @@ export default function Profile() {
       fetchProfileAccessGrants()
     } catch {
       toast.error('Error revoking access')
+    }
+  }
+
+  async function fetchEditBatches() {
+    setLoadingEditBatches(true)
+    try {
+      const { data: sessions, error } = await supabase
+        .from('staged_edit_sessions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .in('status', ['submitted', 'approved', 'rejected'])
+        .order('submitted_at', { ascending: false })
+        .limit(20)
+      if (error) throw error
+      if (!sessions || sessions.length === 0) { setEditBatches([]); return }
+
+      const adminIds = [...new Set(sessions.map(s => s.admin_id))]
+      const sessionIds = sessions.map(s => s.id)
+      const [{ data: adminProfiles }, { data: items }] = await Promise.all([
+        supabase.from('profiles').select('id, rider_name, profile_photo_url').in('id', adminIds),
+        supabase.from('staged_edit_items').select('*').in('session_id', sessionIds),
+      ])
+      const profileMap = {}
+      adminProfiles?.forEach(p => { profileMap[p.id] = p })
+      const itemsBySession = {}
+      items?.forEach(item => {
+        if (!itemsBySession[item.session_id]) itemsBySession[item.session_id] = []
+        itemsBySession[item.session_id].push(item)
+      })
+
+      setEditBatches(sessions.map(s => ({
+        ...s,
+        admin: profileMap[s.admin_id] || null,
+        items: itemsBySession[s.id] || [],
+      })))
+    } catch {
+      toast.error('Error loading proposed changes')
+    } finally {
+      setLoadingEditBatches(false)
+    }
+  }
+
+  async function handleApproveBatch(batch) {
+    setDecidingBatchId(batch.id)
+    try {
+      const { error } = await supabase.rpc('apply_staged_edit_session', { p_session_id: batch.id })
+      if (error) throw error
+      await supabase.from('notifications').insert({
+        user_id: batch.admin_id,
+        type: 'profile_edits_approved',
+        message: `${profile.rider_name} approved your ${batch.items.length} proposed change${batch.items.length === 1 ? '' : 's'}.`,
+        link: '/admin/profile-access',
+      })
+      toast.success('Changes applied')
+      fetchEditBatches()
+      fetchData()
+    } catch (err) {
+      console.error(err)
+      toast.error(err.message || 'Error applying changes')
+    } finally {
+      setDecidingBatchId(null)
+    }
+  }
+
+  async function handleRejectBatch(batch) {
+    setDecidingBatchId(batch.id)
+    try {
+      const { error } = await supabase
+        .from('staged_edit_sessions')
+        .update({ status: 'rejected', decided_at: new Date().toISOString() })
+        .eq('id', batch.id)
+      if (error) throw error
+      await supabase.from('notifications').insert({
+        user_id: batch.admin_id,
+        type: 'profile_edits_rejected',
+        message: `${profile.rider_name} rejected your ${batch.items.length} proposed change${batch.items.length === 1 ? '' : 's'}.`,
+        link: '/admin/profile-access',
+      })
+      toast.success('Changes rejected')
+      fetchEditBatches()
+    } catch (err) {
+      console.error(err)
+      toast.error(err.message || 'Error rejecting changes')
+    } finally {
+      setDecidingBatchId(null)
     }
   }
 
@@ -1017,6 +1108,86 @@ export default function Profile() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Proposed Changes (from View As sessions) ── */}
+      <Card>
+        <CardContent className="p-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <FileCheck size={18} className="text-gray-400" />
+            Proposed Changes
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            While browsing your profile with an active access grant, an admin can propose changes. Nothing is applied until you approve it here.
+          </p>
+
+          {loadingEditBatches ? (
+            <Skeleton className="h-16 rounded-xl" />
+          ) : editBatches.length === 0 ? (
+            <EmptyState
+              title="No proposed changes"
+              description="You'll see a batch here whenever an admin submits changes for your review."
+            />
+          ) : (
+            <div className="space-y-3">
+              {editBatches.map(batch => {
+                const summary = summarizeStagedItems(batch.items)
+                const deciding = decidingBatchId === batch.id
+                return (
+                  <div
+                    key={batch.id}
+                    className={`flex flex-col gap-3 p-4 rounded-xl border ${
+                      batch.status === 'submitted' ? 'border-yellow-200 bg-yellow-50' :
+                      batch.status === 'approved' ? 'border-green-200 bg-green-50' :
+                      'border-gray-200 bg-gray-50 opacity-75'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <AvatarCircle src={batch.admin?.profile_photo_url} name={batch.admin?.rider_name} />
+                        <div>
+                          <p className="font-medium text-gray-800 text-sm">{batch.admin?.rider_name || 'Admin'}</p>
+                          <p className="text-xs text-gray-500">{batch.items.length} change{batch.items.length === 1 ? '' : 's'} proposed</p>
+                        </div>
+                      </div>
+                      <Badge variant={
+                        batch.status === 'submitted' ? 'warning' :
+                        batch.status === 'approved' ? 'success' : 'default'
+                      }>
+                        {batch.status === 'submitted' ? 'Awaiting review' : batch.status === 'approved' ? 'Approved' : 'Rejected'}
+                      </Badge>
+                    </div>
+
+                    {summary.length > 0 && (
+                      <ul className="text-xs text-gray-700 bg-white/60 rounded-lg px-3 py-2 border border-gray-100 space-y-0.5 list-disc list-inside">
+                        {summary.map((line, i) => <li key={i}>{line}</li>)}
+                      </ul>
+                    )}
+
+                    {batch.status === 'submitted' && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApproveBatch(batch)}
+                          disabled={deciding}
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                        >
+                          <UserCheck size={13} /> {deciding ? 'Applying…' : 'Approve'}
+                        </button>
+                        <button
+                          onClick={() => handleRejectBatch(batch)}
+                          disabled={deciding}
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition disabled:opacity-50"
+                        >
+                          <UserX size={13} /> Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
