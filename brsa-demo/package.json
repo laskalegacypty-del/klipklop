@@ -1,0 +1,28 @@
+{
+  "name": "brsa-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "vite build",
+    "preview": "vite preview --port 5174",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name=brsa-pitch"
+  },
+  "dependencies": {
+    "lucide-react": "^0.577.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.13.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.1",
+    "@vitejs/plugin-react": "^6.0.0",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.1",
+    "vite": "^8.0.0",
+    "wrangler": "^4.28.0"
+  }
+}
