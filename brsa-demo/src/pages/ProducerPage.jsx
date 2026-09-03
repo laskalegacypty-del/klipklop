@@ -3,12 +3,18 @@ import { useDemo } from '../demo/store'
 import { rand } from '../demo/money'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
+import { EmptyState } from '../components/ui/EmptyState'
 import { PageHeader } from '../components/ui/PageHeader'
 
 export function ProducerPage() {
   const { user, producer, world, entriesFor } = useDemo()
   if (user.role !== 'producer' || !producer) {
-    return <p>Switch to Ansie (producer / demo).</p>
+    return (
+      <EmptyState
+        title="Producer desk"
+        description="Event fees and contacts show on a producer account."
+      />
+    )
   }
 
   const events = world.events.filter((e) => producer.eventIds.includes(e.id) || e.producerId === producer.id)
@@ -16,6 +22,9 @@ export function ProducerPage() {
   return (
     <div>
       <PageHeader title="Producer desk" description={`${producer.name} · ${producer.region} · ${producer.phone}`} />
+      {events.length === 0 ? (
+        <EmptyState title="No events assigned" description="When you are listed as producer, they will appear here." />
+      ) : (
       <div className="grid gap-4">
         {events.map((event) => {
           const paid = entriesFor(event.id, { paidOnly: true })
@@ -39,6 +48,7 @@ export function ProducerPage() {
           )
         })}
       </div>
+      )}
     </div>
   )
 }

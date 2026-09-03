@@ -2,21 +2,31 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { entryFee, pointsForResult, PRODUCING_COST } from './money'
 import { createSeed } from './world'
+import { applyAccent, defaultAccent } from './accents'
 
 const STORAGE_KEY = 'brsa-pitch-v1'
 const DemoContext = createContext(null)
 
 function loadWorld() {
+  const seed = createSeed()
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed?.version === 1) return parsed
+      if (parsed?.version === 1) {
+        return {
+          ...seed,
+          ...parsed,
+          accent: parsed.accent ?? seed.accent,
+          viewingFromAdmin: parsed.viewingFromAdmin ?? false,
+          viewAsLog: parsed.viewAsLog ?? [],
+        }
+      }
     }
   } catch {
     /* fall through */
   }
-  return createSeed()
+  return seed
 }
 
 export function DemoProvider({ children }) {
@@ -25,6 +35,10 @@ export function DemoProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(world))
   }, [world])
+
+  useEffect(() => {
+    applyAccent(world.accent ?? defaultAccent())
+  }, [world.accent])
 
   const api = useMemo(() => {
     const user = world.users.find((u) => u.id === world.currentUserId) ?? world.users[0]
@@ -60,19 +74,48 @@ export function DemoProvider({ children }) {
       return [...world.riders].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
     }
 
-    function switchUser(userId) {
-      setWorld((w) => ({ ...w, currentUserId: userId }))
+    function switchUser(userId, { reason } = {}) {
+      setWorld((w) => {
+        const target = w.users.find((u) => u.id === userId)
+        const inspecting = userId !== 'admin' && (w.currentUserId === 'admin' || w.viewingFromAdmin)
+        return {
+          ...w,
+          currentUserId: userId,
+          viewingFromAdmin: inspecting,
+          viewAsLog: inspecting
+            ? [
+                {
+                  at: new Date().toISOString(),
+                  userId,
+                  name: target?.name,
+                  role: target?.role,
+                  reason: reason || 'Support',
+                },
+                ...(w.viewAsLog ?? []),
+              ].slice(0, 12)
+            : w.viewAsLog,
+        }
+      })
+    }
+
+    function exitViewAs() {
+      setWorld((w) => ({ ...w, currentUserId: 'admin', viewingFromAdmin: false }))
     }
 
     function resetDemo() {
       const next = createSeed()
-      next.currentUserId = world.currentUserId
+      next.currentUserId = 'admin'
       setWorld(next)
-      toast.success('Demo world reset')
+      toast.success('Season restored on this device')
     }
 
     function setMembershipIncludesApp(value) {
       setWorld((w) => ({ ...w, membershipIncludesApp: value }))
+    }
+
+    function setAccent(accent, { quiet } = {}) {
+      setWorld((w) => ({ ...w, accent }))
+      if (!quiet) toast.success(`Season accent · ${accent.name}`)
     }
 
     function payInvoice(invoiceId) {
@@ -242,7 +285,7 @@ export function DemoProvider({ children }) {
 
     function boostRider(riderId, amount = 50) {
       if (!fan) {
-        toast.error('Switch to a fan to boost')
+        toast.error('Boosts are sent from a supporter account')
         return
       }
       setWorld((w) => ({
@@ -271,6 +314,7 @@ export function DemoProvider({ children }) {
       rider,
       fan,
       producer,
+      viewingFromAdmin: Boolean(world.viewingFromAdmin),
       topRider,
       riderById,
       horseById,
@@ -280,8 +324,10 @@ export function DemoProvider({ children }) {
       resultsFor,
       officialStandings,
       switchUser,
+      exitViewAs,
       resetDemo,
       setMembershipIncludesApp,
+      setAccent,
       payInvoice,
       enterEvent,
       makeOfficial,

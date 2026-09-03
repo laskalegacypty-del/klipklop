@@ -134,10 +134,12 @@ function Board({ rows }) {
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <Td className="font-semibold">{row.rank}</Td>
+              <Td className={row.rank === 1 ? 'font-semibold text-season' : 'font-semibold'}>
+                {row.rank === 1 ? '1' : row.rank}
+              </Td>
               <Td>
                 {row.to ? (
-                  <Link className="font-semibold hover:underline" to={row.to}>
+                  <Link className="link-quiet font-semibold underline" to={row.to}>
                     {row.name}
                   </Link>
                 ) : (

@@ -5,6 +5,7 @@ import { CLASS_FEES, CARRY_OVER_FEE, PRODUCING_COST, entryFee, rand } from '../d
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
+import { EmptyState } from '../components/ui/EmptyState'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Select } from '../components/ui/Select'
 import { Table, TableWrap, Td, Th } from '../components/ui/Table'
@@ -71,11 +72,11 @@ function Flyer({ event, producer }) {
           <h3 className="mt-5 text-sm font-semibold uppercase tracking-wide text-stone-500">Class fees</h3>
           <ul className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
             {event.classes.map((klass) => (
-              <li key={klass} className="rounded-lg bg-dust-50 px-3 py-2">
+              <li key={klass} className="rounded-md border border-dust-200 bg-dust-50 px-3 py-2">
                 {klass} <span className="font-semibold">{rand(CLASS_FEES[klass])}</span>
               </li>
             ))}
-            <li className="rounded-lg bg-brand-50 px-3 py-2">
+            <li className="rounded-md border border-brand-400 bg-brand-50 px-3 py-2">
               Carry-over <span className="font-semibold">+{rand(CARRY_OVER_FEE)}</span>
             </li>
           </ul>
@@ -111,17 +112,16 @@ function Enter({ event }) {
 
   if (user.role !== 'rider' || !rider) {
     return (
-      <Card>
-        <CardContent>Switch to Sunny (rider / demo) to enter from this seat.</CardContent>
-      </Card>
+      <EmptyState
+        title="Rider entries"
+        description="Open a rider account to enter this event."
+      />
     )
   }
 
   if (event.official) {
     return (
-      <Card>
-        <CardContent>This event is official — entries are closed.</CardContent>
-      </Card>
+      <EmptyState title="Entries closed" description="This event is official. The books are shut." />
     )
   }
 
@@ -222,40 +222,50 @@ function Enter({ event }) {
 }
 
 function Draw({ event }) {
-  const { entriesFor, riderById, horseById } = useDemo()
+  const { entriesFor, riderById, horseById, rider } = useDemo()
   const rows = entriesFor(event.id, { paidOnly: true })
 
   return (
     <div>
-      <p className="mb-3 text-sm text-stone-600">Paid names only. Pay-later entries stay off this list.</p>
-      <TableWrap>
-        <Table>
-          <thead>
-            <tr>
-              <Th>#</Th>
-              <Th>Rider</Th>
-              <Th>Horse</Th>
-              <Th>Class</Th>
-              <Th>Carry-over</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={row.id}>
-                <Td>{i + 1}</Td>
-                <Td>
-                  <Link className="font-semibold hover:underline" to={`/riders/${row.riderId}`}>
-                    {riderById(row.riderId)?.name}
-                  </Link>
-                </Td>
-                <Td>{horseById(row.horseId)?.name}</Td>
-                <Td>{row.class}</Td>
-                <Td>{row.carryOver ? 'Yes' : '—'}</Td>
+      <p className="mb-3 text-sm text-stone-600">Paid names only. Pay-later entries stay off this list until they settle.</p>
+      {rows.length === 0 ? (
+        <EmptyState title="Draw is empty" description="Names appear here once the entry is paid." />
+      ) : (
+        <TableWrap>
+          <Table>
+            <thead>
+              <tr>
+                <Th>#</Th>
+                <Th>Rider</Th>
+                <Th>Horse</Th>
+                <Th>Class</Th>
+                <Th>Carry-over</Th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
-      </TableWrap>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => {
+                const mine = rider && row.riderId === rider.id
+                return (
+                  <tr key={row.id} className={mine ? 'bg-season-soft' : undefined}>
+                    <Td>{i + 1}</Td>
+                    <Td>
+                      <Link className="link-quiet font-semibold underline" to={`/riders/${row.riderId}`}>
+                        {riderById(row.riderId)?.name}
+                      </Link>
+                      {mine ? (
+                        <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-season">You</span>
+                      ) : null}
+                    </Td>
+                    <Td>{horseById(row.horseId)?.name}</Td>
+                    <Td>{row.class}</Td>
+                    <Td>{row.carryOver ? 'Yes' : '—'}</Td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </Table>
+        </TableWrap>
+      )}
     </div>
   )
 }
@@ -281,7 +291,7 @@ function Results({ event }) {
   return (
     <div className="space-y-4">
       {!event.official && event.resultsPostedAt ? (
-        <Card className="border-amber-300 bg-amber-50">
+        <Card className="border-brand-400 bg-brand-50">
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold">Unofficial — 7-day protest window</p>
@@ -292,15 +302,19 @@ function Results({ event }) {
             {user.role === 'admin' ? (
               <Button onClick={() => makeOfficial(event.id)}>Make official</Button>
             ) : (
-              <p className="text-xs text-stone-500">Admin seat can mark official.</p>
+              <p className="text-xs text-stone-500">An administrator can mark these official.</p>
             )}
           </CardContent>
         </Card>
       ) : event.official ? (
         <Badge variant="success">Official — points are live</Badge>
       ) : (
-        <p className="text-sm text-stone-600">No results yet.</p>
+        <p className="text-sm text-stone-600">Results have not been posted.</p>
       )}
+
+      {rows.length === 0 && !event.resultsPostedAt ? (
+        <EmptyState title="No times yet" description="Divisional results will publish here after the last horse." />
+      ) : null}
 
       {['1D', '2D', '3D'].map((div) =>
         grouped[div]?.length ? (
@@ -342,9 +356,10 @@ function Payout({ event }) {
   const receipt = world.payouts[event.id]
   if (!event.official || !receipt) {
     return (
-      <Card>
-        <CardContent>Payout receipt lands after results are official.</CardContent>
-      </Card>
+      <EmptyState
+        title="No payout yet"
+        description="The receipt is written when results are marked official."
+      />
     )
   }
 

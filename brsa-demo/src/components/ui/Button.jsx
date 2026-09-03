@@ -3,13 +3,13 @@ import { cn } from './cn'
 
 const styles = {
   base:
-    'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-dust-50',
+    'inline-flex items-center justify-center gap-2 rounded-md font-semibold tracking-wide transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-dust-50',
   variant: {
-    primary: 'bg-brand-600 text-white hover:bg-brand-700',
-    secondary: 'bg-white text-charcoal border border-dust-200 hover:bg-dust-50',
-    ghost: 'text-stone-700 hover:bg-dust-100',
-    danger: 'bg-red-700 text-white hover:bg-red-800',
-    charcoal: 'bg-charcoal text-brand-100 hover:bg-ink',
+    primary: 'bg-brand-400 text-charcoal hover:bg-brand-300',
+    secondary: 'bg-white text-charcoal border border-dust-200 hover:border-brand-400 hover:bg-brand-50',
+    ghost: 'text-stone-700 hover:bg-brand-50 hover:text-charcoal',
+    danger: 'bg-red-800 text-white hover:bg-red-900',
+    charcoal: 'bg-charcoal text-brand-300 hover:bg-ink hover:text-brand-200',
   },
   size: {
     sm: 'h-9 px-3 text-sm',

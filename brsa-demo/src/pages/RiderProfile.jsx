@@ -22,16 +22,18 @@ export function RiderProfile() {
 
   return (
     <div>
-      <div className="mb-5 overflow-hidden rounded-2xl bg-charcoal text-brand-50">
-        <div className="h-28 bg-gradient-to-r from-brand-800 to-stone-700" />
+      <div className="mb-5 overflow-hidden rounded-xl bg-charcoal text-brand-50">
+        <div className="h-1 bg-brand-400" />
+        <div className="h-0.5 bg-season" />
+        <div className="h-24 bg-gradient-to-br from-ink via-charcoal to-stone-900" />
         <div className="px-5 pb-5 -mt-8">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 font-display text-2xl font-bold">
+          <div className="flex h-16 w-16 items-center justify-center rounded-sm bg-brand-400 font-display text-2xl font-bold text-charcoal">
             {rider.name.slice(0, 1)}
           </div>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="font-display text-3xl font-bold">{rider.name}</h1>
-              <p className="mt-1 text-sm text-stone-300">
+              <h1 className="font-display text-4xl font-semibold">{rider.name}</h1>
+              <p className="mt-1 text-sm tracking-wide text-stone-400">
                 {rider.sa} · {rider.class} · {rider.province}
               </p>
             </div>
@@ -57,7 +59,7 @@ export function RiderProfile() {
           </CardHeader>
           <CardContent className="space-y-3">
             {horses.map((h) => (
-              <div key={h.id} className="rounded-xl bg-dust-50 px-4 py-3">
+              <div key={h.id} className="rounded-md border border-dust-200 bg-dust-50 px-4 py-3">
                 <p className="font-semibold">{h.name}</p>
                 <p className="text-sm text-stone-600">
                   {h.sex} · {h.age}yo · LTE {rand(h.lte)} · rank {h.rank}
@@ -86,7 +88,7 @@ export function RiderProfile() {
               <ul className="mt-1 space-y-1">
                 {rodeos.map((ev) => (
                   <li key={ev.id}>
-                    <Link className="hover:underline" to={`/events/${ev.id}`}>
+                    <Link className="link-quiet underline" to={`/events/${ev.id}`}>
                       {ev.name}
                     </Link>{' '}
                     {ev.official ? <Badge variant="success">Official</Badge> : <Badge variant="warning">Live</Badge>}

@@ -2,22 +2,27 @@
 
 @theme {
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
-  --color-brand-50: #fef7ee;
-  --color-brand-100: #fdecd3;
-  --color-brand-200: #f6d5a4;
-  --color-brand-300: #e8b86a;
-  --color-brand-400: #d4963a;
-  --color-brand-500: #c17a1a;
-  --color-brand-600: #a86212;
-  --color-brand-700: #874e10;
-  --color-brand-800: #6b3f12;
-  --color-brand-900: #4a2c0e;
-  --color-dust-50: #f7f3eb;
-  --color-dust-100: #efe6d6;
-  --color-dust-200: #e2d2b6;
-  --color-charcoal: #1c1917;
-  --color-ink: #292524;
+  --font-display: "Cormorant Garamond", ui-serif, Georgia, serif;
+  --color-brand-50: #fbf6e8;
+  --color-brand-100: #f3e6c0;
+  --color-brand-200: #e6d08a;
+  --color-brand-300: #d4b24a;
+  --color-brand-400: #c9a227;
+  --color-brand-500: #c4a035;
+  --color-brand-600: #b8962a;
+  --color-brand-700: #8f7318;
+  --color-brand-800: #5c4a10;
+  --color-brand-900: #3a300a;
+  --color-dust-50: #fafaf7;
+  --color-dust-100: #f3f1ea;
+  --color-dust-200: #ddd6c4;
+  --color-charcoal: #0b0b0b;
+  --color-ink: #141414;
+}
+
+:root {
+  --season: #7a1f2b;
+  --season-ink: #ffffff;
 }
 
 @layer base {
@@ -27,8 +32,8 @@
 
   body {
     margin: 0;
-    background: #efe6d6;
-    color: #1c1917;
+    background: #f3f1ea;
+    color: #0b0b0b;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -36,6 +41,11 @@
 
   * {
     box-sizing: border-box;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--season) 28%, white);
+    color: #0b0b0b;
   }
 }
 
@@ -49,5 +59,42 @@
     max-width: 72rem;
     margin-inline: auto;
     padding-inline: 1rem;
+  }
+
+  .bg-season {
+    background-color: var(--season);
+  }
+
+  .text-season {
+    color: var(--season);
+  }
+
+  .text-season-ink {
+    color: var(--season-ink);
+  }
+
+  .border-season {
+    border-color: var(--season);
+  }
+
+  .bg-season-soft {
+    background-color: color-mix(in srgb, var(--season) 12%, white);
+  }
+
+  .title-rule {
+    display: block;
+    width: 2.75rem;
+    height: 2px;
+    margin-top: 0.55rem;
+    background: var(--season);
+  }
+
+  .link-quiet {
+    text-decoration-color: color-mix(in srgb, var(--season) 55%, transparent);
+    text-underline-offset: 3px;
+  }
+
+  .link-quiet:hover {
+    color: var(--season);
   }
 }

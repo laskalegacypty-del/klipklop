@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { CalendarDays, Crown, Megaphone } from 'lucide-react'
 import { useDemo } from '../demo/store'
+import { roleLabel } from '../demo/world'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
@@ -15,20 +16,23 @@ export function Home() {
     <div>
       <PageHeader
         title="Season desk"
-        description={`${world.season} · July–June · ${
+        description={`${world.season} · ${world.accent?.name ?? 'Season accent'} · July–June · ${
           world.membershipIncludesApp ? 'App included in BRSA membership' : 'App billed as a separate sub'
         }`}
+        actions={<Badge variant="season">{world.accent?.name}</Badge>}
       />
 
       <Card className="mb-5 overflow-hidden bg-charcoal text-brand-50 border-charcoal">
+        <div className="h-1 bg-brand-400" />
+        <div className="h-0.5 bg-season" />
         <CardContent className="flex flex-wrap items-center gap-4 py-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 font-display text-2xl font-bold">
+          <div className="flex h-16 w-16 items-center justify-center rounded-sm bg-brand-400 font-display text-2xl font-bold text-charcoal">
             {world.sponsor.mark}
           </div>
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.2em] text-brand-200">{world.sponsor.tag}</p>
-            <p className="font-display text-2xl font-bold">{world.sponsor.name}</p>
-            <p className="text-sm text-stone-300">Home-page sponsor — they should notice this, not sit through a slide.</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] text-brand-300">{world.sponsor.tag}</p>
+            <p className="font-display text-3xl font-semibold">{world.sponsor.name}</p>
+            <p className="text-sm text-stone-400">Official feed partner for the 2026/27 season.</p>
           </div>
         </CardContent>
       </Card>
@@ -49,13 +53,17 @@ export function Home() {
         <StatCard
           icon={Megaphone}
           label="Your chip"
-          value={rider?.membershipNote ?? (world.users.find((u) => u.id === world.currentUserId)?.role ?? 'Guest')}
-          hint={rider ? `${rider.sa} · ${rider.class}` : 'Switch seats from the bar above'}
+          value={
+            rider?.membershipNote ||
+            roleLabel(world.users.find((u) => u.id === world.currentUserId)?.role) ||
+            'Guest'
+          }
+          hint={rider ? `${rider.sa} · ${rider.class}` : 'Federation desk'}
         />
       </div>
 
       {rider ? (
-        <Card className="mt-5 border-amber-300 bg-amber-50">
+        <Card className="mt-5 border-brand-400 bg-brand-50">
           <CardHeader>
             <CardTitle>Membership</CardTitle>
             <CardDescription>

@@ -18,29 +18,39 @@ const RULES = [
   },
 ]
 
+const RULEBOOK = `BRSA Rulebook — Gate notes (${new Date().getFullYear()})
+
+Dress
+Long sleeve, collar, hat or helmet in the alley. Numbers visible both sides.
+
+Tack
+Western saddle. Tie-downs legal. No training devices in the pattern.
+
+Welfare
+The steward may scratch a horse at the gate. Blood, excessive use of the crop, or an exhausted horse is a no-time and may carry a fine.
+`
+
 export function Rules() {
   return (
     <div>
       <PageHeader
         title="Rulebook"
-        description="Quick rules for the pitch. Full PDF is a placeholder — not a scanned book."
+        description="Dress, tack and welfare at the gate. Download the full notes for the rest."
         actions={
           <Button
             variant="secondary"
             onClick={() => {
-              const blob = new Blob(['BRSA rulebook placeholder — attach the real PDF later.\n'], {
-                type: 'text/plain',
-              })
+              const blob = new Blob([RULEBOOK], { type: 'text/plain' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
               a.href = url
-              a.download = 'BRSA-rulebook-placeholder.txt'
+              a.download = 'BRSA-rulebook.txt'
               a.click()
               URL.revokeObjectURL(url)
             }}
           >
             <BookDown size={16} />
-            Download placeholder
+            Download rulebook
           </Button>
         }
       />

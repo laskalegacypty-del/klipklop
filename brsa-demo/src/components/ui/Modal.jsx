@@ -28,7 +28,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={cn('relative w-full bg-white rounded-2xl shadow-xl p-6 flex flex-col gap-4', sizeClasses[size])}
+        className={cn('relative w-full bg-white rounded-xl shadow-xl p-6 flex flex-col gap-4', sizeClasses[size])}
       >
         <div className="flex items-start justify-between gap-3">
           {title && (

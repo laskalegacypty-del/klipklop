@@ -1,17 +1,26 @@
 import { CLASS_FEES } from './money'
+import { defaultAccent } from './accents'
 
 const UNOFFICIAL_POSTED = '2026-08-30T16:00:00+02:00'
+
+export function roleLabel(role) {
+  if (!role) return ''
+  return role.charAt(0).toUpperCase() + role.slice(1)
+}
 
 export function createSeed() {
   return {
     version: 1,
     season: '2026/27',
     membershipIncludesApp: true,
+    accent: defaultAccent(),
     sponsor: {
       name: 'Rietvlei Feeds',
       tag: 'Official feed partner',
       mark: 'RF',
     },
+    viewingFromAdmin: false,
+    viewAsLog: [],
     currentUserId: 'admin',
     users: [
       { id: 'admin', username: 'admin', password: 'demo', role: 'admin', name: 'BRSA Admin' },
@@ -106,7 +115,7 @@ export function createSeed() {
         official: false,
         resultsPostedAt: null,
         adminFee: 150,
-        flyer: 'Entries open next month. Placeholder flyer for the pitch.',
+        flyer: 'Entries open 1 October. Dress code: long sleeve, hat, collar. Welfare steward on the gate.',
         classes: Object.keys(CLASS_FEES),
       },
     ],

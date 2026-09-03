@@ -3,7 +3,7 @@ import { cn } from './cn'
 export function TableWrap({ className, ...props }) {
   return (
     <div
-      className={cn('overflow-x-auto rounded-2xl border border-dust-200 bg-white shadow-sm', className)}
+      className={cn('overflow-x-auto rounded-xl border border-dust-200 bg-white', className)}
       {...props}
     />
   )
@@ -18,7 +18,8 @@ export function Table({ className, ...props }) {
 export function Th({ className, ...props }) {
   return (
     <th
-      className={cn('whitespace-nowrap border-b border-dust-200 px-3 py-3 font-semibold text-stone-700 sm:px-4', className)}
+      className={cn('whitespace-nowrap border-b px-3 py-3 font-semibold text-stone-700 sm:px-4', className)}
+      style={{ borderBottomColor: 'color-mix(in srgb, var(--season) 32%, #ddd6c4)' }}
       {...props}
     />
   )
