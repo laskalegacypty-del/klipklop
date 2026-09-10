@@ -1,14 +1,11 @@
-// Minimal local server for /api/* routes when `vercel dev` is unavailable.
-// Used by `npm run dev:layer2` (Vite proxies /api → this server).
+// Local /api/* server. Prefer `npm run dev:worker-api` (wrangler) when you need D1/AI/R2.
+// This Node wrapper uses the same Worker router without Cloudflare bindings.
 
 import http from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import chatHandler from '../api/rules/chat.js'
-import shareCreateHandler from '../api/share/create.js'
-import shareTokenHandler from '../api/share/[token].js'
-import klippiesWaitlistHandler from '../api/klippies/waitlist.js'
+import { handleApi, applyEnv } from '../workers/api/routes.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
@@ -26,94 +23,41 @@ if (existsSync(envPath)) {
   }
 }
 
+applyEnv({ ...process.env })
+
 const PORT = Number(process.env.LOCAL_API_PORT || 3001)
 
-function sendJson(res, status, obj) {
-  res.writeHead(status, { 'Content-Type': 'application/json' })
-  res.end(JSON.stringify(obj))
-}
-
-function corsHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  }
-}
-
-async function readRawBody(req) {
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://localhost:${PORT}`)
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
-  return Buffer.concat(chunks).toString('utf8')
-}
+  const raw = Buffer.concat(chunks)
 
-function makeMockReq(req, raw, query = {}) {
-  let body = {}
-  try { body = raw ? JSON.parse(raw) : {} } catch { /* ignore */ }
-
-  return {
-    method: req.method,
-    headers: req.headers,
-    query,
-    body,
-    on(event, cb) {
-      if (event === 'data') cb(raw)
-      if (event === 'end') cb()
-    },
+  const headers = new Headers()
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value == null) continue
+    headers.set(key, Array.isArray(value) ? value.join(', ') : String(value))
   }
-}
 
-function makeMockRes(res) {
-  return {
-    statusCode: 200,
-    status(code) { this.statusCode = code; return this },
-    json(obj) { sendJson(res, this.statusCode, obj) },
-    end() { res.end() },
-  }
-}
+  const method = req.method || 'GET'
+  const hasBody = method !== 'GET' && method !== 'HEAD'
+  const request = new Request(url, {
+    method,
+    headers,
+    body: hasBody ? raw : undefined,
+  })
 
-async function invokeHandler(handler, req, res, raw, query) {
-  const mockReq = makeMockReq(req, raw, query)
-  const mockRes = makeMockRes(res)
   try {
-    await handler(mockReq, mockRes)
+    const response = await handleApi(request, { ...process.env })
+    const outHeaders = {}
+    response.headers.forEach((value, key) => { outHeaders[key] = value })
+    res.writeHead(response.status, outHeaders)
+    const buf = Buffer.from(await response.arrayBuffer())
+    res.end(buf)
   } catch (err) {
-    sendJson(res, 500, { error: err?.message || 'Handler error' })
+    res.writeHead(500, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: err?.message || 'Handler error' }))
   }
-}
-
-const server = http.createServer(async (req, res) => {
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, corsHeaders())
-    res.end()
-    return
-  }
-
-  const url = new URL(req.url, `http://localhost:${PORT}`)
-  const raw = await readRawBody(req)
-
-  if (url.pathname === '/api/rules/chat' && req.method === 'POST') {
-    await invokeHandler(chatHandler, req, res, raw)
-    return
-  }
-
-  if (url.pathname === '/api/share/create' && req.method === 'POST') {
-    await invokeHandler(shareCreateHandler, req, res, raw)
-    return
-  }
-
-  if (url.pathname === '/api/klippies/waitlist' && (req.method === 'GET' || req.method === 'POST')) {
-    await invokeHandler(klippiesWaitlistHandler, req, res, raw)
-    return
-  }
-
-  const shareMatch = url.pathname.match(/^\/api\/share\/([^/]+)$/)
-  if (shareMatch && (req.method === 'GET' || req.method === 'DELETE')) {
-    await invokeHandler(shareTokenHandler, req, res, raw, { token: decodeURIComponent(shareMatch[1]) })
-    return
-  }
-
-  sendJson(res, 404, { error: 'Not found' })
 })
 
 server.listen(PORT, () => {

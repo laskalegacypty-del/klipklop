@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { paystackVerifyUrl } from '../lib/apiClient'
 import { APP_NAME, APP_LOGO_SRC } from '../constants/branding'
 import toast from 'react-hot-toast'
 import {
@@ -100,7 +101,7 @@ export default function Subscribe() {
         try {
           const { data: { session } } = await supabase.auth.getSession()
           const res = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-paystack`,
+            paystackVerifyUrl(),
             {
               method: 'POST',
               headers: {

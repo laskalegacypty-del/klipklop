@@ -37,14 +37,19 @@ export function createAuthedClient(accessToken) {
   })
 }
 
-export async function getUserFromRequest(req) {
-  const token = String(req.headers?.authorization || req.headers?.Authorization || '')
-    .replace(/^Bearer\s+/i, '')
-    .trim()
-  if (!token) return null
-
-  const client = createAuthedClient(token)
-  const { data, error } = await client.auth.getUser(token)
+export async function getUserFromToken(token) {
+  const access = String(token || '').replace(/^Bearer\s+/i, '').trim()
+  if (!access) return null
+  const client = createAuthedClient(access)
+  const { data, error } = await client.auth.getUser(access)
   if (error || !data?.user) return null
   return data.user
+}
+
+export async function getUserFromRequest(req) {
+  return getUserFromToken(req.headers?.authorization || req.headers?.Authorization || '')
+}
+
+export async function getUserFromFetch(request) {
+  return getUserFromToken(request.headers.get('authorization') || '')
 }

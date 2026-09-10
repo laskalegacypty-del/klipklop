@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { profileAccessEmailUrl } from './apiClient'
 
 export const DURATION_PRESETS = [
   { key: '24h', label: '24 hours', hours: 24 },
@@ -91,7 +92,7 @@ export async function sendProfileAccessRequestEmail({ userId, durationLabel, rea
     if (!token) return
 
     await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-profile-access-request-email`,
+      profileAccessEmailUrl(),
       {
         method: 'POST',
         headers: {

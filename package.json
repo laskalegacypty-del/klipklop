@@ -13,9 +13,12 @@
     "dev:layer2": "node scripts/run-layer2.mjs",
     "test:layer2": "node scripts/test-layer2.mjs",
     "d1:export": "node scripts/export-supabase-to-d1.mjs",
+    "dev:worker-api": "wrangler dev -c workers/api/wrangler.toml --port 3001",
     "deploy:api": "wrangler deploy -c workers/api/wrangler.toml",
     "deploy": "npm run build && wrangler deploy",
-    "deploy:cf": "npm run deploy:api && npm run deploy"
+    "deploy:cf": "npm run deploy:api && npm run deploy",
+    "secret:service-role": "node scripts/put-service-role.mjs",
+    "go-live": "node scripts/go-live-cloudflare.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",

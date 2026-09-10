@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { USE_R2, getAccessToken } from './apiClient'
 
 const DEFAULT_MAX_BYTES = 2 * 1024 * 1024
 const VIDEO_MAX_BYTES = 100 * 1024 * 1024
@@ -52,6 +53,44 @@ function buildValidationError(code, message) {
   return new UploadValidationError(code, message)
 }
 
+async function uploadViaBff({ bucket, path, file, onProgress }) {
+  const accessToken = await getAccessToken()
+  if (!accessToken) throw new Error('You must be signed in to upload')
+
+  const form = new FormData()
+  form.append('bucket', bucket)
+  form.append('path', path)
+  form.append('file', file)
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/uploads')
+    xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable || typeof onProgress !== 'function') return
+      const percent = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)))
+      onProgress(percent)
+    }
+
+    xhr.onerror = () => reject(new Error('Network error while uploading'))
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (typeof onProgress === 'function') onProgress(100)
+        try {
+          resolve(JSON.parse(xhr.responseText))
+        } catch {
+          reject(new Error('Invalid upload response'))
+        }
+        return
+      }
+      reject(new Error('Could not upload file. Please try again.'))
+    }
+
+    xhr.send(form)
+  })
+}
+
 /**
  * Upload an image to Supabase Storage.
  *
@@ -80,6 +119,10 @@ export async function uploadImageToBucket({
 
   // If caller passes a path ending with a different extension, normalize it.
   const normalizedPath = path.replace(/\.[^.\/]+$/, `.${ext}`)
+
+  if (USE_R2) {
+    return uploadViaBff({ bucket, path: normalizedPath, file })
+  }
 
   const { error: uploadError } = await supabase.storage
     .from(bucket)
@@ -123,6 +166,10 @@ export async function uploadVideoToBucket({
   }
 
   const normalizedPath = path.replace(/\.[^.\/]+$/, `.${ext}`)
+  if (USE_R2) {
+    return uploadViaBff({ bucket, path: normalizedPath, file, onProgress })
+  }
+
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData?.session?.access_token
   if (!accessToken) {

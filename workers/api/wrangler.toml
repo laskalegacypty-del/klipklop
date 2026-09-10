@@ -5,9 +5,26 @@ compatibility_date = "2026-09-10"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# D1 id is filled after `wrangler d1 create klipklop`.
+# Reads still go to Supabase until a resource is flipped. D1 is the target store.
+[vars]
+DATA_BACKEND = "supabase"
+
+[ai]
+binding = "AI"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "klipklop"
 database_id = "dbdb023c-102c-4c64-ab60-d1bb2544cf93"
 migrations_dir = "../../migrations/d1"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "07f57335e7574bd89bb6649df96aa44e"
+
+# Enable R2 in the Laskalegacypty dashboard, then:
+#   npx wrangler r2 bucket create klipklop-media
+# and uncomment:
+# [[r2_buckets]]
+# binding = "MEDIA"
+# bucket_name = "klipklop-media"

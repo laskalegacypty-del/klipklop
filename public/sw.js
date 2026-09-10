@@ -1,4 +1,4 @@
-const CACHE_NAME = 'klipklop-v5'
+const CACHE_NAME = 'klipklop-v6'
 const STATIC_ASSETS = [
   '/',
   '/index.html',

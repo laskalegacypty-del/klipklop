@@ -1,0 +1,27 @@
+name = "klipklop"
+account_id = "8b60730ec10ba7eb7e85d214fa2505c2"
+main = "workers/spa.js"
+compatibility_date = "2026-09-10"
+workers_dev = true
+
+# Same Worker as wrangler.toml, plus live hostnames.
+# Used only by `npm run go-live` after SUPABASE_SERVICE_ROLE_KEY is set.
+# Do not deploy this while klipklop.co.za should stay on Vercel.
+
+[[routes]]
+pattern = "klipklop.co.za"
+custom_domain = true
+
+[[routes]]
+pattern = "www.klipklop.co.za"
+custom_domain = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[services]]
+binding = "API"
+service = "klipklop-api"

@@ -34,11 +34,14 @@ export default async function handler(req, res) {
     return
   }
 
+  const env = globalThis.__KK_ENV || {}
   const accountId = process.env.CF_ACCOUNT_ID
   const apiToken = process.env.CF_API_TOKEN
   const model = process.env.CF_MODEL || DEFAULT_MODEL
+  const hasBinding = Boolean(env.AI)
+  const hasToken = Boolean(accountId && apiToken)
 
-  if (!accountId || !apiToken) {
+  if (!hasBinding && !hasToken) {
     res.status(500).json({
       error: 'Server is not configured',
       response: '',
@@ -67,36 +70,52 @@ export default async function handler(req, res) {
     content: String(m.content || '').slice(0, 2000),
   }))
 
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...priorTurns,
+    { role: 'user', content: userContent },
+  ]
+
   try {
-    const cfRes = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...priorTurns,
-            { role: 'user', content: userContent },
-          ],
-          temperature: 0.2,
-          max_tokens: 1200,
-        }),
+    let response = ''
+    if (hasBinding) {
+      const result = await env.AI.run(model, {
+        messages,
+        temperature: 0.2,
+        max_tokens: 1200,
+      })
+      response = String(result?.response || '').trim()
+      if (!response) {
+        res.status(200).json({ response: '', used_ai: false, fallback: true })
+        return
       }
-    )
+    } else {
+      const cfRes = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages,
+            temperature: 0.2,
+            max_tokens: 1200,
+          }),
+        }
+      )
 
-    const data = await cfRes.json().catch(() => ({}))
+      const data = await cfRes.json().catch(() => ({}))
 
-    if (!cfRes.ok || data.success === false) {
-      const message = data?.errors?.[0]?.message || `Workers AI returned ${cfRes.status}`
-      res.status(200).json({ response: '', used_ai: false, fallback: true, error: message })
-      return
+      if (!cfRes.ok || data.success === false) {
+        const message = data?.errors?.[0]?.message || `Workers AI returned ${cfRes.status}`
+        res.status(200).json({ response: '', used_ai: false, fallback: true, error: message })
+        return
+      }
+
+      response = (data?.result?.response || '').trim()
     }
-
-    const response = (data?.result?.response || '').trim()
     // Fire-and-forget usage log — never await so it can't slow or break the response
     if (body.visitorId) {
       try {
