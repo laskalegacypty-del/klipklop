@@ -68,6 +68,16 @@ export function AccountMenu() {
                 My profile
               </Link>
             ) : null}
+            {rider ? (
+              <Link
+                to="/dashboard"
+                role="menuitem"
+                className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-dust-50"
+                onClick={() => setOpen(false)}
+              >
+                My season
+              </Link>
+            ) : null}
             {user.role === 'admin' ? (
               <Link
                 to="/admin"
@@ -76,7 +86,17 @@ export function AccountMenu() {
                 onClick={() => setOpen(false)}
               >
                 <Shield size={15} />
-                Admin
+                Support
+              </Link>
+            ) : null}
+            {user.role === 'producer' ? (
+              <Link
+                to="/producer"
+                role="menuitem"
+                className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-dust-50"
+                onClick={() => setOpen(false)}
+              >
+                Producer desk
               </Link>
             ) : null}
             {viewingFromAdmin ? (
@@ -91,7 +111,7 @@ export function AccountMenu() {
                 }}
               >
                 <LogOut size={15} />
-                Stop viewing as member
+                Back to help desk
               </button>
             ) : null}
           </div>

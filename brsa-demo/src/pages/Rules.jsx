@@ -1,46 +1,31 @@
+import { useMemo, useState } from 'react'
 import { BookDown } from 'lucide-react'
+import { RULE_BOOK } from '../demo/world'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
+import { Input } from '../components/ui/Input'
 import { PageHeader } from '../components/ui/PageHeader'
 
-const RULES = [
-  {
-    title: 'Dress',
-    body: 'Long sleeve, collar, hat or helmet in the alley. Numbers visible both sides. No dress protest after the first horse runs.',
-  },
-  {
-    title: 'Tack',
-    body: 'Western saddle. Tie-downs legal. No training devices in the pattern. Bit protest must be lodged before the class is paid out.',
-  },
-  {
-    title: 'Welfare',
-    body: 'Steward can scratch a horse at the gate. Blood, excessive use of the crop, or an exhausted horse is a no-time and a possible fine.',
-  },
-]
-
-const RULEBOOK = `BRSA Rulebook — Gate notes (${new Date().getFullYear()})
-
-Dress
-Long sleeve, collar, hat or helmet in the alley. Numbers visible both sides.
-
-Tack
-Western saddle. Tie-downs legal. No training devices in the pattern.
-
-Welfare
-The steward may scratch a horse at the gate. Blood, excessive use of the crop, or an exhausted horse is a no-time and may carry a fine.
-`
-
 export function Rules() {
+  const [q, setQ] = useState('')
+  const [active, setActive] = useState('A')
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase()
+    if (!query) return RULE_BOOK
+    return RULE_BOOK.filter((s) => `${s.id} ${s.title} ${s.body}`.toLowerCase().includes(query))
+  }, [q])
+  const current = filtered.find((s) => s.id === active) || filtered[0]
+
   return (
     <div>
       <PageHeader
         title="Rulebook"
-        description="Dress, tack and welfare at the gate. Download the full notes for the rest."
+        description="Sections A–L. Search the index, then read the gate notes."
         actions={
           <Button
             variant="secondary"
             onClick={() => {
-              const blob = new Blob([RULEBOOK], { type: 'text/plain' })
+              const blob = new Blob([RULE_BOOK.map((s) => `${s.id}. ${s.title}\n${s.body}\n`).join('\n')], { type: 'text/plain' })
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
               a.href = url
@@ -50,20 +35,35 @@ export function Rules() {
             }}
           >
             <BookDown size={16} />
-            Download rulebook
+            Download
           </Button>
         }
       />
-      <div className="grid gap-4 md:grid-cols-3">
-        {RULES.map((rule) => (
-          <Card key={rule.title}>
+      <Input className="mb-4 max-w-md" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search rules" />
+      <div className="grid gap-4 md:grid-cols-[12rem_1fr]">
+        <div className="flex flex-col gap-1">
+          {filtered.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setActive(s.id)}
+              className={`rounded-sm px-3 py-2 text-left text-sm ${current?.id === s.id ? 'bg-charcoal text-white' : 'hover:bg-dust-200'}`}
+            >
+              {s.id}. {s.title}
+            </button>
+          ))}
+        </div>
+        {current ? (
+          <Card>
             <CardHeader>
-              <CardTitle>{rule.title}</CardTitle>
-              <CardDescription>On the gate</CardDescription>
+              <CardTitle>
+                {current.id}. {current.title}
+              </CardTitle>
+              <CardDescription>Federation notes for the demo</CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-stone-700 leading-relaxed">{rule.body}</CardContent>
+            <CardContent className="leading-relaxed text-stone-700">{current.body}</CardContent>
           </Card>
-        ))}
+        ) : null}
       </div>
     </div>
   )

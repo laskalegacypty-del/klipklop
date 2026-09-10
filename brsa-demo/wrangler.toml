@@ -1,2 +1,12 @@
-name = "brsa-pitch"
-pages_build_output_dir = "dist"
+name = "brsa-demo"
+account_id = "8b60730ec10ba7eb7e85d214fa2505c2"
+compatibility_date = "2026-09-07"
+workers_dev = true
+
+[[routes]]
+pattern = "brsa-demo.klipklop.co.za"
+custom_domain = true
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"

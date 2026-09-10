@@ -38,13 +38,22 @@ export function EventPage() {
         title={event.name}
         description={`${event.date} · ${event.venue}`}
         actions={
-          event.official ? (
-            <Badge variant="success">Official</Badge>
-          ) : event.resultsPostedAt ? (
-            <Badge variant="warning">Unofficial</Badge>
-          ) : (
-            <Badge>Upcoming</Badge>
-          )
+          <div className="flex flex-wrap gap-2">
+            {demo.user.role === 'producer' ? (
+              <Link to={`/events/${event.id}/day`}>
+                <Button size="sm">Event day</Button>
+              </Link>
+            ) : null}
+            {event.official ? (
+              <Badge variant="success">Official</Badge>
+            ) : event.status === 'live' ? (
+              <Badge variant="danger">Live today</Badge>
+            ) : event.resultsPostedAt ? (
+              <Badge variant="warning">Unofficial</Badge>
+            ) : (
+              <Badge>Upcoming</Badge>
+            )}
+          </div>
         }
       />
       <Tabs tabs={TABS} activeTab={tab} onChange={(id) => setParams({ tab: id })} />
@@ -99,11 +108,11 @@ function Flyer({ event, producer }) {
 }
 
 function Enter({ event }) {
-  const { user, rider, unpaidFines, enterEvent, world, horseById } = useDemo()
+  const { user, rider, unpaidFines, enterEvent, world, horseById, payInvoice } = useDemo()
   const horses = rider ? world.horses.filter((h) => h.riderId === rider.id) : []
   const [klass, setKlass] = useState(rider?.class ?? 'Adult')
   const [horseId, setHorseId] = useState(horses[0]?.id ?? '')
-  const [carryOver, setCarryOver] = useState(true)
+  const [carryOver, setCarryOver] = useState(false)
   const fines = rider ? unpaidFines(rider.id) : []
   const fee = entryFee(klass, carryOver)
   const already = rider
@@ -113,8 +122,8 @@ function Enter({ event }) {
   if (user.role !== 'rider' || !rider) {
     return (
       <EmptyState
-        title="Rider entries"
-        description="Open a rider account to enter this event."
+        title="Entries are for riders"
+        description="Switch to a rider to put a horse on this draw."
       />
     )
   }
@@ -129,8 +138,8 @@ function Enter({ event }) {
     return (
       <Card className="border-red-200 bg-red-50">
         <CardHeader>
-          <CardTitle>Entry blocked</CardTitle>
-          <CardDescription>Unpaid fine on this rider. Pay it before the draw will take a name.</CardDescription>
+          <CardTitle>Pay this fine first</CardTitle>
+          <CardDescription>The office will not take your name while a fine is open.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {fines.map((f) => (
@@ -138,9 +147,14 @@ function Enter({ event }) {
               {f.label} — {rand(f.amount)}
             </p>
           ))}
-          <Link to="/invoices">
-            <Button>Pay from invoices</Button>
-          </Link>
+            <div className="flex flex-wrap gap-2">
+              <Button size="lg" onClick={() => payInvoice(fines[0].id)}>
+                Pay {rand(fines[0].amount)}
+              </Button>
+              <Link to="/wallet">
+                <Button variant="secondary">See what I owe</Button>
+              </Link>
+            </div>
         </CardContent>
       </Card>
     )
@@ -153,13 +167,13 @@ function Enter({ event }) {
           <CardTitle>You’re entered</CardTitle>
           <CardDescription>
             {already.class}
-            {already.carryOver ? ' + carry-over' : ''} · {already.paid ? 'Paid — on the draw' : 'Pay later — not on the draw'}
+            {already.carryOver ? ' + second run' : ''} · {already.paid ? 'Paid — you are on the draw' : 'Not paid yet — you are not on the draw'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!already.paid ? (
             <p className="text-sm text-stone-600">
-              Open <Link className="underline" to="/invoices">invoices</Link> and pay the entry to appear on the draw.
+              Pay the entry under <Link className="underline" to="/wallet">Money</Link> and your name goes on the draw.
             </p>
           ) : (
             <Link to={`/events/${event.id}?tab=draw`}>
@@ -203,17 +217,19 @@ function Enter({ event }) {
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={carryOver} onChange={(e) => setCarryOver(e.target.checked)} />
-          Carry-over (+{rand(CARRY_OVER_FEE)})
+          Second run on the same horse (+{rand(CARRY_OVER_FEE)})
         </label>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => enterEvent({ eventId: event.id, riderId: rider.id, horseId, klass, carryOver, payNow: true })}>
-            Pay now {rand(fee)}
+        <p className="text-sm text-stone-600">Total {rand(fee)}</p>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button size="lg" onClick={() => enterEvent({ eventId: event.id, riderId: rider.id, horseId, klass, carryOver, payNow: true })}>
+            Pay {rand(fee)} on my phone
           </Button>
           <Button
             variant="secondary"
+            size="lg"
             onClick={() => enterEvent({ eventId: event.id, riderId: rider.id, horseId, klass, carryOver, payNow: false })}
           >
-            Pay later
+            Put me on the list — I will pay later
           </Button>
         </div>
       </CardContent>
@@ -274,7 +290,7 @@ function Results({ event }) {
   const { resultsFor, riderById, horseById, user, makeOfficial } = useDemo()
   const rows = resultsFor(event.id)
   const grouped = useMemo(() => {
-    const map = { '1D': [], '2D': [], '3D': [] }
+    const map = { '1D': [], '2D': [], '3D': [], '4D': [], '5D': [] }
     for (const row of rows) {
       ;(map[row.division] ??= []).push(row)
     }
@@ -299,10 +315,10 @@ function Results({ event }) {
                 Clock runs to {holdUntil?.toLocaleString('en-ZA')}. Standings do not move until official.
               </p>
             </div>
-            {user.role === 'admin' ? (
+            {user.role === 'producer' ? (
               <Button onClick={() => makeOfficial(event.id)}>Make official</Button>
             ) : (
-              <p className="text-xs text-stone-500">An administrator can mark these official.</p>
+              <p className="text-xs text-stone-500">The producer marks these official.</p>
             )}
           </CardContent>
         </Card>
@@ -316,7 +332,7 @@ function Results({ event }) {
         <EmptyState title="No times yet" description="Divisional results will publish here after the last horse." />
       ) : null}
 
-      {['1D', '2D', '3D'].map((div) =>
+      {['1D', '2D', '3D', '4D', '5D'].map((div) =>
         grouped[div]?.length ? (
           <div key={div}>
             <h3 className="mb-2 font-display text-lg font-semibold">{div}</h3>
@@ -338,7 +354,7 @@ function Results({ event }) {
                       <Td>{riderById(row.riderId)?.name}</Td>
                       <Td>{horseById(row.horseId)?.name}</Td>
                       <Td>{row.class}</Td>
-                      <Td>{row.time.toFixed(3)}</Td>
+                      <Td>{row.time?.toFixed(3)}</Td>
                     </tr>
                   ))}
                 </tbody>
@@ -352,13 +368,15 @@ function Results({ event }) {
 }
 
 function Payout({ event }) {
-  const { world, riderById } = useDemo()
+  const { world, riderById, estimateEventPayout } = useDemo()
   const receipt = world.payouts[event.id]
-  if (!event.official || !receipt) {
+  const estimate = estimateEventPayout(event.id)
+  const numbers = receipt || estimate
+  if (!numbers?.gross && !receipt) {
     return (
       <EmptyState
         title="No payout yet"
-        description="The receipt is written when results are marked official."
+        description="Estimate fills from paid entries. The receipt is written when official."
       />
     )
   }
@@ -367,24 +385,24 @@ function Payout({ event }) {
     <div className="grid gap-4 md:grid-cols-3">
       <Card>
         <CardHeader>
-          <CardTitle>Riders (70%)</CardTitle>
-          <CardDescription>Prize pool after producing cost</CardDescription>
+          <CardTitle>Riders (prize)</CardTitle>
+          <CardDescription>70% pool minus producing cost{receipt ? '' : ' · estimate'}</CardDescription>
         </CardHeader>
-        <CardContent className="text-2xl font-bold">{rand(receipt.prizePool)}</CardContent>
+        <CardContent className="text-2xl font-bold">{rand(numbers.prizePool)}</CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>BRSA admin</CardTitle>
-          <CardDescription>Remainder after 70% pool</CardDescription>
+          <CardDescription>30% of gross entry fees (taken first)</CardDescription>
         </CardHeader>
-        <CardContent className="text-2xl font-bold">{rand(receipt.brsaAdmin)}</CardContent>
+        <CardContent className="text-2xl font-bold">{rand(numbers.brsaAdmin)}</CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>Ground levy</CardTitle>
           <CardDescription>{rand(PRODUCING_COST)} producing / entry × field</CardDescription>
         </CardHeader>
-        <CardContent className="text-2xl font-bold">{rand(receipt.groundLevy)}</CardContent>
+        <CardContent className="text-2xl font-bold">{rand(numbers.groundLevy)}</CardContent>
       </Card>
       <Card className="md:col-span-3">
         <CardHeader>
@@ -392,7 +410,7 @@ function Payout({ event }) {
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm">
-            {receipt.riderShares.map((s) => (
+            {(receipt?.riderShares || []).map((s) => (
               <li key={s.riderId} className="flex justify-between">
                 <span>{riderById(s.riderId)?.name}</span>
                 <span className="font-semibold">{rand(s.amount)}</span>

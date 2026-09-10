@@ -4,115 +4,118 @@ import { useDemo } from '../demo/store'
 import { rand } from '../demo/money'
 import { Badge } from '../components/ui/Badge'
 import { PageHeader } from '../components/ui/PageHeader'
+import { Select } from '../components/ui/Select'
 import { Table, TableWrap, Td, Th } from '../components/ui/Table'
 import { Tabs } from '../components/ui/Tabs'
 
-const TABS = [
-  { id: 'points', label: 'Points' },
-  { id: 'earnings', label: 'Earnings' },
-  { id: 'lte', label: 'LTE' },
-  { id: 'horse', label: 'Horse' },
-  { id: 'province', label: 'Province' },
-  { id: 'prior', label: '2025/26' },
-]
-
 export function Standings() {
-  const { officialStandings, world, eventById } = useDemo()
+  const { officialStandings, world, eventById, horseStandings } = useDemo()
   const [tab, setTab] = useState('points')
+  const [klass, setKlass] = useState('Adult')
+  const [season, setSeason] = useState('2025/26')
+  const [div, setDiv] = useState('1D')
   const west = eventById('west-fest')
   const riders = officialStandings()
-  const byEarn = [...world.riders].sort((a, b) => b.earnings - a.earnings)
-  const byLte = [...world.riders].sort((a, b) => b.lte - a.lte)
-  const horses = [...world.horses].sort((a, b) => b.lte - a.lte)
-  const provinces = [...new Set(world.riders.map((r) => r.province))]
+  const classes = [...new Set(world.riders.map((r) => r.class))]
+  const seasons = Object.keys(world.priorYearStandings || {})
+  const horses = horseStandings(div)
 
   return (
     <div>
       <PageHeader
         title="Standings"
-        description="Official events only. Unofficial jackpot does not move this board."
+        description="Official events only."
         actions={!west.official ? <Badge variant="warning">West Fest not in yet</Badge> : <Badge variant="success">West Fest official</Badge>}
       />
-      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} />
+      <Tabs
+        tabs={[
+          { id: 'points', label: 'Points' },
+          { id: 'horse', label: 'Horse' },
+          { id: 'prior', label: 'Prior years' },
+          { id: 'earnings', label: 'Earnings' },
+          { id: 'province', label: 'Province' },
+        ]}
+        activeTab={tab}
+        onChange={setTab}
+      />
       <div className="mt-5">
         {tab === 'points' && (
-          <Board
-            rows={riders.map((r, i) => ({
-              id: r.id,
-              rank: i + 1,
-              name: r.name,
-              meta: r.province,
-              value: `${r.points} pts`,
-              to: `/riders/${r.id}`,
-            }))}
-          />
+          <div>
+            <Select className="mb-3 w-40" value={klass} onChange={(e) => setKlass(e.target.value)}>
+              {classes.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+            <Board
+              rows={riders
+                .filter((r) => r.class === klass)
+                .map((r, i) => ({ id: r.id, rank: i + 1, name: r.name, meta: r.province, value: `${r.points} pts`, to: `/riders/${r.id}` }))}
+            />
+          </div>
+        )}
+        {tab === 'horse' && (
+          <div>
+            <Select className="mb-3 w-32" value={div} onChange={(e) => setDiv(e.target.value)}>
+              {['1D', '2D', '3D', '4D', '5D'].map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </Select>
+            <Board
+              rows={horses.map((h, i) => ({
+                id: h.horseId,
+                rank: i + 1,
+                name: h.horse?.name,
+                meta: `${h.wins} wins · avg ${h.avg.toFixed(3)}`,
+                value: rand(h.horse?.lte ?? 0),
+                to: `/horses/${h.horseId}`,
+              }))}
+            />
+          </div>
+        )}
+        {tab === 'prior' && (
+          <div>
+            <Select className="mb-3 w-40" value={season} onChange={(e) => setSeason(e.target.value)}>
+              {seasons.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+            <Board
+              rows={(world.priorYearStandings[season] || []).map((r) => ({
+                id: r.name,
+                rank: r.rank,
+                name: r.name,
+                meta: `${r.class} · ${r.province}`,
+                value: `${r.points} pts`,
+              }))}
+            />
+          </div>
         )}
         {tab === 'earnings' && (
           <Board
-            rows={byEarn.map((r, i) => ({
-              id: r.id,
-              rank: i + 1,
-              name: r.name,
-              meta: r.class,
-              value: rand(r.earnings),
-              to: `/riders/${r.id}`,
-            }))}
-          />
-        )}
-        {tab === 'lte' && (
-          <Board
-            rows={byLte.map((r, i) => ({
-              id: r.id,
-              rank: i + 1,
-              name: r.name,
-              meta: r.sa,
-              value: rand(r.lte),
-              to: `/riders/${r.id}`,
-            }))}
-          />
-        )}
-        {tab === 'horse' && (
-          <Board
-            rows={horses.map((h, i) => ({
-              id: h.id,
-              rank: i + 1,
-              name: h.name,
-              meta: `${h.rank ? `${h.rank} · ` : ''}${h.futurity ? 'Futurity' : 'Open'}`,
-              value: rand(h.lte),
-            }))}
+            rows={[...world.riders]
+              .sort((a, b) => b.earnings - a.earnings)
+              .map((r, i) => ({ id: r.id, rank: i + 1, name: r.name, meta: r.class, value: rand(r.earnings), to: `/riders/${r.id}` }))}
           />
         )}
         {tab === 'province' && (
           <div className="space-y-4">
-            {provinces.map((p) => (
+            {[...new Set(world.riders.map((r) => r.province))].map((p) => (
               <div key={p}>
                 <h3 className="mb-2 font-display text-lg">{p}</h3>
                 <Board
                   rows={riders
                     .filter((r) => r.province === p)
-                    .map((r, i) => ({
-                      id: r.id,
-                      rank: i + 1,
-                      name: r.name,
-                      meta: r.class,
-                      value: `${r.points} pts`,
-                      to: `/riders/${r.id}`,
-                    }))}
+                    .map((r, i) => ({ id: r.id, rank: i + 1, name: r.name, meta: r.class, value: `${r.points} pts`, to: `/riders/${r.id}` }))}
                 />
               </div>
             ))}
           </div>
-        )}
-        {tab === 'prior' && (
-          <Board
-            rows={world.priorYearStandings.map((r) => ({
-              id: r.name,
-              rank: r.rank,
-              name: r.name,
-              meta: r.province,
-              value: `${r.points} pts`,
-            }))}
-          />
         )}
       </div>
     </div>
@@ -127,19 +130,17 @@ function Board({ rows }) {
           <tr>
             <Th>Rank</Th>
             <Th>Name</Th>
-            <Th> </Th>
-            <Th> </Th>
+            <Th></Th>
+            <Th></Th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <Td className={row.rank === 1 ? 'font-semibold text-season' : 'font-semibold'}>
-                {row.rank === 1 ? '1' : row.rank}
-              </Td>
+              <Td className={row.rank === 1 ? 'font-semibold text-season' : 'font-semibold'}>{row.rank}</Td>
               <Td>
                 {row.to ? (
-                  <Link className="link-quiet font-semibold underline" to={row.to}>
+                  <Link className="font-semibold underline" to={row.to}>
                     {row.name}
                   </Link>
                 ) : (

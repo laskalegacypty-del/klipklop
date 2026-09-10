@@ -7,7 +7,7 @@
     "dev": "vite --port 5174",
     "build": "vite build",
     "preview": "vite preview --port 5174",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name=brsa-pitch"
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "lucide-react": "^0.577.0",
