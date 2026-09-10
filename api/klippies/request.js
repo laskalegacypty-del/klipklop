@@ -1,6 +1,7 @@
 // Submit a Klippies access request (name + email).
 // Returns { status } — either 'pending' (new request) or the existing status if already submitted.
 import { createAdminClient } from '../_lib/supabaseAdmin.js'
+import { d1Insert, newId, nowIso } from '../_lib/d1.js'
 
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body
@@ -50,6 +51,14 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Failed to submit request' })
     return
   }
+
+  await d1Insert('klippies_access_requests', {
+    id: newId(),
+    name,
+    email,
+    status: 'pending',
+    created_at: nowIso(),
+  })
 
   res.json({ status: 'pending' })
 }

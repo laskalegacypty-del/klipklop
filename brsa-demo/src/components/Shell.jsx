@@ -9,6 +9,7 @@ import {
   Landmark,
   LayoutDashboard,
   Menu,
+  MessageCircle,
   Newspaper,
   Search,
   Shield,
@@ -56,6 +57,7 @@ export function Shell() {
     { to: '/times', label: 'My times', icon: Clock, show: user.role === 'rider' || user.role === 'producer', dock: user.role === 'rider' },
     { to: '/hof', label: 'Hall of Fame', icon: Landmark, show: true },
     { to: '/rules', label: 'Rules', icon: BookOpen, show: true },
+    { to: '/barry', label: 'Barry', icon: MessageCircle, show: true },
     { to: '/producer', label: 'Show office', icon: CalendarDays, show: user.role === 'producer', dock: user.role === 'producer' },
     { to: '/admin', label: 'Help a member', icon: Shield, show: user.role === 'admin', dock: user.role === 'admin' },
   ].filter((item) => item.show)

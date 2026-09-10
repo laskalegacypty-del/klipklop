@@ -6,5 +6,12 @@ export default defineConfig({
   server: {
     port: 5174,
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'https://brsa-demo.klipklop.co.za',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
   },
 })

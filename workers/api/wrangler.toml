@@ -1,0 +1,13 @@
+name = "klipklop-api"
+account_id = "8b60730ec10ba7eb7e85d214fa2505c2"
+main = "index.js"
+compatibility_date = "2026-09-10"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# D1 id is filled after `wrangler d1 create klipklop`.
+[[d1_databases]]
+binding = "DB"
+database_name = "klipklop"
+database_id = "dbdb023c-102c-4c64-ab60-d1bb2544cf93"
+migrations_dir = "../../migrations/d1"

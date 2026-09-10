@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { BookDown } from 'lucide-react'
 import { RULE_BOOK } from '../demo/world'
 import { Button } from '../components/ui/Button'
@@ -22,6 +23,10 @@ export function Rules() {
         title="Rulebook"
         description="Sections A–L. Search the index, then read the gate notes."
         actions={
+          <div className="flex flex-wrap gap-2">
+          <Link to="/barry">
+            <Button variant="charcoal">Ask Barry</Button>
+          </Link>
           <Button
             variant="secondary"
             onClick={() => {
@@ -37,6 +42,7 @@ export function Rules() {
             <BookDown size={16} />
             Download
           </Button>
+          </div>
         }
       />
       <Input className="mb-4 max-w-md" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search rules" />

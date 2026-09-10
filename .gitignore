@@ -32,3 +32,8 @@ vercel.dev.json
 *.sw?
 
 .vercel
+.wrangler
+.dev.vars
+workers/api/.dev.vars
+scripts/.d1-export.sql
+.env.cf-build

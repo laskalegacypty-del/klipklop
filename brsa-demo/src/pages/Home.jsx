@@ -54,6 +54,9 @@ export function Home() {
             <Link to="/dashboard">
               <Button variant="secondary">My season</Button>
             </Link>
+            <Link to="/barry">
+              <Button variant="ghost">Ask Barry</Button>
+            </Link>
           </CardContent>
         </Card>
       ) : null}

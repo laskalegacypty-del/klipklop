@@ -1,10 +1,10 @@
-import { createAdminClient, getUserFromRequest } from '../_lib/supabaseAdmin.js'
-import { sendJson } from '../_lib/http.js'
+import { createAdminClient, getUserFromRequest } from '../../_lib/supabaseAdmin.js'
+import { sendJson } from '../../_lib/http.js'
 import {
   redeemSessionToken,
   fetchSessionByToken,
   eventDayErrorMessage,
-} from '../_lib/eventDaySession.js'
+} from '../../_lib/eventDaySession.js'
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {

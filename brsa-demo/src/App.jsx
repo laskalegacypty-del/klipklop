@@ -15,6 +15,7 @@ import { Feed } from './pages/Feed'
 import { Community } from './pages/Community'
 import { HallOfFame } from './pages/HallOfFame'
 import { Rules } from './pages/Rules'
+import { Barry } from './pages/Barry'
 import { AdminPage } from './pages/AdminPage'
 import { ProducerPage } from './pages/ProducerPage'
 import { MyTimes } from './pages/MyTimes'
@@ -40,6 +41,8 @@ export default function App() {
         <Route path="/community" element={<Community />} />
         <Route path="/hof" element={<HallOfFame />} />
         <Route path="/rules" element={<Rules />} />
+        <Route path="/barry" element={<Barry />} />
+        <Route path="/brandy" element={<Navigate to="/barry" replace />} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/producer" element={<ProducerPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

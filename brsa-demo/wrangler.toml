@@ -1,5 +1,6 @@
 name = "brsa-demo"
 account_id = "8b60730ec10ba7eb7e85d214fa2505c2"
+main = "worker.js"
 compatibility_date = "2026-09-07"
 workers_dev = true
 
@@ -9,4 +10,9 @@ custom_domain = true
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[ai]
+binding = "AI"

@@ -1,0 +1,17 @@
+name = "klipklop"
+account_id = "8b60730ec10ba7eb7e85d214fa2505c2"
+main = "workers/spa.js"
+compatibility_date = "2026-09-10"
+workers_dev = true
+
+# Preview only. Do not attach klipklop.co.za until apex cutover is approved.
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[services]]
+binding = "API"
+service = "klipklop-api"

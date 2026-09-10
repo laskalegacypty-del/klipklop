@@ -2,6 +2,7 @@
 // Accepts { visitorId, eventType } and inserts into klippies_events via service role.
 // No auth required — this is called from an anonymous public page.
 import { createAdminClient } from '../_lib/supabaseAdmin.js'
+import { d1Insert, newId, nowIso } from '../_lib/d1.js'
 
 async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body
@@ -31,6 +32,12 @@ export default async function handler(req, res) {
   try {
     const admin = createAdminClient()
     await admin.from('klippies_events').insert({ visitor_id: visitorId, event_type: eventType })
+    await d1Insert('klippies_events', {
+      id: newId(),
+      visitor_id: visitorId,
+      event_type: eventType,
+      created_at: nowIso(),
+    })
     res.status(204).end()
   } catch {
     res.status(204).end() // fail silently — analytics must never break the user experience

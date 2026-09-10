@@ -1,5 +1,6 @@
 import { createAdminClient } from '../_lib/supabaseAdmin.js'
 import { readJsonBody, sendJson } from '../_lib/http.js'
+import { d1Insert, newId, nowIso } from '../_lib/d1.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -58,6 +59,15 @@ export default async function handler(req, res) {
       sendJson(res, 500, { error: 'Could not save your signup, please try again' })
       return
     }
+
+    await d1Insert('klippies_waitlist', {
+      id: newId(),
+      name,
+      surname,
+      email,
+      phone,
+      created_at: nowIso(),
+    })
 
     const { count } = await admin
       .from('klippies_waitlist')
