@@ -16,6 +16,7 @@ import { Community } from './pages/Community'
 import { HallOfFame } from './pages/HallOfFame'
 import { Rules } from './pages/Rules'
 import { Barry } from './pages/Barry'
+import { Ask } from './pages/Ask'
 import { AdminPage } from './pages/AdminPage'
 import { ProducerPage } from './pages/ProducerPage'
 import { MyTimes } from './pages/MyTimes'
@@ -24,6 +25,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/events/:eventId/timekeeper" element={<Timekeeper />} />
+      <Route path="/ask" element={<Ask />} />
       <Route element={<Shell />}>
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />

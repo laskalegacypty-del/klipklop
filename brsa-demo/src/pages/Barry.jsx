@@ -102,15 +102,17 @@ function Citations({ citations }) {
 }
 
 function BarryMark({ size = 'md' }) {
-  const cls = size === 'lg' ? 'h-16 w-16 text-2xl' : 'h-8 w-8 text-sm'
+  const cls = size === 'lg' ? 'h-16 w-16' : 'h-8 w-8'
   return (
-    <div className={`grid ${cls} flex-shrink-0 place-items-center rounded-full bg-season font-display font-semibold text-white`}>
-      B
-    </div>
+    <img
+      src="/barry-avatar.png"
+      alt="Barry"
+      className={`${cls} flex-shrink-0 rounded-full border border-dust-200 bg-white object-cover`}
+    />
   )
 }
 
-export function Barry() {
+export function Barry({ compact = false } = {}) {
   const { world, rider, unpaidFines } = useDemo()
   const [ready, setReady] = useState(false)
   const [input, setInput] = useState('')
@@ -215,31 +217,37 @@ export function Barry() {
 
   const isEmpty = messages.length === 0
 
+  const actions = (
+    <div className="flex flex-wrap gap-2">
+      <Link to="/rules">
+        <Button variant="secondary">Open rulebook</Button>
+      </Link>
+      {messages.length ? (
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setMessages([])
+            localStorage.removeItem(CHAT_KEY)
+          }}
+        >
+          <Trash2 size={16} />
+          Clear
+        </Button>
+      ) : null}
+    </div>
+  )
+
   return (
     <div>
-      <PageHeader
-        title="Barry"
-        description="Rules assistant for Barrel Racing SA. Grounded in sections A–L."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link to="/rules">
-              <Button variant="secondary">Open rulebook</Button>
-            </Link>
-            {messages.length ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setMessages([])
-                  localStorage.removeItem(CHAT_KEY)
-                }}
-              >
-                <Trash2 size={16} />
-                Clear
-              </Button>
-            ) : null}
-          </div>
-        }
-      />
+      {compact ? (
+        <div className="mb-5 flex justify-end sm:mb-6">{actions}</div>
+      ) : (
+        <PageHeader
+          title="Barry"
+          description="Rules assistant for Barrel Racing SA. Grounded in sections A–L."
+          actions={actions}
+        />
+      )}
 
       <Card className="overflow-hidden">
         <CardContent className="flex h-[calc(100vh-14rem)] min-h-[28rem] flex-col p-0">

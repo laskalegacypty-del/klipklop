@@ -119,9 +119,7 @@ export function Shell() {
               <Menu size={18} />
             </button>
             <Link to="/" className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-sm bg-brand-400 font-display text-base font-bold text-charcoal">
-                BR
-              </span>
+              <img src="/brsa-logo-white.png" alt="BRSA" className="h-10 w-10 rounded-sm" />
               <div className="leading-tight">
                 <p className="font-display text-xl font-semibold tracking-wide text-white">BRSA</p>
                 <p className="text-[10px] uppercase tracking-[0.22em] text-brand-300">Barrel Racing SA</p>
