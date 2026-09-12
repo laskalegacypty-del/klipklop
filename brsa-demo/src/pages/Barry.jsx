@@ -219,9 +219,11 @@ export function Barry({ compact = false } = {}) {
 
   const actions = (
     <div className="flex flex-wrap gap-2">
-      <Link to="/rules">
-        <Button variant="secondary">Open rulebook</Button>
-      </Link>
+      {compact ? null : (
+        <Link to="/rules">
+          <Button variant="secondary">Open rulebook</Button>
+        </Link>
+      )}
       {messages.length ? (
         <Button
           variant="ghost"
