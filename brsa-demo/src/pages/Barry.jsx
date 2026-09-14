@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { loadDomain, searchDomain, buildDomainContext } from 'rules-engine/core'
 import { BookOpen, ChevronDown, Send, Trash2 } from 'lucide-react'
 import { useDemo } from '../demo/store'
 import { brsa } from '../lib/brsaDomain'
 import { buildBarryRiderBlock, looksPersonal } from '../lib/barryContext'
+import { loadBarryRules, searchBarryRules, buildBarryContext } from '../lib/barryRules'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent } from '../components/ui/Card'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -78,8 +78,9 @@ function renderRichText(text) {
   return blocks
 }
 
-function Citations({ citations }) {
-  if (!citations?.length) return null
+function Citation({ citation }) {
+  const entry = citation || null
+  if (!entry?.text) return null
   return (
     <details className="group mt-3 border-t border-dust-200 pt-3">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-charcoal">
@@ -87,15 +88,11 @@ function Citations({ citations }) {
         {brsa.ui.citationLabel}
         <ChevronDown size={13} className="ml-auto transition-transform group-open:rotate-180" />
       </summary>
-      <div className="mt-2 space-y-1.5">
-        {citations.slice(0, 3).map((c, i) => (
-          <div key={i} className="rounded-md border border-dust-200 bg-dust-50 px-3 py-2">
-            <p className="text-xs font-semibold text-charcoal">
-              {c.section && c.section !== c.title ? `${c.section} · ` : ''}{c.title}
-            </p>
-            <p className="mt-0.5 line-clamp-2 text-xs text-stone-600">{c.text}</p>
-          </div>
-        ))}
+      <div className="mt-2 rounded-md border border-dust-200 bg-dust-50 px-3 py-2">
+        <p className="text-xs font-semibold text-charcoal">
+          {entry.section && entry.section !== entry.title ? `${entry.section} · ` : ''}{entry.title || entry.section}
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-stone-600">{entry.text}</p>
       </div>
     </details>
   )
@@ -130,8 +127,8 @@ export function Barry({ compact = false } = {}) {
 
   useEffect(() => {
     let active = true
-    loadDomain(brsa)
-      .then((ok) => { if (active) setReady(Boolean(ok)) })
+    loadBarryRules()
+      .then(() => { if (active) setReady(true) })
       .catch(() => { if (active) setReady(false) })
     return () => { active = false }
   }, [])
@@ -159,8 +156,9 @@ export function Barry({ compact = false } = {}) {
 
     try {
       const personal = looksPersonal(query)
-      const citations = personal ? [] : searchDomain(brsa, query, 6)
-      const rulesContext = personal ? '' : buildDomainContext(brsa, query, 6000, 12)
+      const matches = personal ? [] : searchBarryRules(query, 6)
+      const citation = personal ? null : (matches[0] || null)
+      const rulesContext = personal ? '' : buildBarryContext(matches, 6000)
       const merged = [
         rulesContext ? `${brsa.ai.rulesHeading}\n${rulesContext}` : '',
         riderBlock ? `RIDER DATA (the signed-in demo rider):\n${riderBlock}` : '',
@@ -188,9 +186,8 @@ export function Barry({ compact = false } = {}) {
       }
 
       if (!response) {
-        if (citations.length) {
-          const top = citations[0]
-          response = `Here's the most relevant rule I found${top.section ? ` (${top.section})` : ''}:\n\n**${top.title}**\n${top.text}`
+        if (citation) {
+          response = `Here's the most relevant rule I found${citation.section ? ` (${citation.section})` : ''}:\n\n**${citation.title}**\n${citation.text}`
         } else if (personal && riderBlock) {
           response = `From your demo season:\n\n${riderBlock}`
         } else {
@@ -200,7 +197,7 @@ export function Barry({ compact = false } = {}) {
 
       setMessages((prev) => [
         ...prev,
-        { id: nextId(), role: 'assistant', content: response, citations: personal ? [] : citations },
+        { id: nextId(), role: 'assistant', content: response, citation: personal ? null : citation },
       ])
     } finally {
       setLoading(false)
@@ -297,7 +294,7 @@ export function Barry({ compact = false } = {}) {
                     ) : (
                       <div className="leading-relaxed">
                         {renderRichText(m.content)}
-                        <Citations citations={m.citations} />
+                        <Citation citation={m.citation || m.citations?.[0] || null} />
                       </div>
                     )}
                   </div>

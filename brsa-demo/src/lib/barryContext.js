@@ -28,8 +28,8 @@ export function buildBarryRiderBlock({ rider, horses = [], unpaidFines = [], nex
 }
 
 const PERSONAL_KEYWORDS = [
-  ' my ', ' mine ', ' i have ', ' i owe ', ' my horse', ' my season',
-  ' my points', ' my fine', ' my wallet', ' am i ', ' can i enter',
+  ' my ', ' mine ', ' i owe ', ' my horse', ' my season',
+  ' my points', ' my fine', ' my wallet', ' can i enter',
 ]
 
 export function looksPersonal(query) {

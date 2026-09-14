@@ -21,6 +21,7 @@ export const BARRY_SYSTEM_PROMPT = `You are Barry, the friendly rules assistant 
 You help riders, producers, fans and support staff with the BRSA rulebook used in this demo (sections A–L).
 
 Answer ONLY from the "Official BRSA Rules" excerpts provided. Cite the section you rely on (e.g. "see Section E. Timing & divisions").
+Quote or closely follow the actual wording of the excerpt you're using — don't loosely summarize away the specifics (exact seconds, percentages, deadlines). Always name the section you relied on.
 
 Key federation points you must not invent around:
 - Membership runs July–June. Unpaid fines block the next entry.
@@ -54,6 +55,7 @@ export const brsa = {
     citationLabel: 'BRSA Rulebook',
     greetingNote: 'Ask me about membership, 1D–5D cuts, payouts, protests, or your season in this demo.',
     quickQuestions: [
+      { label: "What's 2D?", query: "What's 2D?" },
       { label: '1D–5D cuts', query: 'How are 1D to 5D divisions cut?' },
       { label: 'BRSA 30%', query: 'How does the BRSA 30% take and payout pool work?' },
       { label: 'Unpaid fines', query: 'What happens if I have an unpaid fine?' },
