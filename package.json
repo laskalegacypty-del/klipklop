@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:prod": "bash -lc 'set -a && . ./.env.cf-build && set +a && vite build'",
     "lint": "eslint .",
     "preview": "vite preview",
     "rules:ingest": "node scripts/ingest-rules.mjs",

@@ -12,6 +12,9 @@
     <link rel="icon" type="image/png" href="/brand/klipklop-logo.png" />
     <link rel="apple-touch-icon" href="/brand/klipklop-logo.png" />
     <title>KlipKlop</title>
+    <script>
+      if (location.hostname.endsWith('.workers.dev')) document.title = '[Dev] KlipKlop'
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import SharedTimesView from '../components/times/SharedTimesView'
 import { fetchSharedTimes } from '../lib/shareLink'
-import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE } from '../constants/branding'
+import { APP_NAME, APP_LOGO_SRC, APP_TAGLINE, withHostTitle } from '../constants/branding'
 import { Skeleton } from '../components/ui'
 
 function ShareBrandedShell({ children, footer = true }) {
@@ -96,10 +96,10 @@ export default function ShareTimes() {
 
   useEffect(() => {
     if (payload?.share_meta?.share_title) {
-      document.title = payload.share_meta.share_title
+      document.title = withHostTitle(payload.share_meta.share_title)
     }
     return () => {
-      document.title = APP_NAME
+      document.title = withHostTitle()
     }
   }, [payload])
 
