@@ -2,11 +2,19 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDemo } from '../demo/store'
 import { Badge } from '../components/ui/Badge'
-import { Card, CardContent } from '../components/ui/Card'
-import { EmptyState } from '../components/ui/EmptyState'
 import { Input } from '../components/ui/Input'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Select } from '../components/ui/Select'
+import { Table, TableWrap, Td, Th } from '../components/ui/Table'
+
+function statusOf(event) {
+  if (event.status === 'live') return { label: 'Live today', variant: 'danger' }
+  if (event.official) return { label: 'Official', variant: 'success' }
+  if (event.resultsPostedAt) return { label: 'Unofficial', variant: 'warning' }
+  return { label: 'Upcoming', variant: 'default' }
+}
+
+const filterControl = 'h-9 shadow-none'
 
 export function Events() {
   const { world } = useDemo()
@@ -14,6 +22,8 @@ export function Events() {
   const [type, setType] = useState('all')
   const [region, setRegion] = useState('all')
   const [status, setStatus] = useState('all')
+  const types = [...new Set(world.events.map((e) => e.type))]
+  const regions = [...new Set(world.events.map((e) => e.region))]
   const events = useMemo(() => {
     return [...world.events]
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -31,64 +41,99 @@ export function Events() {
   return (
     <div>
       <PageHeader title="Events" description="Mini-Qualifier · Jackpot · Rodeo" />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Input className="w-48" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" />
-        <Select value={type} onChange={(e) => setType(e.target.value)} className="w-40">
-          <option value="all">All types</option>
-          {[...new Set(world.events.map((e) => e.type))].map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </Select>
-        <Select value={region} onChange={(e) => setRegion(e.target.value)} className="w-44">
-          <option value="all">All regions</option>
-          {[...new Set(world.events.map((e) => e.region))].map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </Select>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-40">
-          <option value="all">All status</option>
-          <option value="live">Live today</option>
-          <option value="upcoming">Upcoming</option>
-          <option value="official">Official</option>
-        </Select>
-      </div>
-      {events.length === 0 ? (
-        <EmptyState title="No events listed" description="When the calendar is posted, it will show here." />
-      ) : (
-        <div className="grid gap-4">
-          {events.map((event) => (
-            <Link key={event.id} to={`/events/${event.id}`}>
-              <Card className="group hover:border-brand-400 transition">
-                <CardContent className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-display text-xl font-semibold">{event.name}</h2>
-                      <Badge>{event.type}</Badge>
-                      {event.status === 'live' ? (
-                        <Badge variant="danger">Live today</Badge>
-                      ) : event.official ? (
-                        <Badge variant="success">Official</Badge>
-                      ) : event.resultsPostedAt ? (
-                        <Badge variant="warning">Unofficial</Badge>
-                      ) : (
-                        <Badge>Upcoming</Badge>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm text-stone-600">
-                      {event.date} · {event.region} · {event.venue}
-                    </p>
-                  </div>
-                  <p className="text-sm font-semibold">Open flyer →</p>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
+      <TableWrap>
+        <Table>
+          <thead>
+            <tr>
+              <Th>Date</Th>
+              <Th
+                filter={
+                  <Input
+                    className={filterControl}
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Search"
+                  />
+                }
+              >
+                Event
+              </Th>
+              <Th
+                filter={
+                  <Select className={filterControl} value={type} onChange={(e) => setType(e.target.value)}>
+                    <option value="all">All</option>
+                    {types.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </Select>
+                }
+              >
+                Type
+              </Th>
+              <Th
+                filter={
+                  <Select className={filterControl} value={region} onChange={(e) => setRegion(e.target.value)}>
+                    <option value="all">All</option>
+                    {regions.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </Select>
+                }
+              >
+                Region
+              </Th>
+              <Th>Venue</Th>
+              <Th
+                filter={
+                  <Select className={filterControl} value={status} onChange={(e) => setStatus(e.target.value)}>
+                    <option value="all">All</option>
+                    <option value="live">Live today</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="official">Official</option>
+                  </Select>
+                }
+              >
+                Status
+              </Th>
+              <Th></Th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.length === 0 ? (
+              <tr>
+                <Td colSpan={7} className="text-stone-500">
+                  No events match those filters.
+                </Td>
+              </tr>
+            ) : (
+              events.map((event) => {
+                const st = statusOf(event)
+                return (
+                  <tr key={event.id} className="hover:bg-dust-50">
+                    <Td className="whitespace-nowrap">{event.date}</Td>
+                    <Td className="font-semibold">{event.name}</Td>
+                    <Td>{event.type}</Td>
+                    <Td>{event.region}</Td>
+                    <Td>{event.venue}</Td>
+                    <Td>
+                      <Badge variant={st.variant}>{st.label}</Badge>
+                    </Td>
+                    <Td>
+                      <Link className="font-semibold text-season underline" to={`/events/${event.id}`}>
+                        Open flyer
+                      </Link>
+                    </Td>
+                  </tr>
+                )
+              })
+            )}
+          </tbody>
+        </Table>
+      </TableWrap>
     </div>
   )
 }

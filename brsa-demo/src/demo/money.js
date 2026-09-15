@@ -25,8 +25,37 @@ export const HOF_CATEGORIES = [
   { id: 'brsa-record', label: 'BRSA Record' },
   { id: 'sa-record', label: 'South African Record' },
   { id: 'championship', label: 'Championship Win' },
+  { id: 'producer-year', label: 'Producer of the Year' },
   { id: 'special', label: 'Special Recognition' },
 ]
+
+export const FINE_TYPES = [
+  { id: 'cancellation', label: 'Cancellation' },
+  { id: 'late-admin', label: 'Late admin' },
+  { id: 'penalty', label: 'Penalty' },
+]
+
+export const DIVISIONS = ['1D', '2D', '3D']
+
+export function seasonStartDate(season = '2026/27') {
+  const year = Number(String(season).slice(0, 4)) || new Date().getFullYear()
+  return new Date(`${year}-07-01T00:00:00`)
+}
+
+/** Rulebook D-8 age bands as of 1 July of the season. */
+export function classForBirthdate(birthdate, asOf = new Date()) {
+  if (!birthdate) return null
+  const born = new Date(birthdate)
+  if (Number.isNaN(born.getTime())) return null
+  let age = asOf.getFullYear() - born.getFullYear()
+  const m = asOf.getMonth() - born.getMonth()
+  if (m < 0 || (m === 0 && asOf.getDate() < born.getDate())) age -= 1
+  if (age <= 10) return 'Peewee'
+  if (age <= 13) return 'Junior'
+  if (age <= 18) return 'Youth'
+  if (age <= 49) return 'Adult'
+  return 'Senior'
+}
 
 export const AWARD_CATEGORIES = ['Best Run', 'Video Post', 'Best Venue', 'Cowboy/Cowgirl of the Month']
 
@@ -54,14 +83,15 @@ export function pointsForResult(result) {
 }
 
 /**
- * BRSA 30% of gross entry fees first.
- * Remaining 70% (payout pool) minus producing costs = prize pool.
+ * Melissa / current BRSA practice: R150 (or per-event adminFee) producing
+ * comes off gross first. Of the remainder, BRSA keeps 30% and pays out 70%.
  */
 export function splitFees(gross, producing) {
-  const brsaAdmin = Math.round(gross * 0.3)
-  const payoutPool = Math.max(0, gross - brsaAdmin)
-  const prizePool = Math.max(0, payoutPool - producing)
-  return { gross, producing, brsaAdmin, payoutPool, prizePool, groundLevy: producing }
+  const producingCost = Math.max(0, Number(producing) || 0)
+  const payoutPool = Math.max(0, gross - producingCost)
+  const brsaAdmin = Math.round(payoutPool * 0.3)
+  const prizePool = Math.max(0, payoutPool - brsaAdmin)
+  return { gross, producing: producingCost, brsaAdmin, payoutPool, prizePool, groundLevy: producingCost }
 }
 
 export function estimatePayout(paidEntries, producingCost = PRODUCING_COST) {
@@ -76,7 +106,7 @@ export function bestTime(row) {
   return Math.min(...times)
 }
 
-/** Rulebook E.3 — 0.5s buckets off the fastest completed time. */
+/** Current BRSA practice: 3D format, 1.0s splits off the fastest completed time. */
 export function computeDivisionsAndPlaces(rows) {
   const completed = rows
     .map((r) => ({ ...r, officialTime: bestTime(r) }))
@@ -85,10 +115,10 @@ export function computeDivisionsAndPlaces(rows) {
     return rows.map((r) => ({ ...r, division: r.division ?? null, place: r.place ?? null, officialTime: bestTime(r) }))
   }
   const fastest = Math.min(...completed.map((r) => r.officialTime))
-  const divisions = ['1D', '2D', '3D', '4D', '5D']
-  const byDiv = { '1D': [], '2D': [], '3D': [], '4D': [], '5D': [] }
+  const divisions = DIVISIONS
+  const byDiv = { '1D': [], '2D': [], '3D': [] }
   for (const row of completed) {
-    const steps = Math.min(4, Math.floor((row.officialTime - fastest + 1e-9) / 0.5))
+    const steps = Math.min(2, Math.floor((row.officialTime - fastest + 1e-9) / 1.0))
     row.division = divisions[steps]
     byDiv[row.division].push(row)
   }

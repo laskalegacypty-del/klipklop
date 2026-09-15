@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useDemo } from '../demo/store'
 import { heatRows } from '../demo/money'
+import { isFedStaff } from '../demo/world'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
@@ -19,7 +20,7 @@ export function EventDay() {
   const [sheet, setSheet] = useState('Diesel,16.421\nComet,16.910\nPepper,17.050')
 
   if (!event) return <p>Event not found.</p>
-  if (user.role !== 'producer') {
+  if (user.role !== 'producer' && !isFedStaff(user.role)) {
     return <EmptyState title="Producer console" description="Event day running is a producer tool." />
   }
 
@@ -28,6 +29,10 @@ export function EventDay() {
   const missingDraw = paid.filter((e) => !e.drawNo)
   const heats = heatRows(paid, 5)
   const lateLink = `${window.location.origin}/events/${event.id}?tab=enter&guest=1`
+  const holdUntil = event.resultsPostedAt
+    ? new Date(new Date(event.resultsPostedAt).getTime() + 7 * 24 * 60 * 60 * 1000)
+    : null
+  const windowOpen = Boolean(holdUntil && Date.now() < holdUntil.getTime() && !event.official)
 
   return (
     <div>
@@ -107,7 +112,18 @@ export function EventDay() {
             <Link to={`/events/${event.id}/timekeeper`}>
               <Button>Timekeeper (phone)</Button>
             </Link>
-            {!event.official ? <Button onClick={() => makeOfficial(event.id)}>Make official</Button> : null}
+            {!event.official ? (
+              <>
+                <Button disabled={windowOpen} onClick={() => makeOfficial(event.id)}>
+                  Make official
+                </Button>
+                {windowOpen ? (
+                  <Button variant="ghost" onClick={() => makeOfficial(event.id, { override: true })}>
+                    Override — mark official early (demo)
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
           </div>
           {heats.map((heat, i) => (
             <Card key={i}>
@@ -157,7 +173,7 @@ export function Timekeeper() {
   const res = entry ? resultsFor(eventId).find((r) => r.entryId === entry.id) : null
   const run = res?.run1 == null ? 1 : event?.runs > 1 && res?.run2 == null ? 2 : 1
 
-  if (user.role !== 'producer' || !event) {
+  if ((user.role !== 'producer' && !isFedStaff(user.role)) || !event) {
     return <EmptyState title="Timekeeper" description="Open this from the producer Event day console." />
   }
 
@@ -167,7 +183,7 @@ export function Timekeeper() {
       <h1 className="font-display text-3xl mt-2">Timekeeper</h1>
       {entry ? (
         <div className="mt-8">
-          <p className="text-stone-400">
+          <p className="text-brand-200">
             Draw {entry.drawNo} · Run {run} of {event.runs}
           </p>
           <p className="font-display text-4xl mt-2">{riderById(entry.riderId)?.name}</p>
@@ -188,12 +204,12 @@ export function Timekeeper() {
               Prev
             </Button>
           </div>
-          {res?.time ? <p className="mt-4 text-stone-400">Official (best): {res.time.toFixed(3)}</p> : null}
+          {res?.time ? <p className="mt-4 text-brand-200">Official (best): {res.time.toFixed(3)}</p> : null}
         </div>
       ) : (
         <p className="mt-8">No paid names.</p>
       )}
-      <Link to={`/events/${eventId}/day`} className="mt-10 inline-block text-sm text-stone-400 underline">
+      <Link to={`/events/${eventId}/day`} className="mt-10 inline-block text-sm text-brand-200 underline">
         Back to event day
       </Link>
     </div>

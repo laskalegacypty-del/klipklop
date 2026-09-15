@@ -10,7 +10,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { StatCard } from '../components/ui/StatCard'
 
 export function Dashboard() {
-  const { user, rider, world, unpaidFines, officialStandings, payInvoice } = useDemo()
+  const { user, rider, world, unpaidFines, unpaidMembership, officialStandings, payInvoice } = useDemo()
   const hooksRider = rider
 
   const stats = useMemo(() => {
@@ -27,7 +27,8 @@ export function Dashboard() {
   }
 
   const fines = unpaidFines(rider.id)
-  const nationalsCut = 40
+  const dues = unpaidMembership(rider.id)
+  const championshipsCut = 40
 
   return (
     <div>
@@ -36,8 +37,23 @@ export function Dashboard() {
         <StatCard label="In my pocket" value={rand(rider.wallet)} hint="Only you see this" />
         <StatCard label="Points" value={rider.points} hint={`#${stats.rank} in ${rider.class}`} />
         <StatCard label="Shows this season" value={stats.shows} hint={`${stats.horses} horses in the barn`} />
-        <StatCard label="Nationals" value={rider.points >= nationalsCut ? 'You are on the list' : `${nationalsCut - rider.points} points to go`} hint={`Need ${nationalsCut} points`} />
+        <StatCard label="Championships" value={rider.points >= championshipsCut ? 'You are on the list' : `${championshipsCut - rider.points} points to go`} hint={`Need ${championshipsCut} points`} />
       </div>
+      {dues.length ? (
+        <Card className="mt-5 border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle>Membership renewal is due</CardTitle>
+            <CardDescription>
+              {dues[0].label} — {rand(dues[0].amount)}. New entries are blocked until this is paid.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button size="lg" onClick={() => payInvoice(dues[0].id, { fromWallet: true })}>
+              Pay {rand(dues[0].amount)}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
       {fines.length ? (
         <Card className="mt-5 border-red-200 bg-red-50">
           <CardHeader>

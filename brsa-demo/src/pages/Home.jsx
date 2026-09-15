@@ -9,14 +9,31 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { StatCard } from '../components/ui/StatCard'
 
 export function Home() {
-  const { world, topRider, eventById, rider, unpaidFines, payInvoice } = useDemo()
+  const { world, topRider, eventById, rider, unpaidFines, unpaidMembership, payInvoice } = useDemo()
   const live = world.events.find((e) => e.status === 'live') || eventById('west-fest')
   const featured = world.events.find((e) => e.featured) || live
   const fines = rider ? unpaidFines(rider.id) : []
+  const dues = rider ? unpaidMembership(rider.id) : []
 
   return (
     <div>
       <PageHeader title="Barrel Racing South Africa" description={`${world.season} season`} />
+
+      {rider && dues.length ? (
+        <Card className="mb-5 border-red-300 bg-red-50">
+          <CardHeader>
+            <CardTitle>Membership renewal is due</CardTitle>
+            <CardDescription>
+              {dues[0].label} — {rand(dues[0].amount)}. New entries are blocked until this is paid.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button size="lg" onClick={() => payInvoice(dues[0].id, { fromWallet: true })}>
+              Pay {rand(dues[0].amount)} now
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {rider && fines.length ? (
         <Card className="mb-5 border-red-300 bg-red-50">
@@ -88,8 +105,8 @@ export function Home() {
           </div>
           <div>
             <p className="text-[11px] uppercase tracking-[0.22em] text-brand-300">{world.sponsor.tag}</p>
-            <p className="font-display text-3xl font-semibold">{world.sponsor.name}</p>
-            <p className="text-sm text-stone-400">Official feed partner for the 2026/27 season.</p>
+            <p className="font-display text-3xl font-semibold text-white">{world.sponsor.name}</p>
+            <p className="text-sm text-brand-200">Official feed partner for the 2026/27 season.</p>
           </div>
         </CardContent>
       </Card>

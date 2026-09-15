@@ -32,8 +32,12 @@ export function cn(...values) {
 }
 
 function conflictKey(token) {
-  const t = token.replace(/^(sm:|md:|lg:|xl:|hover:|focus:)+/, '')
+  const responsive = /^(sm:|md:|lg:|xl:|hover:|focus:|focus-visible:)/.test(token)
+  const t = token.replace(/^(sm:|md:|lg:|xl:|hover:|focus:|focus-visible:)+/, '')
   if (t === 'bg-white' || /^bg-(dust|brand|charcoal|red|season)/.test(t)) return 'bg'
   if (/^border-(dust|brand|charcoal|red|season|white)/.test(t) || t === 'border-transparent') return 'border-color'
+  if (!responsive && /^(text-white|text-charcoal|text-black|text-stone-|text-brand-|text-red-|text-season)/.test(token)) return 'text-color'
+  if (!responsive && /^w-/.test(token)) return 'width'
+  if (!responsive && /^h-/.test(token)) return 'height'
   return null
 }

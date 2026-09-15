@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDemo } from '../demo/store'
-import { rand } from '../demo/money'
+import { FINE_TYPES, rand, seasonStartDate } from '../demo/money'
+import { isFedStaff } from '../demo/world'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
@@ -11,22 +12,55 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { Select } from '../components/ui/Select'
 
 export function ProducerPage() {
-  const { user, producer, world, entriesFor, estimateEventPayout, createEvent, issueFine, postNews, adjustPoints } = useDemo()
-  const [fine, setFine] = useState({ riderId: 'sunny', amount: 250, label: 'Late admin fee' })
+  const {
+    user,
+    producer,
+    world,
+    entriesFor,
+    estimateEventPayout,
+    createEvent,
+    issueFine,
+    postNews,
+    adjustPoints,
+    downloadMemberList,
+    recomputeAgeClasses,
+    resolveQuery,
+    riderById,
+    horseById,
+    eventById,
+  } = useDemo()
+  const [fine, setFine] = useState({ riderId: 'sunny', amount: 250, label: 'Late admin fee', fineType: 'late-admin' })
   const [news, setNews] = useState('')
   const [adj, setAdj] = useState({ riderId: 'sunny', delta: 1, note: 'Correction' })
 
-  if (user.role !== 'producer' || !producer) {
+  if ((user.role !== 'producer' || !producer) && !isFedStaff(user.role)) {
     return <EmptyState title="Producer desk" description="Event running, fines, official results and news live here." />
   }
 
-  const events = world.events.filter((e) => e.producerId === producer.id)
+  const events = producer
+    ? world.events.filter((e) => e.producerId === producer.id)
+    : world.events
+  const openQueries = (world.timeQueries ?? []).filter((q) => q.status === 'open')
   const unpaid = world.invoices.filter((i) => !i.paid)
   const due = world.riders.filter((r) => /due|day/i.test(r.membershipNote) || world.invoices.some((i) => i.riderId === r.id && i.type === 'membership' && !i.paid))
+  const start = seasonStartDate(world.season)
+  const byProvince = {}
+  for (const r of world.riders) {
+    const slot = (byProvince[r.province] ??= { total: 0, joined: 0 })
+    slot.total += 1
+    if (r.joinedAt && new Date(r.joinedAt) >= start) slot.joined += 1
+  }
 
   return (
     <div>
-      <PageHeader title="Show office" description={`${producer.name} · ${producer.region}`} />
+      <PageHeader
+        title="Show office"
+        description={
+          producer
+            ? `${producer.name} · ${producer.region}`
+            : 'Federation view — all producers and shows.'
+        }
+      />
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
@@ -46,7 +80,64 @@ export function ProducerPage() {
             <CardDescription>Membership due / day members</CardDescription>
           </CardHeader>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Members — {world.riders.length}</CardTitle>
+            <CardDescription>Season roster</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={downloadMemberList}>Download member list PDF</Button>
+            <Button variant="ghost" onClick={recomputeAgeClasses}>Recompute age classes</Button>
+          </CardContent>
+        </Card>
       </div>
+
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle>Growth by province</CardTitle>
+          <CardDescription>Total members · joined since 1 July</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 text-sm">
+          {Object.entries(byProvince).map(([province, row]) => (
+            <p key={province}>
+              {province}: {row.total}+{row.joined}
+            </p>
+          ))}
+        </CardContent>
+      </Card>
+
+      {openQueries.length ? (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Time queries</CardTitle>
+            <CardDescription>Riders flag unofficial clocks here. Resolve them from the show office — not My times.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {openQueries.map((q) => {
+              const row = world.results.find((r) => r.id === q.resultId)
+              return (
+                <div key={q.id} className="rounded-md border border-dust-200 px-4 py-3">
+                  <p className="font-semibold">
+                    {riderById(q.riderId)?.name} · {horseById(row?.horseId)?.name} · {eventById(row?.eventId)?.name}
+                  </p>
+                  <p className="mt-1 text-sm text-stone-600">{q.note}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => resolveQuery(q.id, 'accepted')}>
+                      Yes — run them again
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => resolveQuery(q.id, 'rejected')}>
+                      Time stands
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => resolveQuery(q.id, 'need-detail', 'Please send a video.')}>
+                      Please send a video
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <h2 className="mt-8 mb-3 font-display text-xl">Calendar</h2>
       <div className="grid gap-3">
@@ -112,6 +203,11 @@ export function ProducerPage() {
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
+              ))}
+            </Select>
+            <Select value={fine.fineType} onChange={(e) => setFine({ ...fine, fineType: e.target.value, label: FINE_TYPES.find((t) => t.id === e.target.value)?.label || fine.label })}>
+              {FINE_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>{t.label}</option>
               ))}
             </Select>
             <Input value={fine.label} onChange={(e) => setFine({ ...fine, label: e.target.value })} />

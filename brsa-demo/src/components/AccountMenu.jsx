@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown, LogOut, Shield, UserRound } from 'lucide-react'
 import { useDemo } from '../demo/store'
+import { isFedStaff, isSysAdmin } from '../demo/world'
+import { isPhotoSrc } from '../lib/imageCrop'
 
 export function AccountMenu() {
   const { user, rider, viewingFromAdmin, exitViewAs } = useDemo()
@@ -34,9 +36,13 @@ export function AccountMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-brand-400 font-display text-sm font-bold text-charcoal">
-          {initial}
-        </span>
+        {isPhotoSrc(rider?.photo) ? (
+          <img src={rider.photo} alt="" className="h-8 w-8 rounded-sm object-cover" />
+        ) : (
+          <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-brand-400 font-display text-sm font-bold text-charcoal">
+            {initial}
+          </span>
+        )}
         <span className="hidden sm:block leading-tight">
           <span className="block text-sm font-medium text-white">{user.name}</span>
           <span className="block text-[11px] capitalize tracking-wide text-stone-400">{user.role}</span>
@@ -78,7 +84,7 @@ export function AccountMenu() {
                 My season
               </Link>
             ) : null}
-            {user.role === 'admin' ? (
+            {isFedStaff(user.role) ? (
               <Link
                 to="/admin"
                 role="menuitem"
@@ -86,7 +92,27 @@ export function AccountMenu() {
                 onClick={() => setOpen(false)}
               >
                 <Shield size={15} />
-                Support
+                BRSA office
+              </Link>
+            ) : null}
+            {isSysAdmin(user.role) ? (
+              <Link
+                to="/dev"
+                role="menuitem"
+                className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-dust-50"
+                onClick={() => setOpen(false)}
+              >
+                Dev tools
+              </Link>
+            ) : null}
+            {isFedStaff(user.role) ? (
+              <Link
+                to="/complaints"
+                role="menuitem"
+                className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-dust-50"
+                onClick={() => setOpen(false)}
+              >
+                Complaints
               </Link>
             ) : null}
             {user.role === 'producer' ? (

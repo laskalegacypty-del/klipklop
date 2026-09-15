@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useDemo } from '../demo/store'
-import { CLASS_FEES, CARRY_OVER_FEE, PRODUCING_COST, entryFee, rand } from '../demo/money'
+import { CLASS_FEES, CARRY_OVER_FEE, DIVISIONS, PRODUCING_COST, entryFee, pointsForResult, rand } from '../demo/money'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
@@ -22,8 +22,9 @@ const TABS = [
 export function EventPage() {
   const { eventId } = useParams()
   const [params, setParams] = useSearchParams()
-  const tab = TABS.some((t) => t.id === params.get('tab')) ? params.get('tab') : 'flyer'
   const demo = useDemo()
+  const tabs = demo.user.role === 'fan' ? TABS.filter((t) => t.id !== 'enter') : TABS
+  const tab = tabs.some((t) => t.id === params.get('tab')) ? params.get('tab') : 'flyer'
   const event = demo.eventById(eventId)
 
   if (!event) {
@@ -56,7 +57,7 @@ export function EventPage() {
           </div>
         }
       />
-      <Tabs tabs={TABS} activeTab={tab} onChange={(id) => setParams({ tab: id })} />
+      <Tabs tabs={tabs} activeTab={tab} onChange={(id) => setParams({ tab: id })} />
       <div className="mt-5">
         {tab === 'flyer' && <Flyer event={event} producer={producer} />}
         {tab === 'enter' && <Enter event={event} />}
@@ -108,12 +109,13 @@ function Flyer({ event, producer }) {
 }
 
 function Enter({ event }) {
-  const { user, rider, unpaidFines, enterEvent, world, horseById, payInvoice } = useDemo()
+  const { user, rider, unpaidFines, unpaidMembership, enterEvent, world, horseById, payInvoice } = useDemo()
   const horses = rider ? world.horses.filter((h) => h.riderId === rider.id) : []
   const [klass, setKlass] = useState(rider?.class ?? 'Adult')
   const [horseId, setHorseId] = useState(horses[0]?.id ?? '')
   const [carryOver, setCarryOver] = useState(false)
   const fines = rider ? unpaidFines(rider.id) : []
+  const dues = rider ? unpaidMembership(rider.id) : []
   const fee = entryFee(klass, carryOver)
   const already = rider
     ? world.entries.find((e) => e.eventId === event.id && e.riderId === rider.id)
@@ -155,6 +157,32 @@ function Enter({ event }) {
                 <Button variant="secondary">See what I owe</Button>
               </Link>
             </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (dues.length) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardHeader>
+          <CardTitle>Membership renewal is due</CardTitle>
+          <CardDescription>The office will not take a new entry until this invoice is paid.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {dues.map((f) => (
+            <p key={f.id} className="text-sm font-medium">
+              {f.label} — {rand(f.amount)}
+            </p>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <Button size="lg" onClick={() => payInvoice(dues[0].id, { fromWallet: true })}>
+              Pay {rand(dues[0].amount)}
+            </Button>
+            <Link to="/wallet">
+              <Button variant="secondary">See what I owe</Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     )
@@ -290,7 +318,7 @@ function Results({ event }) {
   const { resultsFor, riderById, horseById, user, makeOfficial } = useDemo()
   const rows = resultsFor(event.id)
   const grouped = useMemo(() => {
-    const map = { '1D': [], '2D': [], '3D': [], '4D': [], '5D': [] }
+    const map = { '1D': [], '2D': [], '3D': [] }
     for (const row of rows) {
       ;(map[row.division] ??= []).push(row)
     }
@@ -303,12 +331,13 @@ function Results({ event }) {
   const holdUntil = event.resultsPostedAt
     ? new Date(new Date(event.resultsPostedAt).getTime() + 7 * 24 * 60 * 60 * 1000)
     : null
+  const windowOpen = holdUntil && Date.now() < holdUntil.getTime() && !event.official
 
   return (
     <div className="space-y-4">
       {!event.official && event.resultsPostedAt ? (
-        <Card className="border-brand-400 bg-brand-50">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-md border border-brand-400 bg-brand-50 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-semibold">Unofficial — 7-day protest window</p>
               <p className="text-sm text-stone-600">
@@ -316,12 +345,21 @@ function Results({ event }) {
               </p>
             </div>
             {user.role === 'producer' ? (
-              <Button onClick={() => makeOfficial(event.id)}>Make official</Button>
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={windowOpen} onClick={() => makeOfficial(event.id)}>
+                  Make official
+                </Button>
+                {windowOpen ? (
+                  <Button variant="ghost" onClick={() => makeOfficial(event.id, { override: true })}>
+                    Override — mark official early (demo)
+                  </Button>
+                ) : null}
+              </div>
             ) : (
               <p className="text-xs text-stone-500">The producer marks these official.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : event.official ? (
         <Badge variant="success">Official — points are live</Badge>
       ) : (
@@ -332,7 +370,7 @@ function Results({ event }) {
         <EmptyState title="No times yet" description="Divisional results will publish here after the last horse." />
       ) : null}
 
-      {['1D', '2D', '3D', '4D', '5D'].map((div) =>
+      {DIVISIONS.map((div) =>
         grouped[div]?.length ? (
           <div key={div}>
             <h3 className="mb-2 font-display text-lg font-semibold">{div}</h3>
@@ -345,6 +383,7 @@ function Results({ event }) {
                     <Th>Horse</Th>
                     <Th>Class</Th>
                     <Th>Time</Th>
+                    <Th>Points</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -355,6 +394,7 @@ function Results({ event }) {
                       <Td>{horseById(row.horseId)?.name}</Td>
                       <Td>{row.class}</Td>
                       <Td>{row.time?.toFixed(3)}</Td>
+                      <Td>{pointsForResult(row)}</Td>
                     </tr>
                   ))}
                 </tbody>
@@ -386,21 +426,21 @@ function Payout({ event }) {
       <Card>
         <CardHeader>
           <CardTitle>Riders (prize)</CardTitle>
-          <CardDescription>70% pool minus producing cost{receipt ? '' : ' · estimate'}</CardDescription>
+          <CardDescription>70% of the pool after R{event.adminFee ?? PRODUCING_COST} producing{receipt ? '' : ' · estimate'}</CardDescription>
         </CardHeader>
         <CardContent className="text-2xl font-bold">{rand(numbers.prizePool)}</CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>BRSA admin</CardTitle>
-          <CardDescription>30% of gross entry fees (taken first)</CardDescription>
+          <CardDescription>30% after producing is taken off</CardDescription>
         </CardHeader>
         <CardContent className="text-2xl font-bold">{rand(numbers.brsaAdmin)}</CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>Ground levy</CardTitle>
-          <CardDescription>{rand(PRODUCING_COST)} producing / entry × field</CardDescription>
+          <CardDescription>{rand(event.adminFee ?? PRODUCING_COST)} producing / entry × field</CardDescription>
         </CardHeader>
         <CardContent className="text-2xl font-bold">{rand(numbers.groundLevy)}</CardContent>
       </Card>

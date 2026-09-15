@@ -5,6 +5,7 @@ import { useDemo } from '../demo/store'
 import { brsa } from '../lib/brsaDomain'
 import { buildBarryRiderBlock, looksPersonal } from '../lib/barryContext'
 import { loadBarryRules, searchBarryRules, buildBarryContext } from '../lib/barryRules'
+import { RuleText } from '../lib/rulebookView'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent } from '../components/ui/Card'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -81,18 +82,35 @@ function renderRichText(text) {
 function Citation({ citation }) {
   const entry = citation || null
   if (!entry?.text) return null
+  const sectionRules = [...(entry.sectionEntries || [])]
+  const idx = sectionRules.findIndex((r) => r.id === entry.id)
+  if (idx > 0) {
+    const [hit] = sectionRules.splice(idx, 1)
+    sectionRules.unshift(hit)
+  }
+  const rules = sectionRules.length ? sectionRules : [{ id: entry.id, title: entry.title, text: entry.text, note: entry.note }]
   return (
     <details className="group mt-3 border-t border-dust-200 pt-3">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-charcoal">
         <BookOpen size={13} />
         {brsa.ui.citationLabel}
+        {entry.sectionId ? ` · Section ${entry.sectionId}` : ''}
         <ChevronDown size={13} className="ml-auto transition-transform group-open:rotate-180" />
       </summary>
-      <div className="mt-2 rounded-md border border-dust-200 bg-dust-50 px-3 py-2">
-        <p className="text-xs font-semibold text-charcoal">
-          {entry.section && entry.section !== entry.title ? `${entry.section} · ` : ''}{entry.title || entry.section}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-stone-600">{entry.text}</p>
+      <div className="mt-2 max-h-80 space-y-3 overflow-y-auto rounded-md border border-dust-200 bg-dust-50 px-3 py-2">
+        {rules.map((rule) => {
+          const referenced = rule.id === entry.id || rule.title === entry.title
+          return (
+            <div key={rule.id || rule.title} className={referenced ? 'rounded-sm border border-season bg-white px-2 py-2' : ''}>
+              <p className="text-xs font-semibold text-charcoal">
+                {rule.title}
+                {referenced ? <span className="ml-2 text-[10px] uppercase tracking-wide text-season">Referenced</span> : null}
+              </p>
+              <RuleText text={rule.text} className="mt-1" />
+              {rule.note ? <p className="mt-1 text-[11px] italic text-stone-500">{rule.note}</p> : null}
+            </div>
+          )
+        })}
       </div>
     </details>
   )
@@ -243,7 +261,7 @@ export function Barry({ compact = false } = {}) {
       ) : (
         <PageHeader
           title="Barry"
-          description="Rules assistant for Barrel Racing SA. Grounded in sections A–L."
+          description="Rules assistant for Barrel Racing SA. Grounded in the 2026 rulebook, sections A–L."
           actions={actions}
         />
       )}

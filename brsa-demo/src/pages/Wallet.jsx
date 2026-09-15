@@ -18,14 +18,15 @@ export function Wallet() {
     producer,
     world,
     boostRider,
+    fundWallet,
     withdrawWallet,
     updateBankDetails,
     setDebitOrder,
     payInvoice,
     writeOffMembership,
-    topSupporters,
   } = useDemo()
   const [tab, setTab] = useState(() => 'balance')
+  const [addAmt, setAddAmt] = useState('250')
   const owner = rider ? { id: rider.id, type: 'rider' } : fan ? { id: fan.id, type: 'fan' } : null
   const wallet = rider?.wallet ?? fan?.wallet
   const bank = rider?.bank ?? fan?.bank ?? {}
@@ -35,7 +36,6 @@ export function Wallet() {
     : user.role === 'producer'
       ? world.invoices
       : []
-  const supporters = topSupporters()
   const owing = invoices.filter((i) => !i.paid)
 
   if (wallet == null && user.role !== 'producer') {
@@ -51,7 +51,6 @@ export function Wallet() {
           { id: 'invoices', label: 'What I owe' },
           { id: 'bank', label: 'Bank' },
           { id: 'ledger', label: 'History' },
-          { id: 'supporters', label: 'Biggest fans' },
         ]}
         activeTab={tab}
         onChange={setTab}
@@ -79,13 +78,35 @@ export function Wallet() {
                 <CardTitle>{rand(wallet ?? world.brsaWallet)}</CardTitle>
                 <CardDescription>{rider ? `Won this season ${rand(rider.earnings)}` : fan ? 'Money you can send to a rider' : "BRSA's cut this season"}</CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                {fan ? <Button onClick={() => boostRider('sunny', 50)}>Boost Liani R50</Button> : null}
+              <CardContent className="space-y-3">
                 {owner ? (
-                  <Button variant="secondary" onClick={() => withdrawWallet(100, owner)}>
-                    Send R100 to my bank
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      className="w-28"
+                      type="number"
+                      min="1"
+                      value={addAmt}
+                      onChange={(e) => setAddAmt(e.target.value)}
+                      aria-label="Amount to add"
+                    />
+                    <Button size="lg" onClick={() => fundWallet(addAmt, owner)}>
+                      Add to wallet
+                    </Button>
+                    {[100, 250, 500].map((n) => (
+                      <Button key={n} variant="secondary" onClick={() => fundWallet(n, owner)}>
+                        +{rand(n)}
+                      </Button>
+                    ))}
+                  </div>
                 ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {fan ? <Button variant="secondary" onClick={() => boostRider('sunny', 50)}>Boost Liani R50</Button> : null}
+                  {owner ? (
+                    <Button variant="ghost" onClick={() => withdrawWallet(100, owner)}>
+                      Send R100 to my bank
+                    </Button>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
             {rider
@@ -130,6 +151,7 @@ export function Wallet() {
                 <thead>
                   <tr>
                     {user.role === 'producer' ? <Th>Rider</Th> : null}
+                    <Th>Type</Th>
                     <Th>Item</Th>
                     <Th>Amount</Th>
                     <Th></Th>
@@ -139,10 +161,8 @@ export function Wallet() {
                   {invoices.map((inv) => (
                     <tr key={inv.id}>
                       {user.role === 'producer' ? <Td>{world.riders.find((r) => r.id === inv.riderId)?.name}</Td> : null}
-                      <Td>
-                        {inv.label}
-                        <span className="ml-2 text-xs uppercase text-stone-400">{inv.type}</span>
-                      </Td>
+                      <Td className="capitalize">{inv.fineType ? inv.fineType.replace('-', ' ') : inv.type}</Td>
+                      <Td>{inv.label}</Td>
                       <Td>{rand(inv.amount)}</Td>
                       <Td>
                         {inv.paid ? (
@@ -194,32 +214,6 @@ export function Wallet() {
                     <Td>{t.label}</Td>
                     <Td>{t.dir}</Td>
                     <Td>{rand(t.amount)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
-        )}
-        {tab === 'supporters' && (
-          <TableWrap>
-            <Table>
-              <thead>
-                <tr>
-                  <Th>#</Th>
-                  <Th>Supporter</Th>
-                  <Th>Boosted</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {supporters.map((s, i) => (
-                  <tr key={s.id}>
-                    <Td>{i + 1}</Td>
-                    <Td>
-                      <Link className="underline" to={`/fans/${s.id}`}>
-                        {s.name}
-                      </Link>
-                    </Td>
-                    <Td>{rand(s.amount)}</Td>
                   </tr>
                 ))}
               </tbody>

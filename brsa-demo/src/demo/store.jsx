@@ -3,15 +3,19 @@ import toast from 'react-hot-toast'
 import {
   computeDivisionsAndPlaces,
   entryFee,
+  classForBirthdate,
   estimatePayout,
+  FINE_TYPES,
   membershipFee,
   parseTimesheet,
   pointsForResult,
   PRODUCING_COST,
+  seasonStartDate,
   splitFees,
 } from './money'
-import { createSeed } from './world'
+import { createSeed, isFedStaff, isSysAdmin, migrateUsers } from './world'
 import { applyAccent, defaultAccent } from './accents'
+import { downloadMemberListPdf } from './pdf'
 
 const STORAGE_KEY = 'brsa-pitch-v2'
 const DemoContext = createContext(null)
@@ -22,14 +26,22 @@ function loadWorld() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (parsed?.version === 2) {
+      if (parsed?.version === 4) {
+        const users = migrateUsers(parsed.users ?? seed.users)
+        let currentUserId = parsed.currentUserId === 'admin' ? 'brsa' : parsed.currentUserId
+        if (!users.some((u) => u.id === currentUserId)) currentUserId = seed.currentUserId
         return {
           ...seed,
           ...parsed,
+          users,
+          currentUserId,
           accent: parsed.accent ?? seed.accent,
           viewingFromAdmin: parsed.viewingFromAdmin ?? false,
+          viewAsReturnId: parsed.viewAsReturnId ?? null,
           viewAsLog: parsed.viewAsLog ?? [],
           timeQueries: parsed.timeQueries ?? [],
+          complaints: parsed.complaints ?? seed.complaints,
+          links: { ...seed.links, ...(parsed.links || {}) },
           transactions: parsed.transactions ?? seed.transactions,
           follows: parsed.follows ?? seed.follows,
         }
@@ -84,7 +96,7 @@ export function DemoProvider({ children }) {
     const fan = user.fanId ? world.fans.find((f) => f.id === user.fanId) : null
     const producer = user.producerId ? world.producers.find((p) => p.id === user.producerId) : null
     const topRider = [...world.riders].sort((a, b) => b.points - a.points)[0]
-    const isOps = user.role === 'producer'
+    const isOps = user.role === 'producer' || isFedStaff(user.role)
 
     function riderById(id) {
       return world.riders.find((r) => r.id === id)
@@ -148,12 +160,17 @@ export function DemoProvider({ children }) {
     function switchUser(userId, { reason } = {}) {
       setWorld((w) => {
         const target = w.users.find((u) => u.id === userId)
-        const inspecting = userId !== 'admin' && (w.currentUserId === 'admin' || w.viewingFromAdmin)
+        const current = w.users.find((u) => u.id === w.currentUserId)
+        const staffLooking = isFedStaff(current?.role) || w.viewingFromAdmin
+        const inspecting = staffLooking && !isFedStaff(target?.role)
         return {
           ...w,
           currentUserId: userId,
           viewingFromAdmin: inspecting,
-          viewAsLog: inspecting && (w.currentUserId === 'admin' || w.viewingFromAdmin)
+          viewAsReturnId: inspecting
+            ? w.viewAsReturnId || (isFedStaff(current?.role) ? current.id : 'brsa')
+            : w.viewAsReturnId,
+          viewAsLog: inspecting
             ? [
                 { at: new Date().toISOString(), userId, name: target?.name, role: target?.role, reason: reason || 'Support' },
                 ...(w.viewAsLog ?? []),
@@ -163,14 +180,23 @@ export function DemoProvider({ children }) {
       })
     }
     function demoSwitch(userId) {
-      setWorld((w) => ({ ...w, currentUserId: userId, viewingFromAdmin: false }))
+      setWorld((w) => ({ ...w, currentUserId: userId, viewingFromAdmin: false, viewAsReturnId: null }))
     }
     function exitViewAs() {
-      setWorld((w) => ({ ...w, currentUserId: 'admin', viewingFromAdmin: false }))
+      setWorld((w) => ({
+        ...w,
+        currentUserId: w.viewAsReturnId || 'brsa',
+        viewingFromAdmin: false,
+        viewAsReturnId: null,
+      }))
     }
     function resetDemo() {
+      if (!isSysAdmin(user.role)) {
+        toast.error('Only a sys admin can restore the sample season')
+        return
+      }
       const next = birthdayPosts(createSeed())
-      next.currentUserId = 'admin'
+      next.currentUserId = 'sysadmin'
       setWorld(next)
       toast.success('Season restored on this device')
     }
@@ -181,6 +207,10 @@ export function DemoProvider({ children }) {
       setWorld((w) => ({ ...w, appPrice: Number(value) || 0 }))
     }
     function setAccent(accent, { quiet } = {}) {
+      if (!isSysAdmin(user.role)) {
+        toast.error('Season accent is a sys-admin tool')
+        return
+      }
       setWorld((w) => ({ ...w, accent }))
       if (!quiet) toast.success(`Season accent · ${accent.name}`)
     }
@@ -264,6 +294,11 @@ export function DemoProvider({ children }) {
       if (fines.length) {
         toast.error('Unpaid fine blocks this entry')
         return { ok: false, blocked: true }
+      }
+      const dues = unpaidMembership(riderId)
+      if (dues.length && !guest) {
+        toast.error('Membership renewal is due — pay it before you enter')
+        return { ok: false, blocked: 'membership' }
       }
       const existing = world.entries.find(
         (e) => e.eventId === eventId && e.riderId === riderId && e.horseId === horseId && e.class === klass,
@@ -377,13 +412,20 @@ export function DemoProvider({ children }) {
       }
     }
 
-    function makeOfficial(eventId) {
+    function makeOfficial(eventId, { override } = {}) {
       if (!isOps && user.role !== 'producer') {
         toast.error('Producer marks results official')
         return
       }
       const event = eventById(eventId)
       if (!event || event.official) return
+      if (event.resultsPostedAt && !override) {
+        const openUntil = new Date(event.resultsPostedAt).getTime() + 7 * 86400000
+        if (Date.now() < openUntil) {
+          toast.error('7-day unofficial window is still open')
+          return
+        }
+      }
       const prevTop = topRider?.id
       setWorld((w) => {
         const paid = w.entries.filter((e) => e.eventId === eventId && e.paid)
@@ -408,8 +450,9 @@ export function DemoProvider({ children }) {
           }
         }
 
+        const liveEvent = w.events.find((e) => e.id === eventId)
         const gross = paid.reduce((s, e) => s + e.fee, 0)
-        const producing = paid.length * PRODUCING_COST
+        const producing = paid.length * (liveEvent?.adminFee ?? PRODUCING_COST)
         const split = splitFees(gross, producing)
         const firsts = results.filter((r) => r.place === 1)
         const seconds = results.filter((r) => r.place === 2)
@@ -590,7 +633,7 @@ export function DemoProvider({ children }) {
 
     function boostRider(riderId, amount = 50) {
       if (!fan && !rider) {
-        toast.error('Boosts are sent from a supporter or rider account')
+        payRiderDirect(riderId, amount)
         return
       }
       const from = fan ?? rider
@@ -641,6 +684,25 @@ export function DemoProvider({ children }) {
       toast.success('Payment sent')
     }
 
+    function fundWallet(amount, owner) {
+      const who = owner ?? (rider ? { id: rider.id, type: 'rider' } : fan ? { id: fan.id, type: 'fan' } : null)
+      const n = Number(amount)
+      if (!who) return
+      if (!Number.isFinite(n) || n <= 0) {
+        toast.error('Enter an amount')
+        return
+      }
+      setWorld((w) => {
+        let next =
+          who.type === 'rider'
+            ? { ...w, riders: w.riders.map((x) => (x.id === who.id ? { ...x, wallet: x.wallet + n } : x)) }
+            : { ...w, fans: w.fans.map((x) => (x.id === who.id ? { ...x, wallet: x.wallet + n } : x)) }
+        next = addTx(next, { ownerId: who.id, ownerType: who.type, dir: 'credit', amount: n, label: 'Added from bank' })
+        return next
+      })
+      toast.success(`Added R${n}`)
+    }
+
     function withdrawWallet(amount, owner) {
       const who = owner ?? (rider ? { id: rider.id, type: 'rider' } : fan ? { id: fan.id, type: 'fan' } : null)
       if (!who) return
@@ -688,19 +750,29 @@ export function DemoProvider({ children }) {
       )
     }
 
-    function issueFine({ riderId, amount, label }) {
+    function issueFine({ riderId, amount, label, fineType }) {
       if (!isOps) {
         toast.error('Producer issues fines')
         return
       }
+      const type = FINE_TYPES.find((t) => t.id === fineType || t.label === fineType) || FINE_TYPES.find((t) => t.label === label) || { id: 'penalty', label: label || 'Penalty' }
       setWorld((w) => ({
         ...w,
         invoices: [
           ...w.invoices,
-          { id: `inv-fine-${Date.now()}`, riderId, type: 'fine', label, amount: Number(amount), paid: false, createdAt: new Date().toISOString() },
+          {
+            id: `inv-fine-${Date.now()}`,
+            riderId,
+            type: 'fine',
+            fineType: type.id,
+            label: label || `${type.label} fine`,
+            amount: Number(amount),
+            paid: false,
+            createdAt: new Date().toISOString(),
+          },
         ],
       }))
-      toast.success('Fine issued')
+      toast.success(`${type.label} issued`)
     }
 
     function adjustPoints(riderId, delta, note) {
@@ -752,29 +824,81 @@ export function DemoProvider({ children }) {
     }
 
     function saveProfile(riderId, patch) {
-      setWorld((w) => ({ ...w, riders: w.riders.map((r) => (r.id === riderId ? { ...r, ...patch } : r)) }))
+      setWorld((w) => ({
+        ...w,
+        riders: w.riders.map((r) => {
+          if (r.id !== riderId) return r
+          const next = { ...r, ...patch }
+          if (patch.birthday) {
+            const klass = classForBirthdate(patch.birthday, seasonStartDate(w.season))
+            if (klass && !['Open', 'Training', 'Futurity'].includes(r.class)) next.class = klass
+          }
+          return next
+        }),
+      }))
       toast.success('Profile saved')
     }
 
     function saveHorse(horseId, patch) {
+      const horse = horseById(horseId)
+      const nextAge = Number(patch.age ?? horse?.age)
+      if ((patch.futurity ?? horse?.futurity) && nextAge > 5) {
+        toast.error('Futurity horses must be 5 or under')
+        return
+      }
       setWorld((w) => ({ ...w, horses: w.horses.map((h) => (h.id === horseId ? { ...h, ...patch } : h)) }))
       toast.success('Horse saved')
     }
 
-    function registerHorse(riderId, patch) {
+    function registerHorse(riderId, patch = {}) {
+      const name = String(patch.name || '').trim()
+      if (!name) {
+        toast.error('Give the horse a name')
+        return null
+      }
+      if (patch.futurity && Number(patch.age) > 5) {
+        toast.error('Futurity horses must be 5 or under')
+        return null
+      }
       const id = `h-${Date.now()}`
-      setWorld((w) => ({ ...w, horses: [...w.horses, { id, riderId, name: patch.name || 'New horse', sex: 'Gelding', age: 6, lte: 0, futurity: false, points: 0, sire: '—', dam: '—', colour: 'Bay', height: '15.0hh', ...patch }] }))
-      toast.success('Horse registered')
+      setWorld((w) => ({
+        ...w,
+        horses: [
+          ...w.horses,
+          {
+            id,
+            riderId,
+            name,
+            sex: patch.sex || 'Gelding',
+            age: Number(patch.age) || 6,
+            lte: 0,
+            futurity: Boolean(patch.futurity),
+            points: 0,
+            sire: patch.sire || '—',
+            dam: patch.dam || '—',
+            colour: patch.colour || 'Bay',
+            height: patch.height || '15.0hh',
+            photo: null,
+            ...patch,
+            name,
+          },
+        ],
+      }))
+      toast.success(`${name} is on the card`)
       return id
     }
 
-    function postCommunity({ text, kind = 'photo', videoUrl, resultId }) {
+    function postCommunity({ text, kind = 'photo', videoUrl, resultId, photo }) {
       const author = rider || fan
       if (!author) return
+      if (kind === 'photo' && !photo) {
+        toast.error('Crop a photo before you post')
+        return
+      }
       setWorld((w) => ({
         ...w,
         community: [
-          { id: `com-${Date.now()}`, riderId: rider?.id, fanId: fan?.id, at: new Date().toISOString(), kind, text, videoUrl, resultId, likes: [], comments: [] },
+          { id: `com-${Date.now()}`, riderId: rider?.id, fanId: fan?.id, at: new Date().toISOString(), kind, text, videoUrl, resultId, photo, likes: [], comments: [] },
           ...w.community,
         ],
       }))
@@ -782,15 +906,28 @@ export function DemoProvider({ children }) {
     }
 
     function likeCommunity(postId) {
-      const who = rider?.id || fan?.id
-      if (!who) return
+      reactCommunity(postId, 'heart')
+    }
+
+    function reactCommunity(postId, emoji) {
+      const who = rider?.id || fan?.id || user?.id
+      if (!who) {
+        toast.error('Switch to a member to react')
+        return
+      }
       setWorld((w) => ({
         ...w,
-        community: w.community.map((p) =>
-          p.id === postId
-            ? { ...p, likes: (p.likes || []).includes(who) ? p.likes.filter((x) => x !== who) : [...(p.likes || []), who] }
-            : p,
-        ),
+        community: w.community.map((p) => {
+          if (p.id !== postId) return p
+          if (emoji === 'heart') {
+            const likes = p.likes || []
+            return { ...p, likes: likes.includes(who) ? likes.filter((x) => x !== who) : [...likes, who] }
+          }
+          const key = String(emoji)
+          const current = p.reactions?.[key] || []
+          const next = current.includes(who) ? current.filter((x) => x !== who) : [...current, who]
+          return { ...p, reactions: { ...(p.reactions || {}), [key]: next } }
+        }),
       }))
     }
 
@@ -823,12 +960,14 @@ export function DemoProvider({ children }) {
       toast.success('Posted to the feed')
     }
 
-    function upgradeFanToRider(fanId) {
+    function upgradeFanToRider(fanId, { klass = 'Adult', province = 'Gauteng' } = {}) {
       setWorld((w) => {
         const f = w.fans.find((x) => x.id === fanId)
         if (!f) return w
+        const nextSa = `SA${1000 + w.riders.length + 1}`
         const riderId = `r-${fanId}`
         const user = w.users.find((u) => u.fanId === fanId)
+        const amount = membershipFee(klass)
         return {
           ...w,
           riders: [
@@ -836,21 +975,38 @@ export function DemoProvider({ children }) {
             {
               id: riderId,
               name: f.name,
-              sa: 'SA-NEW',
-              class: 'Adult',
-              province: 'Gauteng',
+              sa: nextSa,
+              class: klass,
+              province,
               points: 0,
               lte: 0,
               earnings: 0,
               wallet: f.wallet,
-              membershipNote: 'Day member',
+              membershipNote: 'Member · due',
               debitOrder: false,
+              joinedAt: new Date().toISOString().slice(0, 10),
               bio: f.bio || '',
               sponsors: [],
               photo: f.name.slice(0, 1),
               cover: 'dust',
               bank: f.bank || {},
             },
+          ],
+          invoices: [
+            ...w.invoices,
+            {
+              id: `inv-mem-${riderId}`,
+              riderId,
+              type: 'membership',
+              label: `${klass} membership 2026/27`,
+              amount,
+              paid: false,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+          feed: [
+            { id: `feed-welcome-${riderId}`, type: 'system', at: new Date().toISOString(), riderId, text: `${f.name} joined as a rider (${nextSa}).` },
+            ...w.feed,
           ],
           users: w.users.map((u) => (u.id === user?.id ? { ...u, role: 'rider', riderId, fanId: undefined } : u)),
           currentUserId: user?.id || w.currentUserId,
@@ -859,6 +1015,90 @@ export function DemoProvider({ children }) {
       toast.success('Upgraded to rider')
     }
 
+    function recomputeAgeClasses() {
+      if (!isOps) return
+      let changed = 0
+      setWorld((w) => {
+        const asOf = seasonStartDate(w.season)
+        const riders = w.riders.map((r) => {
+          if (!r.birthday || ['Open', 'Training', 'Futurity'].includes(r.class)) return r
+          const klass = classForBirthdate(r.birthday, asOf)
+          if (klass && klass !== r.class) {
+            changed += 1
+            return { ...r, class: klass }
+          }
+          return r
+        })
+        return { ...w, riders }
+      })
+      toast.success(changed ? `Updated ${changed} class${changed === 1 ? '' : 'es'}` : 'No class changes')
+    }
+
+    function setLinks(patch) {
+      setWorld((w) => ({ ...w, links: { ...w.links, ...patch } }))
+    }
+
+    function submitComplaint({ reason, message }) {
+      const who = rider || fan
+      if (!who) {
+        toast.error('Sign in as a rider or supporter to send a complaint')
+        return
+      }
+      setWorld((w) => ({
+        ...w,
+        complaints: [
+          {
+            id: `cmp-${Date.now()}`,
+            fromId: who.id,
+            fromRole: rider ? 'rider' : 'fan',
+            reason,
+            message,
+            status: 'open',
+            at: new Date().toISOString(),
+            replies: [],
+          },
+          ...(w.complaints || []),
+        ],
+      }))
+      toast.success('Complaint sent')
+    }
+
+    function replyToComplaint(id, text) {
+      if (user.role !== 'producer' && !isFedStaff(user.role)) return
+      const from = isFedStaff(user.role) ? (isSysAdmin(user.role) ? 'Sys admin' : 'BRSA') : 'producer'
+      setWorld((w) => ({
+        ...w,
+        complaints: (w.complaints || []).map((c) =>
+          c.id === id ? { ...c, replies: [...(c.replies || []), { at: new Date().toISOString(), from, text }] } : c,
+        ),
+      }))
+      toast.success('Reply sent')
+    }
+
+    function resolveComplaint(id) {
+      if (user.role !== 'producer' && !isFedStaff(user.role)) return
+      setWorld((w) => ({
+        ...w,
+        complaints: (w.complaints || []).map((c) => (c.id === id ? { ...c, status: 'resolved', resolvedAt: new Date().toISOString() } : c)),
+      }))
+      toast.success('Marked resolved')
+    }
+
+    function downloadMemberList() {
+      downloadMemberListPdf(world.riders, { season: world.season })
+      toast.success('Member list PDF downloaded')
+    }
+
+    const unpaidInvoiceCount = user.role === 'producer'
+      ? world.invoices.filter((i) => !i.paid).length
+      : rider
+        ? world.invoices.filter((i) => i.riderId === rider.id && !i.paid).length
+        : 0
+    const openComplaints = (world.complaints || []).filter((c) => c.status === 'open')
+    const pendingComplaints = user.role === 'producer' || isFedStaff(user.role)
+      ? openComplaints.length
+      : openComplaints.filter((c) => c.fromId === (rider?.id || fan?.id)).length
+
     return {
       world,
       user,
@@ -866,6 +1106,8 @@ export function DemoProvider({ children }) {
       fan,
       producer,
       isOps,
+      isFedStaff: isFedStaff(user.role),
+      isSysAdmin: isSysAdmin(user.role),
       viewingFromAdmin: Boolean(world.viewingFromAdmin),
       topRider,
       riderById,
@@ -874,12 +1116,20 @@ export function DemoProvider({ children }) {
       fanById,
       unpaidFines,
       unpaidMembership,
+      unpaidInvoiceCount,
+      pendingComplaints,
       entriesFor,
       resultsFor,
       officialStandings,
       horseStandings,
       topSupporters,
-      estimateEventPayout: (eventId) => estimatePayout(world.entries.filter((e) => e.eventId === eventId && e.paid)),
+      estimateEventPayout: (eventId) => {
+        const event = world.events.find((e) => e.id === eventId)
+        return estimatePayout(
+          world.entries.filter((e) => e.eventId === eventId && e.paid),
+          event?.adminFee ?? PRODUCING_COST,
+        )
+      },
       switchUser,
       demoSwitch,
       exitViewAs,
@@ -887,6 +1137,7 @@ export function DemoProvider({ children }) {
       setMembershipIncludesApp,
       setAppPrice,
       setAccent,
+      setLinks,
       payInvoice,
       issueMembershipInvoice,
       enterEvent,
@@ -900,6 +1151,7 @@ export function DemoProvider({ children }) {
       resolveQuery,
       boostRider,
       payRiderDirect,
+      fundWallet,
       withdrawWallet,
       updateBankDetails,
       setDebitOrder,
@@ -913,10 +1165,16 @@ export function DemoProvider({ children }) {
       registerHorse,
       postCommunity,
       likeCommunity,
+      reactCommunity,
       commentCommunity,
       toggleFollow,
       postNews,
       upgradeFanToRider,
+      recomputeAgeClasses,
+      downloadMemberList,
+      submitComplaint,
+      replyToComplaint,
+      resolveComplaint,
     }
   }, [world])
 

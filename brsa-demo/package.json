@@ -10,12 +10,14 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.577.0",
-    "rules-engine": "github:Geck018/rules-engine",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "react-easy-crop": "^5.5.7",
     "react-hot-toast": "^2.6.0",
-    "react-router-dom": "^7.13.1"
+    "react-router-dom": "^7.13.1",
+    "rules-engine": "github:Geck018/rules-engine"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",

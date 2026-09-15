@@ -15,13 +15,16 @@ export function Table({ className, ...props }) {
   )
 }
 
-export function Th({ className, ...props }) {
+export function Th({ className, children, filter, ...props }) {
   return (
     <th
-      className={cn('whitespace-nowrap border-b px-3 py-3 font-semibold text-stone-700 sm:px-4', className)}
+      className={cn('border-b px-3 py-3 align-bottom font-semibold text-stone-700 sm:px-4', className)}
       style={{ borderBottomColor: 'color-mix(in srgb, var(--season) 32%, #ddd6c4)' }}
       {...props}
-    />
+    >
+      <span className="block whitespace-nowrap">{children}</span>
+      {filter ? <div className="mt-1.5 min-w-[7.5rem] font-normal">{filter}</div> : null}
+    </th>
   )
 }
 

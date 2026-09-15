@@ -26,7 +26,7 @@ export function Ask() {
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-season">BRSA's rules assistant</p>
             <h1 className="mt-2 font-display text-4xl font-bold text-white sm:text-5xl">Meet Barry</h1>
             <p className="mx-auto mt-3 max-w-md text-sm text-stone-300 sm:text-base">
-              Ask about membership, 1D–5D cuts, payouts, protests, or anything else in the BRSA rulebook — day or night.
+              Ask about membership, 3D payouts, protests, Championships, or anything else in the 2026 BRSA rulebook — day or night.
             </p>
           </div>
         </div>

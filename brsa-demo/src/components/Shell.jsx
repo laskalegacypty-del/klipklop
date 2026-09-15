@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   Clock,
   Home,
+  Inbox,
   Landmark,
   LayoutDashboard,
   Menu,
@@ -16,20 +17,23 @@ import {
   Trophy,
   Users,
   Wallet,
+  Wrench,
   X,
 } from 'lucide-react'
 import { useDemo } from '../demo/store'
-import { roleLabel } from '../demo/world'
+import { isFedStaff, isSysAdmin, roleLabel } from '../demo/world'
 import { AccountMenu } from './AccountMenu'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 
 export function Shell() {
-  const { world, user, rider, viewingFromAdmin, exitViewAs, demoSwitch } = useDemo()
+  const { world, user, rider, viewingFromAdmin, exitViewAs, demoSwitch, unpaidInvoiceCount, pendingComplaints } = useDemo()
   const navigate = useNavigate()
   const location = useLocation()
   const [q, setQ] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const fed = isFedStaff(user.role)
+  const sys = isSysAdmin(user.role)
 
   const hits = useMemo(() => {
     const query = q.trim().toLowerCase()
@@ -50,16 +54,37 @@ export function Shell() {
     { to: '/', label: 'Home', icon: Home, show: true, end: true, dock: user.role !== 'rider' },
     { to: '/dashboard', label: 'My season', icon: LayoutDashboard, show: user.role === 'rider', dock: user.role === 'rider' },
     { to: '/events', label: 'Events', icon: CalendarDays, show: true, dock: true },
-    { to: '/standings', label: 'Standings', icon: Trophy, show: true, dock: user.role === 'admin' },
+    { to: '/standings', label: 'Standings', icon: Trophy, show: true, dock: fed },
     { to: '/feed', label: 'News', icon: Newspaper, show: true },
-    { to: '/community', label: 'Yard', icon: Users, show: user.role !== 'admin', dock: user.role === 'fan' },
-    { to: '/wallet', label: 'Money', icon: Wallet, show: user.role === 'rider' || user.role === 'fan' || user.role === 'producer', dock: user.role === 'rider' || user.role === 'fan' || user.role === 'producer' },
-    { to: '/times', label: 'My times', icon: Clock, show: user.role === 'rider' || user.role === 'producer', dock: user.role === 'rider' },
+    { to: '/community', label: 'Yard', icon: Users, show: true, dock: user.role === 'fan' },
+    {
+      to: '/wallet',
+      label: 'Money',
+      icon: Wallet,
+      show: user.role === 'rider' || user.role === 'fan' || user.role === 'producer' || sys,
+      dock: user.role === 'rider' || user.role === 'fan' || user.role === 'producer',
+      badge: unpaidInvoiceCount,
+    },
+    { to: '/times', label: 'My times', icon: Clock, show: user.role === 'rider', dock: user.role === 'rider' },
+    {
+      to: '/complaints',
+      label: 'Complaints',
+      icon: Inbox,
+      show: user.role === 'rider' || user.role === 'fan' || user.role === 'producer' || fed,
+      badge: pendingComplaints,
+    },
     { to: '/hof', label: 'Hall of Fame', icon: Landmark, show: true },
     { to: '/rules', label: 'Rules', icon: BookOpen, show: true },
     { to: '/barry', label: 'Barry', icon: MessageCircle, show: true },
-    { to: '/producer', label: 'Show office', icon: CalendarDays, show: user.role === 'producer', dock: user.role === 'producer' },
-    { to: '/admin', label: 'Help a member', icon: Shield, show: user.role === 'admin', dock: user.role === 'admin' },
+    {
+      to: '/producer',
+      label: 'Show office',
+      icon: CalendarDays,
+      show: user.role === 'producer' || fed,
+      dock: user.role === 'producer',
+    },
+    { to: '/admin', label: 'BRSA office', icon: Shield, show: fed, dock: fed && !sys },
+    { to: '/dev', label: 'Dev tools', icon: Wrench, show: sys, dock: sys },
   ].filter((item) => item.show)
 
   useEffect(() => {
@@ -77,8 +102,9 @@ export function Shell() {
   }, [menuOpen])
 
   function goAdminDesk() {
+    const back = world.viewAsReturnId || 'brsa'
     exitViewAs()
-    navigate('/admin')
+    navigate(back === 'sysadmin' ? '/dev' : '/admin')
     setMenuOpen(false)
   }
 
@@ -97,7 +123,10 @@ export function Shell() {
           }
         >
           <item.icon size={16} />
-          {item.label}
+          <span className="flex-1">{item.label}</span>
+          {item.badge ? (
+            <span className="rounded-full bg-brand-400 px-1.5 text-[10px] font-bold text-charcoal">{item.badge}</span>
+          ) : null}
         </NavLink>
       ))}
     </nav>
@@ -182,7 +211,7 @@ export function Shell() {
               >
                 {world.users.map((u) => (
                   <option key={u.id} value={u.id} className="text-charcoal">
-                    {u.name.split(' ')[0]}
+                    {isFedStaff(u.role) ? roleLabel(u.role) : u.name.split(' ')[0]}
                   </option>
                 ))}
               </select>
@@ -233,6 +262,16 @@ export function Shell() {
         <main className="min-w-0 flex-1 px-4 py-6 pb-24 sm:px-6 lg:pb-16">
           <div className="mx-auto max-w-6xl">
             <Outlet />
+            <footer className="mt-10 flex flex-wrap items-center gap-3 border-t border-dust-200 pt-4 text-xs text-stone-500">
+              <span>BRSA {world.season}</span>
+              {Object.entries(world.links || {})
+                .filter(([, href]) => href)
+                .map(([key, href]) => (
+                  <a key={key} href={href} className="capitalize underline hover:text-charcoal" target="_blank" rel="noreferrer">
+                    {key}
+                  </a>
+                ))}
+            </footer>
           </div>
         </main>
       </div>
@@ -251,7 +290,14 @@ export function Shell() {
                   `flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-semibold ${isActive ? 'text-brand-300' : 'text-stone-300'}`
                 }
               >
-                <item.icon size={18} />
+                <span className="relative">
+                  <item.icon size={18} />
+                  {item.badge ? (
+                    <span className="absolute -right-2 -top-1 min-w-[1rem] rounded-full bg-brand-400 px-1 text-[9px] font-bold leading-4 text-charcoal">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </span>
                 {item.label}
               </NavLink>
             ))}

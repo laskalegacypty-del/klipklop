@@ -1,11 +1,43 @@
 import { CLASS_FEES, HOF_CATEGORIES } from './money'
 import { defaultAccent } from './accents'
 
-const UNOFFICIAL_POSTED = '2026-08-30T16:00:00+02:00'
+const UNOFFICIAL_POSTED = '2026-09-10T16:00:00+02:00'
+
+/** Pitch account levels (high → low): sysadmin → brsa → producer → rider/fan */
+export function isSysAdmin(role) {
+  return role === 'sysadmin'
+}
+
+export function isBrsa(role) {
+  return role === 'brsa' || role === 'admin'
+}
+
+/** Federation staff: BRSA management + sys admins */
+export function isFedStaff(role) {
+  return isSysAdmin(role) || isBrsa(role)
+}
 
 export function roleLabel(role) {
   if (!role) return ''
+  if (role === 'sysadmin') return 'Sys admin'
+  if (role === 'brsa' || role === 'admin') return 'BRSA'
   return role.charAt(0).toUpperCase() + role.slice(1)
+}
+
+export function migrateUsers(users = []) {
+  const next = users.map((u) => {
+    if (u.id === 'admin' || u.role === 'admin') {
+      return { ...u, id: u.id === 'admin' ? 'brsa' : u.id, role: 'brsa', name: u.name === 'BRSA Support' ? 'BRSA Management' : u.name }
+    }
+    return u
+  })
+  if (!next.some((u) => u.role === 'sysadmin')) {
+    next.unshift({ id: 'sysadmin', username: 'sysadmin', password: 'demo', role: 'sysadmin', name: 'Sys Admin' })
+  }
+  if (!next.some((u) => u.role === 'brsa')) {
+    next.unshift({ id: 'brsa', username: 'brsa', password: 'demo', role: 'brsa', name: 'BRSA Management' })
+  }
+  return next
 }
 
 export const RULE_BOOK = [
@@ -13,19 +45,19 @@ export const RULE_BOOK = [
   { id: 'B', title: 'Classes', body: 'Peewee, Junior, Youth, Adult, Senior, Open, Training and Futurity. A rider enters the class they are a member in. Carry-over is a second run on the same horse for an extra fee.' },
   { id: 'C', title: 'Entries', body: 'Entries close when the books are marked official. Pay-later names stay off the draw until the entry invoice is paid. Producers may take a late (guest) entry on the day.' },
   { id: 'D', title: 'Draw', body: 'The draw is a random shuffle of paid names. Draw numbers are posted before the first horse. A missing number is a producer warning, not an automatic scratch.' },
-  { id: 'E', title: 'Timing & divisions', body: 'Section E.3: divisions 1D–5D are cut every 0.5 seconds off the fastest completed time in that class field. 1D is 0–0.49 seconds off the pace, 2D is 0.50–0.99 seconds off, 3D is 1.00–1.49 seconds off, 4D is 1.50–1.99 seconds off, and 5D is 2.00 seconds or more off the pace. Place is inside the division. A two-run jackpot keeps the better run.' },
-  { id: 'F', title: 'Dress & welfare', body: 'Long sleeve, hat, collar. A welfare steward stands the gate. Abuse or an unsafe horse is a producer scratch and a possible fine.' },
+  { id: 'E', title: 'Timing & divisions', body: 'BRSA currently pays 3D. The split is a straight one second off the fastest completed time in the class. Place is inside the division. A two-run jackpot keeps the better run. Points are still calculated across five divisions in the written book, but payouts run 3D today.' },
+  { id: 'F', title: 'Dress & welfare', body: 'Long sleeve, hat, collar. Under-18s wear a helmet. A welfare steward stands the gate. Abuse or an unsafe horse is a producer scratch and a possible fine.' },
   { id: 'G', title: 'Points', body: 'Five participation points plus 5–1 for places 1–5. Carry-over does not add a bonus. Futurity points sit on the horse; a carry-over credits the rider the same points as the horse.' },
-  { id: 'H', title: 'Payouts', body: 'BRSA takes 30% of gross entry fees first. The remaining 70% is the payout pool. Producing / ground cost comes off that pool to leave the prize money. Wins apply to an unpaid membership invoice unless written off as cash.' },
+  { id: 'H', title: 'Payouts', body: 'The entry includes a set R150 event cost, deducted first. Of the remainder, BRSA keeps 30% and pays out 70% to competitors. Wins apply to an unpaid membership invoice unless written off as cash.' },
   { id: 'I', title: 'Protests', body: 'Unofficial times stand for seven days. A rider may query a time. The producer can accept (re-open for re-timing), reject, or ask for more detail.' },
-  { id: 'J', title: 'Nationals', body: 'Qualification is by class points across official events in the season. The rider Dashboard tracks the cut.' },
+  { id: 'J', title: 'Championships', body: 'Qualification is by class points across official events in the season. The rider Dashboard tracks the cut.' },
   { id: 'K', title: 'Conduct', body: 'Federation voice in the feed. Community is member-to-member. Boosts and gifts are optional and never buy a placing.' },
   { id: 'L', title: 'Records', body: 'Hall of Fame categories: BRSA Record, South African Record, Championship Win, Special Recognition. Category is required; the achievement line is free text.' },
 ]
 
 export function createSeed() {
   return {
-    version: 2,
+    version: 4,
     season: '2026/27',
     membershipIncludesApp: true,
     appPrice: 180,
@@ -36,36 +68,75 @@ export function createSeed() {
       tag: 'Official feed partner',
       mark: 'RF',
     },
-    viewingFromAdmin: false,
+    links: {
+      website: 'https://barrelracing-southafrica.co.za',
+      facebook: 'https://facebook.com/BRSAdemo',
+      instagram: 'https://instagram.com/brsa.demo',
+      tiktok: 'https://tiktok.com/@brsa.demo',
+      whatsapp: 'https://wa.me/27824410091',
+      email: 'mailto:info@brsa.demo',
+    },
     viewAsLog: [],
-    currentUserId: 'admin',
+    currentUserId: 'brsa',
     users: [
-      { id: 'admin', username: 'admin', password: 'demo', role: 'admin', name: 'BRSA Support' },
+      { id: 'sysadmin', username: 'sysadmin', password: 'demo', role: 'sysadmin', name: 'Sys Admin' },
+      { id: 'brsa', username: 'brsa', password: 'demo', role: 'brsa', name: 'BRSA Management' },
       { id: 'rider', username: 'rider', password: 'demo', role: 'rider', name: 'Liani van der Walt', riderId: 'sunny' },
       { id: 'fan', username: 'fan', password: 'demo', role: 'fan', name: 'Sarel Venter', fanId: 'sarel' },
       { id: 'producer', username: 'producer', password: 'demo', role: 'producer', name: 'Ansie Nel', producerId: 'ansie' },
     ],
     riders: [
       rider('sunny', 'Liani van der Walt', 'SA1001', 'Adult', 'Gauteng', 16, 18400, 4200, 420, 'Member · due 15 Sep', {
-        birthday: '1994-09-10',
+        birthday: null,
         debitOrder: true,
-        bio: 'Gauteng Adult. Diesel in the 1D, Cinder coming through in Youth/Open schooling. Season desk is this phone.',
-        sponsors: ['Dust & Diesel Outfitters', 'Rietvlei Feeds'],
-        photo: 'LV',
-        cover: 'arena',
+        joinedAt: '2024-07-12',
+        bio: 'Liani rides out of Gauteng with two horses on the trailer — Diesel in the 1D and her Appaloosa gelding Eagle bringing the experience. Chasing a Championships qualification this season.',
+        sponsors: ['Dust & Diesel Outfitters', 'Highveld Tack & Feed'],
+        photo: '/photos/Liani_ProfilePhoto.jpg',
+        cover: '/photos/Liani_CoverPhoto.jpg',
+        achievements: ['2025 Rookie of the Year', '2026 West Fest Jackpot Champion — 1D', 'Gauteng Adult Division — Season Top 5'],
         bank: { bank: 'FNB', account: '6274 1190 03', branch: '250655' },
       }),
-      rider('ruan', 'Ruan Botha', 'SA1002', 'Adult', 'Western Cape', 18, 31200, 9800, 1100),
-      rider('lindi', 'Lindi van Wyk', 'SA1008', 'Youth', 'Free State', 12, 14100, 3600, 280, 'Member', { birthday: '2008-09-12' }),
-      rider('jaco', 'Jaco Steyn', 'SA1015', 'Senior', 'Gauteng', 14, 22100, 5100, 640),
-      rider('thandi', 'Thandi Mokoena', 'SA1020', 'Adult', 'KwaZulu-Natal', 16, 19800, 4400, 510),
-      rider('piet', 'Piet du Preez', 'SA1033', 'Open', 'Eastern Cape', 11, 16700, 3900, 200, 'Day member'),
-      rider('mia', 'Mia Jacobs', 'SA1041', 'Junior', 'Gauteng', 8, 6200, 900, 90),
-      rider('kyle', 'Kyle Adams', 'SA1055', 'Adult', 'Gauteng', 9, 8800, 1500, 150, 'Member · due 1 Oct'),
+      rider('ruan', 'Ruan Botha', 'SA1002', 'Adult', 'Western Cape', 18, 31200, 9800, 1100, 'Member', { joinedAt: '2023-07-01' }),
+      rider('lindi', 'Lindi van Wyk', 'SA1008', 'Youth', 'Free State', 12, 14100, 3600, 280, 'Member', { birthday: '2008-09-12', joinedAt: '2025-08-02' }),
+      rider('jaco', 'Jaco Steyn', 'SA1015', 'Senior', 'Gauteng', 14, 22100, 5100, 640, 'Member', { joinedAt: '2022-07-01' }),
+      rider('thandi', 'Thandi Mokoena', 'SA1020', 'Adult', 'KwaZulu-Natal', 16, 19800, 4400, 510, 'Member', { joinedAt: '2024-09-18' }),
+      rider('piet', 'Piet du Preez', 'SA1033', 'Open', 'Eastern Cape', 11, 16700, 3900, 200, 'Day member', { joinedAt: '2026-08-08' }),
+      rider('mia', 'Mia Jacobs', 'SA1041', 'Junior', 'Gauteng', 8, 6200, 900, 90, 'Member', { joinedAt: '2026-07-20' }),
+      rider('kyle', 'Kyle Adams', 'SA1055', 'Adult', 'Gauteng', 9, 8800, 1500, 150, 'Member · due 1 Oct', { joinedAt: '2025-07-04' }),
     ],
     horses: [
-      horse('diesel', 'Diesel', 'sunny', { sex: 'Gelding', age: 8, lte: 9200, rank: 4, sire: 'Dash Ta Fame', dam: 'Frenchmans Easy', colour: 'Sorrel', height: '15.1hh' }),
-      horse('cinder', 'Cinder', 'sunny', { sex: 'Mare', age: 5, lte: 2100, rank: 9, sire: 'Frenchmans Guy', dam: 'Streakin Six', colour: 'Bay', height: '14.3hh' }),
+      horse('diesel', 'Diesel', 'sunny', {
+        sex: 'Gelding',
+        age: 8,
+        breed: 'American Quarter Horse',
+        lte: 9200,
+        rank: 4,
+        sire: 'Dash For Diesel',
+        dam: 'Sunny Miss',
+        colour: 'Sorrel',
+        height: '15.0hh',
+        registered: false,
+        vaccinationProof: true,
+        bio: 'Steady in the alley, strongest first-barrel turn on the card.',
+        photo: null,
+      }),
+      horse('eagle', 'Eagle', 'sunny', {
+        sex: 'Gelding',
+        age: 16,
+        breed: 'Appaloosa',
+        lte: 2100,
+        rank: 9,
+        sire: "Chief's Eagle",
+        dam: 'Dixie Spot',
+        colour: 'Leopard Appaloosa',
+        height: '14.3hh',
+        registered: true,
+        vaccinationProof: true,
+        achievements: ['2026 Karoo Night Rodeo — 2D Reserve'],
+        bio: 'Seasoned campaigner — experienced in the alley and steady even in a loud rodeo crowd.',
+        photo: '/photos/Eagle_Photo.jpg',
+      }),
       horse('comet', 'Comet', 'ruan', { sex: 'Mare', age: 7, lte: 15400, rank: 1 }),
       horse('pepper', 'Pepper', 'lindi', { sex: 'Mare', age: 6, lte: 7100, rank: 6 }),
       horse('smoke', 'Smoke', 'jaco', { sex: 'Gelding', age: 12, lte: 12100, rank: 3 }),
@@ -186,6 +257,7 @@ export function createSeed() {
         id: 'inv-fine-sunny',
         riderId: 'sunny',
         type: 'fine',
+        fineType: 'late-admin',
         label: 'Late admin fee — Karoo Night Rodeo',
         amount: 250,
         paid: false,
@@ -259,7 +331,7 @@ export function createSeed() {
         id: 'feed-rule',
         type: 'rule',
         at: '2026-07-15T09:00:00+02:00',
-        text: 'Rule update: 30% BRSA admin is taken from gross entry fees before producing cost.',
+        text: 'Rule update: producing cost (R150) comes off first; BRSA then keeps 30% of the remainder and pays out 70%.',
       },
       {
         id: 'feed-hof',
@@ -294,6 +366,7 @@ export function createSeed() {
       { id: 'hof-2', year: '2025/26', category: 'brsa-record', title: 'BRSA Record', name: 'Ruan Botha', horse: 'Comet', achievement: '16.210 Open — Highveld Finals' },
       { id: 'hof-3', year: '2024/25', category: 'sa-record', title: 'South African Record', name: 'Annelie Vos', horse: 'Cinnamon', achievement: '15.980 Youth — SA Champs' },
       { id: 'hof-4', year: '2024/25', category: 'special', title: 'Biggest Fan', name: 'Sarel Venter', achievement: 'Most boosts in a season' },
+      { id: 'hof-5', year: '2025/26', category: 'producer-year', title: 'Producer of the Year', name: 'Ansie Nel', achievement: 'Western Cape — 2025/26' },
     ],
     hofCategories: HOF_CATEGORIES,
     priorYearStandings: {
@@ -308,7 +381,29 @@ export function createSeed() {
         { rank: 3, name: 'Jaco Steyn', class: 'Senior', points: 61, province: 'Gauteng' },
       ],
     },
-    pointAdjustments: [],
+    complaints: [
+      {
+        id: 'cmp-1',
+        fromId: 'sunny',
+        fromRole: 'rider',
+        reason: 'Draw / running order',
+        message: 'West Fest heat 2 started before Diesel was at the gate. Asking the office to look at the clock.',
+        status: 'open',
+        at: '2026-09-05T18:10:00+02:00',
+        replies: [],
+      },
+      {
+        id: 'cmp-2',
+        fromId: 'sarel',
+        fromRole: 'fan',
+        reason: 'Membership / app',
+        message: 'Boost receipt did not show on Liani’s public profile the same evening.',
+        status: 'resolved',
+        at: '2026-08-21T09:00:00+02:00',
+        replies: [{ at: '2026-08-21T11:20:00+02:00', from: 'producer', text: 'Feed item was delayed; it is up now.' }],
+        resolvedAt: '2026-08-21T11:20:00+02:00',
+      },
+    ],
     follows: { sarel: ['sunny'], ruan: ['sunny'] },
     toasts: [],
   }
@@ -328,6 +423,7 @@ function rider(id, name, sa, klass, province, points, lte, earnings, wallet, mem
     membershipNote,
     debitOrder: extra.debitOrder ?? false,
     birthday: extra.birthday ?? null,
+    joinedAt: extra.joinedAt ?? '2024-07-01',
     bio: extra.bio ?? `${name.split(' ')[0]} rides out of ${province}. Season ${klass}.`,
     sponsors: extra.sponsors ?? (id === 'sunny' ? ['Dust & Diesel Outfitters'] : []),
     photo: extra.photo ?? name.slice(0, 1),
@@ -352,6 +448,13 @@ function horse(id, name, riderId, extra = {}) {
     dam: extra.dam ?? '—',
     colour: extra.colour ?? 'Bay',
     height: extra.height ?? '15.0hh',
+    breed: extra.breed ?? '',
+    registered: extra.registered ?? false,
+    vaccinationProof: extra.vaccinationProof ?? false,
+    birthdateProof: extra.birthdateProof ?? false,
+    bio: extra.bio ?? '',
+    photo: extra.photo ?? null,
+    achievements: extra.achievements ?? [],
   }
 }
 

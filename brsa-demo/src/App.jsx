@@ -19,6 +19,7 @@ import { Barry } from './pages/Barry'
 import { Ask } from './pages/Ask'
 import { AdminPage } from './pages/AdminPage'
 import { ProducerPage } from './pages/ProducerPage'
+import { Complaints } from './pages/Complaints'
 import { MyTimes } from './pages/MyTimes'
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/wallet" element={<Wallet />} />
         <Route path="/invoices" element={<Navigate to="/wallet" replace />} />
         <Route path="/times" element={<MyTimes />} />
+        <Route path="/complaints" element={<Complaints />} />
         <Route path="/riders/:riderId" element={<RiderProfile />} />
         <Route path="/horses/:horseId" element={<HorseProfile />} />
         <Route path="/fans/:fanId" element={<FanProfile />} />
@@ -46,6 +48,7 @@ export default function App() {
         <Route path="/barry" element={<Barry />} />
         <Route path="/brandy" element={<Navigate to="/barry" replace />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/dev" element={<AdminPage mode="dev" />} />
         <Route path="/producer" element={<ProducerPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
