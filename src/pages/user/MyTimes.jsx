@@ -734,7 +734,7 @@ export default function MyTimes() {
     ? (selectedRider?.rider_name || 'Rider')
     : (profile?.rider_name || 'Rider')
 
-  async function handleExport(format) {
+  async function handleExport(format, section = 'all') {
     if (format === 'csv') {
       const rows = [
         // Metadata block
@@ -788,6 +788,7 @@ export default function MyTimes() {
       const existing = document.getElementById('mytimes-print-style')
       if (existing) existing.remove()
 
+      const pbOnly = section === 'personal-bests'
       const style = document.createElement('style')
       style.id = 'mytimes-print-style'
       style.textContent = `
@@ -816,6 +817,13 @@ export default function MyTimes() {
             page-break-after: avoid;
             break-after: avoid;
           }
+          ${pbOnly ? `
+            #mytimes-print-area .print-page:not(.print-page-pb) { display: none !important; }
+            #mytimes-print-area .print-page-pb {
+              page-break-after: avoid !important;
+              break-after: avoid !important;
+            }
+          ` : ''}
         }
       `
       document.head.appendChild(style)
@@ -925,10 +933,17 @@ export default function MyTimes() {
                 </button>
                 <button
                   onClick={() => handleExport('pdf')}
-                  className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
                 >
                   <span className="font-medium">Export PDF</span>
                   <span className="block text-xs text-gray-400">Qualifier grid, landscape</span>
+                </button>
+                <button
+                  onClick={() => handleExport('pdf', 'personal-bests')}
+                  className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <span className="font-medium">Download PBs as PDF</span>
+                  <span className="block text-xs text-gray-400">Personal bests table only</span>
                 </button>
               </div>
             </div>
@@ -1855,7 +1870,7 @@ export default function MyTimes() {
           <div id="mytimes-print-area" style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '1100px', background: 'white' }}>
 
             {/* ── PAGE 1: Personal Bests ─────────────────────────────────────── */}
-            <div className="print-page" style={{ padding: '0', ...P }}>
+            <div className="print-page print-page-pb" style={{ padding: '0', ...P }}>
               <PageHeader section="Personal Bests" />
 
               {/* Nationals summary strip */}

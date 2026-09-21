@@ -6,6 +6,7 @@ import { wmg } from '../lib/rulesDomains/wmg'
 import { MATRIX, getLevel } from '../lib/matrix'
 import { APP_LOGO_SRC } from '../constants/branding'
 import ReportProblemModal from '../components/ReportProblemModal'
+import { VISITOR_KEY as NATIONALS_VISITOR_KEY } from '../lib/nationalsEntries'
 
 const MASCOT_SRC = '/klippies-mascot.png'
 const SESSIONS_KEY = 'klippies_sessions'
@@ -292,6 +293,9 @@ The official SAWMGA overcount rule determines what level a rider competes at Nat
 5. New level = min(4, level_entered + level_jump).
 6. The new level becomes the entering level for the next qualifier.
 
+NATIONALS 2026 RUNNING ORDER & TIMESLOTS:
+You have the full published Gold and Silver Nationals 2026 running schedules (day by day, group by group, arena by arena, with rider-number ranges and times). Use these to answer general schedule questions (e.g. "what time does Group C run on Gold Day 2?", "which arena is Speed Barrels in for Silver?"). For a RIDER'S OWN personal times and running order, you don't know who is asking — direct them to the KlipKlop "Nationals" page (/nationals), where they can look themselves up by name (no login needed) and see their own program.
+
 Rules:
 - Be friendly, concise and practical. Use South African terms.
 - Never invent rules, penalties, distances, dates or facts.
@@ -304,6 +308,7 @@ Rules:
 const QUICK_QUESTIONS = [
   { label: 'Overcount rule',           query: 'How does the SAWMGA overcount rule work?' },
   { label: 'Nationals eligibility',    query: 'What are the requirements to qualify for Nationals?' },
+  { label: 'Nationals running order',  query: 'How do I find my Nationals running order and times?' },
   { label: 'Barrel penalty',           query: 'What is the penalty for knocking over a barrel?' },
   { label: 'Qualifier games',          query: 'What games are included in each qualifier?' },
   { label: 'WMG levels',              query: 'What levels are there in Western Mounted Games?' },
@@ -379,6 +384,16 @@ function AccessGate({ onApproved }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    // A visitor who already verified their name on the public Nationals
+    // page has proven who they are for that purpose — don't make them
+    // request access again just to ask Klippies a rules question.
+    try {
+      if (localStorage.getItem(NATIONALS_VISITOR_KEY)) {
+        onApproved()
+        return
+      }
+    } catch {}
+
     const saved = localStorage.getItem('klippies_access_email')
     if (saved) {
       checkAccess(saved)

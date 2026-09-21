@@ -41,6 +41,7 @@ import GettingStarted from './pages/user/GettingStarted'
 import Subscribe from './pages/Subscribe'
 import Klippies from './pages/Klippies'
 import KlippiesWaitlist from './pages/KlippiesWaitlist'
+import Nationals from './pages/Nationals'
 import Legal from './pages/Legal'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
@@ -153,6 +154,7 @@ export default function App() {
         <Route path="/subscribe" element={<SubscribeRoute><Subscribe /></SubscribeRoute>} />
         <Route path="/klippies" element={<Klippies />} />
         <Route path="/list" element={<KlippiesWaitlist />} />
+        <Route path="/nationals" element={<Nationals />} />
         <Route path="/legal" element={<Legal />} />
         <Route path="/share/:token" element={<ShareTimes />} />
         <Route path="/event-day/help/:token" element={<EventDayHelper />} />
