@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Trophy, MapPin, CalendarDays, Search, CheckCircle2, RotateCcw, Zap, Sparkles,
   Users, UserPlus, ChevronDown, ListChecks, PlayCircle, ChevronLeft, ChevronRight, Target,
+  Menu, X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { APP_LOGO_SRC } from '../constants/branding'
@@ -33,6 +34,19 @@ function formatDay(dateStr) {
   try {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', {
       weekday: 'long', day: 'numeric', month: 'long',
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+// Compact form for table cells, where "Monday, 28 September" eats too much
+// column width — "Mon, 28 Sep" instead.
+function formatDayShort(dateStr) {
+  if (!dateStr) return 'TBC'
+  try {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', {
+      weekday: 'short', day: 'numeric', month: 'short',
     })
   } catch {
     return dateStr
@@ -421,34 +435,34 @@ function ScheduleTableRow({ entry, saved, onTimeChange }) {
 
   return (
     <tr className="hover:bg-white/5 transition">
-      <td className="px-3 py-2 text-green-200 whitespace-nowrap">{formatDay(entry.day)}</td>
-      <td className="px-3 py-2 text-green-300 font-bold whitespace-nowrap">{entry.scheduled_time || '—'}</td>
-      <td className="px-3 py-2 text-green-500 font-semibold whitespace-nowrap">{entry.arena || '—'}</td>
-      <td className="px-3 py-2 text-white font-medium whitespace-nowrap">{entry.game || 'Game TBC'}</td>
-      <td className="px-3 py-2 text-green-300 whitespace-nowrap">{entry.horse_name}</td>
-      <td className="px-3 py-2 text-green-400 whitespace-nowrap">{entry.level ?? '—'}</td>
+      <td className="px-2 sm:px-3 py-2 text-green-200 whitespace-nowrap sm:whitespace-normal">{formatDayShort(entry.day)}</td>
+      <td className="px-2 sm:px-3 py-2 text-green-300 font-bold whitespace-nowrap sm:whitespace-normal">{entry.scheduled_time || '—'}</td>
+      <td className="px-2 sm:px-3 py-2 text-green-500 font-semibold whitespace-nowrap sm:whitespace-normal">{entry.arena || '—'}</td>
+      <td className="px-2 sm:px-3 py-2 text-white font-medium whitespace-nowrap sm:whitespace-normal">{entry.game || 'Game TBC'}</td>
+      <td className="px-2 sm:px-3 py-2 text-green-300 whitespace-nowrap sm:whitespace-normal">{entry.horse_name}</td>
+      <td className="px-2 sm:px-3 py-2 text-green-400 whitespace-nowrap sm:whitespace-normal">{entry.level ?? '—'}</td>
       {onTimeChange && (
         <>
-          <td className="px-2 py-2">
+          <td className="px-1.5 sm:px-2 py-2">
             <input
               type="number" step="0.001" min="0" placeholder="Run 1"
               value={run1}
               onChange={e => update(e.target.value, run2)}
-              className="w-20 rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-xs text-white text-right placeholder-green-400/40 focus:outline-none focus:ring-2 focus:ring-green-400/50"
+              className="w-20 sm:w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-xs text-white text-right placeholder-green-400/40 focus:outline-none focus:ring-2 focus:ring-green-400/50"
             />
           </td>
-          <td className="px-2 py-2">
+          <td className="px-1.5 sm:px-2 py-2">
             <input
               type="number" step="0.001" min="0" placeholder="Run 2"
               value={run2}
               onChange={e => update(run1, e.target.value)}
-              className="w-20 rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-xs text-white text-right placeholder-green-400/40 focus:outline-none focus:ring-2 focus:ring-green-400/50"
+              className="w-20 sm:w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-xs text-white text-right placeholder-green-400/40 focus:outline-none focus:ring-2 focus:ring-green-400/50"
             />
           </td>
-          <td className="px-3 py-2 text-right text-white font-semibold whitespace-nowrap">
+          <td className="px-2 sm:px-3 py-2 text-right text-white font-semibold whitespace-nowrap sm:whitespace-normal">
             {saved?.best != null ? saved.best.toFixed(3) : '—'}
           </td>
-          <td className="px-3 py-2 text-right">
+          <td className="px-2 sm:px-3 py-2 text-right">
             {saved?.level != null ? <LevelBadge level={saved.level} compact /> : <span className="text-green-600">—</span>}
           </td>
         </>
@@ -471,22 +485,22 @@ function ScheduleTable({ entries, timesById, onTimeChange, emptyText }) {
       {!filtered.length ? (
         <EmptyPanel text="No runs match these filters." />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-white/20 bg-white/5">
-          <table className="w-full text-xs sm:text-sm">
+        <div className="overflow-x-auto sm:overflow-visible rounded-2xl border border-white/20 bg-white/5">
+          <table className="w-full table-auto sm:table-fixed text-xs sm:text-sm">
             <thead className="bg-white/10 text-green-300 uppercase text-[10px] sm:text-xs">
               <tr>
-                <th className="px-3 py-2 text-left">Day</th>
-                <th className="px-3 py-2 text-left">Time</th>
-                <th className="px-3 py-2 text-left">Arena</th>
-                <th className="px-3 py-2 text-left">Game</th>
-                <th className="px-3 py-2 text-left">Horse</th>
-                <th className="px-3 py-2 text-left">Level</th>
+                <th className={`px-2 sm:px-3 py-2 text-left ${onTimeChange ? 'sm:w-[10%]' : 'sm:w-[16%]'}`}>Day</th>
+                <th className={`px-2 sm:px-3 py-2 text-left ${onTimeChange ? 'sm:w-[9%]' : 'sm:w-[14%]'}`}>Time</th>
+                <th className={`px-2 sm:px-3 py-2 text-left ${onTimeChange ? 'sm:w-[8%]' : 'sm:w-[12%]'}`}>Arena</th>
+                <th className={`px-2 sm:px-3 py-2 text-left ${onTimeChange ? 'sm:w-[12%]' : 'sm:w-[20%]'}`}>Game</th>
+                <th className={`px-2 sm:px-3 py-2 text-left ${onTimeChange ? 'sm:w-[13%]' : 'sm:w-[26%]'}`}>Horse</th>
+                <th className={`px-2 sm:px-3 py-2 text-left ${onTimeChange ? 'sm:w-[6%]' : 'sm:w-[12%]'}`}>Level</th>
                 {onTimeChange && (
                   <>
-                    <th className="px-3 py-2 text-right">Run 1</th>
-                    <th className="px-3 py-2 text-right">Run 2</th>
-                    <th className="px-3 py-2 text-right">Best</th>
-                    <th className="px-3 py-2 text-right">Achieved</th>
+                    <th className="px-1.5 sm:px-2 py-2 text-right sm:w-[9%]">Run 1</th>
+                    <th className="px-1.5 sm:px-2 py-2 text-right sm:w-[9%]">Run 2</th>
+                    <th className="px-2 sm:px-3 py-2 text-right sm:w-[8%]">Best</th>
+                    <th className="px-2 sm:px-3 py-2 text-right sm:w-[16%]">Achieved</th>
                   </>
                 )}
               </tr>
@@ -754,24 +768,25 @@ function TimesView({ myEntries, visitor }) {
   )
 }
 
-function SideNav({ active, onChange }) {
-  const items = [
-    { key: 'schedule', label: 'Schedule', icon: CalendarDays },
-    { key: 'live', label: 'Live Day', icon: PlayCircle },
-    { key: 'friends', label: 'Friends', icon: Users },
-    { key: 'times', label: 'Times', icon: ListChecks },
-    { key: 'leveltarget', label: 'Level Target', icon: Target },
-  ]
+const NAV_ITEMS = [
+  { key: 'schedule', label: 'Schedule', icon: CalendarDays },
+  { key: 'live', label: 'Live Day', icon: PlayCircle },
+  { key: 'friends', label: 'Friends', icon: Users },
+  { key: 'times', label: 'Times', icon: ListChecks },
+  { key: 'leveltarget', label: 'Level Target', icon: Target },
+]
+
+function NavButtons({ active, onChange, itemClassName }) {
   return (
-    <nav className="flex sm:flex-col gap-1.5 sm:w-40 flex-shrink-0 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
-      {items.map(item => {
+    <>
+      {NAV_ITEMS.map(item => {
         const Icon = item.icon
         const isActive = active === item.key
         return (
           <button
             key={item.key}
             onClick={() => onChange(item.key)}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition flex-shrink-0 sm:flex-shrink-0 sm:w-full ${
+            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition ${itemClassName} ${
               isActive
                 ? 'bg-green-500 text-white'
                 : 'bg-white/10 text-green-200 border border-white/10 hover:bg-white/20 hover:text-white'
@@ -784,12 +799,66 @@ function SideNav({ active, onChange }) {
       })}
       <Link
         to="/klippies"
-        className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-white/10 text-green-200 border border-white/10 hover:bg-white/20 hover:text-white transition flex-shrink-0 sm:flex-shrink-0 sm:w-full"
+        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold bg-white/10 text-green-200 border border-white/10 hover:bg-white/20 hover:text-white transition ${itemClassName}`}
       >
         <Sparkles size={16} />
         Klippies
       </Link>
-    </nav>
+    </>
+  )
+}
+
+// Mobile-only trigger bar: shows the current section and opens the slide-out
+// nav drawer. Hidden at sm+ where the sidebar is always visible instead.
+function MobileNavTrigger({ active, onOpen }) {
+  const activeItem = NAV_ITEMS.find(item => item.key === active)
+  const Icon = activeItem?.icon || Menu
+  return (
+    <button
+      onClick={onOpen}
+      className="sm:hidden w-full flex items-center gap-2.5 px-4 py-3 mb-4 rounded-xl bg-white/10 border border-white/20 text-white transition hover:bg-white/20"
+    >
+      <Menu size={18} className="text-green-400 flex-shrink-0" />
+      <Icon size={16} className="flex-shrink-0" />
+      <span className="text-sm font-semibold">{activeItem?.label || 'Menu'}</span>
+    </button>
+  )
+}
+
+// Mobile-only slide-out drawer version of the nav, opened via MobileNavTrigger.
+function MobileNavDrawer({ active, onChange, open, onClose }) {
+  if (!open) return null
+  return (
+    <div className="sm:hidden">
+      <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
+      <div className="fixed left-0 top-0 bottom-0 w-72 max-w-[80vw] bg-green-950 border-r border-green-800/60 z-50 flex flex-col p-4 gap-1.5 overflow-y-auto">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-white font-black text-sm">Menu</span>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-green-400 hover:text-white hover:bg-white/10 transition">
+            <X size={18} />
+          </button>
+        </div>
+        <NavButtons
+          active={active}
+          onChange={key => { onChange(key); onClose() }}
+          itemClassName="w-full"
+        />
+      </div>
+    </div>
+  )
+}
+
+// Desktop sidebar (always visible, sm+) plus the mobile trigger/drawer pair
+// (hidden at sm+, where the sidebar takes over).
+function SideNav({ active, onChange, mobileOpen, onMobileOpen, onMobileClose }) {
+  return (
+    <>
+      <MobileNavTrigger active={active} onOpen={onMobileOpen} />
+      <MobileNavDrawer active={active} onChange={onChange} open={mobileOpen} onClose={onMobileClose} />
+      <nav className="hidden sm:flex sm:flex-col gap-1.5 sm:w-40 flex-shrink-0">
+        <NavButtons active={active} onChange={onChange} itemClassName="sm:w-full" />
+      </nav>
+    </>
   )
 }
 
@@ -1071,6 +1140,8 @@ function LevelTargetView({ visitor, onTargetLevelChange, onLevelTimeChange }) {
 }
 
 function Dashboard({ visitor, entries, activeTab, setActiveTab, onEditSelection, onNotYou, onTimeChange, onAddFriend, onRemoveFriend, onTargetLevelChange, onLevelTimeChange }) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
   const myEntries = useMemo(() => entriesForIds(entries, visitor.selectedEntryIds), [entries, visitor.selectedEntryIds])
 
   const horseNames = useMemo(() => {
@@ -1127,7 +1198,13 @@ function Dashboard({ visitor, entries, activeTab, setActiveTab, onEditSelection,
       )}
 
       <div className="flex flex-col sm:flex-row gap-4">
-        <SideNav active={activeTab} onChange={setActiveTab} />
+        <SideNav
+          active={activeTab}
+          onChange={setActiveTab}
+          mobileOpen={mobileNavOpen}
+          onMobileOpen={() => setMobileNavOpen(true)}
+          onMobileClose={() => setMobileNavOpen(false)}
+        />
         <div className="flex-1 min-w-0">
           {activeTab === 'schedule' && (
             <ScheduleTable
