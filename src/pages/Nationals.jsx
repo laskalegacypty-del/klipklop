@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Trophy, MapPin, CalendarDays, Search, CheckCircle2, RotateCcw, Sparkles,
   Users, UserPlus, ChevronDown, ListChecks, PlayCircle, ChevronLeft, ChevronRight, Target,
-  Menu, X,
+  Menu, X, Download,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { APP_LOGO_SRC } from '../constants/branding'
@@ -770,6 +770,7 @@ const NAV_ITEMS = [
   { key: 'friends', label: 'Friends', icon: Users },
   { key: 'times', label: 'Times', icon: ListChecks },
   { key: 'leveltarget', label: 'Level Target', icon: Target },
+  { key: 'export', label: 'Export PDF', icon: Download },
 ]
 
 function NavButtons({ active, onChange, itemClassName }) {
@@ -1134,8 +1135,180 @@ function LevelTargetView({ visitor, onTargetLevelChange, onLevelTimeChange }) {
   )
 }
 
-function Dashboard({ visitor, entries, activeTab, setActiveTab, onEditSelection, onNotYou, onTimeChange, onAddFriend, onRemoveFriend, onTargetLevelChange, onLevelTimeChange }) {
+function ExportView({ options, target, onTargetChange, onDownload }) {
+  const selected = options.find(o => o.id === target) || options[0]
+  return (
+    <div>
+      <h2 className="text-white font-bold text-lg mb-1">Export PDF</h2>
+      <p className="text-green-300 text-sm mb-5 leading-relaxed">
+        A printable program for yourself or a friend — every horse, run, arena and time in one document.
+        {selected?.id !== 'me' && ' Friends only have their schedule stored, not times, since times aren’t logged on their behalf.'}
+      </p>
+
+      <div className="flex gap-2 flex-wrap mb-5">
+        {options.map(o => (
+          <button
+            key={o.id}
+            onClick={() => onTargetChange(o.id)}
+            className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
+              target === o.id
+                ? 'bg-green-500 text-white'
+                : 'bg-white/10 text-green-200 border border-white/10 hover:bg-white/20 hover:text-white'
+            }`}
+          >
+            {o.firstName} {o.lastName}{o.id === 'me' ? ' (you)' : ''}
+          </button>
+        ))}
+      </div>
+
+      {selected && (
+        <p className="text-green-500 text-xs mb-4">
+          {selected.selectedEntryIds?.length || 0} runs will be included.
+        </p>
+      )}
+
+      <button
+        onClick={onDownload}
+        disabled={!selected || !selected.selectedEntryIds?.length}
+        className="flex items-center gap-2 px-5 py-3 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition disabled:opacity-40"
+      >
+        <Download size={16} />
+        Download {selected?.firstName ? `${selected.firstName}'s` : ''} PDF
+      </button>
+    </div>
+  )
+}
+
+// Off-screen (not display:none — some browsers skip display:none content when
+// printing even after a media-query override) print layout, toggled visible
+// only inside the @media print rule injected by handleExportPdf.
+function PrintExportArea({ target, entries, event }) {
+  const targetEntries = target ? entriesForIds(entries, target.selectedEntryIds) : []
+  const groups = groupByHorse(targetEntries)
+  const dateLabel = event
+    ? new Date(event.date + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null
+  const hasTimes = !!target?.times
+
+  return (
+    <div id="nationals-print-area" style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', background: 'white' }}>
+      <div className="p-10 text-gray-900">
+        <div className="flex items-center justify-between border-b-2 border-gray-900 pb-4 mb-6">
+          <div className="flex items-center gap-3">
+            <img src={APP_LOGO_SRC} alt="KlipKlop" className="h-12 w-12 object-contain" />
+            <div>
+              <p className="font-black text-xl leading-tight">KlipKlop</p>
+              <p className="text-xs text-gray-500 uppercase tracking-widest">Nationals 2026</p>
+            </div>
+          </div>
+          <div className="text-right text-sm text-gray-600">
+            {event && <p>{event.venue}{event.province ? `, ${event.province}` : ''}</p>}
+            {dateLabel && <p>{dateLabel}</p>}
+          </div>
+        </div>
+
+        <h1 className="text-2xl font-black mb-1">{target?.firstName} {target?.lastName}</h1>
+        <p className="text-sm text-gray-500 mb-6">
+          {targetEntries.length} run{targetEntries.length === 1 ? '' : 's'} across {groups.length} horse{groups.length === 1 ? '' : 's'}
+        </p>
+
+        {groups.map(group => (
+          <div key={group.horseName} className="mb-6" style={{ breakInside: 'avoid' }}>
+            <h2 className="text-base font-bold mb-2 bg-gray-100 px-3 py-1.5 rounded">{group.horseName}</h2>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-gray-300 text-left text-gray-500 uppercase text-[10px]">
+                  <th className="py-1.5 pr-2">Day</th>
+                  <th className="py-1.5 pr-2">Time</th>
+                  <th className="py-1.5 pr-2">Arena</th>
+                  <th className="py-1.5 pr-2">Game</th>
+                  <th className="py-1.5 pr-2">Level</th>
+                  {hasTimes && (
+                    <>
+                      <th className="py-1.5 pr-2 text-right">Run 1</th>
+                      <th className="py-1.5 pr-2 text-right">Run 2</th>
+                      <th className="py-1.5 pr-2 text-right">Best</th>
+                      <th className="py-1.5 text-right">Achieved</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {group.entries.map(entry => {
+                  const t = target?.times?.[entry.id]
+                  return (
+                    <tr key={entry.id} className="border-b border-gray-100">
+                      <td className="py-1.5 pr-2">{formatDayShort(entry.day)}</td>
+                      <td className="py-1.5 pr-2 font-semibold">{entry.scheduled_time || '—'}</td>
+                      <td className="py-1.5 pr-2">{entry.arena || '—'}</td>
+                      <td className="py-1.5 pr-2 font-semibold">{entry.game || '—'}</td>
+                      <td className="py-1.5 pr-2">{entry.level ?? '—'}</td>
+                      {hasTimes && (
+                        <>
+                          <td className="py-1.5 pr-2 text-right">{t?.run1 || '—'}</td>
+                          <td className="py-1.5 pr-2 text-right">{t?.run2 || '—'}</td>
+                          <td className="py-1.5 pr-2 text-right font-semibold">{t?.best != null ? t.best.toFixed(3) : '—'}</td>
+                          <td className="py-1.5 text-right">{t?.level != null ? `L${t.level}` : '—'}</td>
+                        </>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+
+        <p className="text-[10px] text-gray-400 mt-8 pt-4 border-t border-gray-200">
+          Generated by KlipKlop · klipklop.co.za/nationals · {new Date().toLocaleDateString('en-ZA')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function handleExportPdf() {
+  const existing = document.getElementById('nationals-print-style')
+  if (existing) existing.remove()
+
+  const style = document.createElement('style')
+  style.id = 'nationals-print-style'
+  style.textContent = `
+    @media print {
+      @page { size: A4 portrait; margin: 12mm; }
+      body * { visibility: hidden !important; }
+      #nationals-print-area {
+        display: block !important;
+        visibility: visible !important;
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        background: white !important;
+      }
+      #nationals-print-area * {
+        visibility: visible !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  `
+  document.head.appendChild(style)
+  window.print()
+}
+
+function Dashboard({ visitor, entries, event, activeTab, setActiveTab, onEditSelection, onNotYou, onTimeChange, onAddFriend, onRemoveFriend, onTargetLevelChange, onLevelTimeChange }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [exportTarget, setExportTarget] = useState('me')
+
+  const exportOptions = useMemo(() => [
+    { id: 'me', firstName: visitor.firstName, lastName: visitor.lastName, selectedEntryIds: visitor.selectedEntryIds, times: visitor.times },
+    ...(visitor.friends || []).map(f => ({ id: f.id, firstName: f.firstName, lastName: f.lastName, selectedEntryIds: f.selectedEntryIds, times: null })),
+  ], [visitor])
+
+  useEffect(() => {
+    if (!exportOptions.some(o => o.id === exportTarget)) setExportTarget('me')
+  }, [exportOptions, exportTarget])
 
   const myEntries = useMemo(() => entriesForIds(entries, visitor.selectedEntryIds), [entries, visitor.selectedEntryIds])
 
@@ -1230,8 +1403,22 @@ function Dashboard({ visitor, entries, activeTab, setActiveTab, onEditSelection,
               onLevelTimeChange={onLevelTimeChange}
             />
           )}
+          {activeTab === 'export' && (
+            <ExportView
+              options={exportOptions}
+              target={exportTarget}
+              onTargetChange={setExportTarget}
+              onDownload={handleExportPdf}
+            />
+          )}
         </div>
       </div>
+
+      <PrintExportArea
+        target={exportOptions.find(o => o.id === exportTarget)}
+        entries={entries}
+        event={event}
+      />
 
       <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
         <p className="text-green-300 text-sm min-w-0">Questions about rules, levels, or nationals eligibility?</p>
@@ -1455,6 +1642,7 @@ export default function Nationals() {
         <Dashboard
           visitor={visitor}
           entries={entries}
+          event={event}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           onEditSelection={handleEditSelection}
