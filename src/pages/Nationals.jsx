@@ -1667,6 +1667,43 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
   )
 }
 
+// Mirrors the Dashboard's own layout (header row, side nav, content card)
+// so the page doesn't jump when the real content swaps in — shown while
+// entries are still loading, which is the common case on a first visit.
+function DashboardSkeleton() {
+  const bar = 'rounded-lg bg-white/10 animate-pulse'
+  return (
+    <div className="w-full max-w-5xl mx-auto px-4 pb-14">
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div className="space-y-2">
+          <div className={`${bar} h-5 w-36`} />
+          <div className={`${bar} h-3 w-24`} />
+        </div>
+        <div className="flex gap-2 flex-shrink-0">
+          <div className={`${bar} h-7 w-14 rounded-full`} />
+          <div className={`${bar} h-7 w-20 rounded-full`} />
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="hidden sm:flex sm:flex-col gap-1.5 sm:w-40 flex-shrink-0">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className={`${bar} h-10`} />
+          ))}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className={`${bar} h-4 w-32 mb-3`} />
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className={`${bar} h-4`} style={{ width: `${92 - i * 7}%` }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Dashboard({ visitor, entries, event, activeTab, setActiveTab, onEditSelection, onNotYou, onTimeChange, onAddFriend, onRemoveFriend, onTargetLevelChange, onLevelTimeChange, onPhotoChange }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [exportTarget, setExportTarget] = useState('me')
@@ -1984,11 +2021,7 @@ export default function Nationals() {
     <div className="min-h-screen bg-gradient-to-b from-green-950 via-green-950 to-green-900 flex flex-col">
       <PageHeader event={event} />
 
-      {!entriesLoaded && (
-        <div className="flex-1 flex items-center justify-center pb-14">
-          <div className="w-6 h-6 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
+      {!entriesLoaded && <DashboardSkeleton />}
 
       {entriesLoaded && loadError && (
         <div className="w-full max-w-sm mx-auto px-4 pb-4 text-center">
