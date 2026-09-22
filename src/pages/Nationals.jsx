@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import html2canvas from 'html2canvas'
+import Cropper from 'react-easy-crop'
 import {
   Trophy, MapPin, CalendarDays, Search, CheckCircle2, RotateCcw, Sparkles,
   Users, UserPlus, ChevronDown, ListChecks, PlayCircle, ChevronLeft, ChevronRight, Target,
@@ -11,6 +12,7 @@ import { supabase } from '../lib/supabaseClient'
 import { APP_LOGO_SRC } from '../constants/branding'
 import { getLevel, MATRIX } from '../lib/matrix'
 import { GAMES } from '../lib/constants'
+import { createCroppedImageFile } from '../lib/imageCrop'
 import {
   fetchNationalsEntries,
   findEntriesForName,
@@ -1313,36 +1315,18 @@ function handleExportPdf() {
   window.print()
 }
 
-// Downscales and recompresses an uploaded photo before it goes into
-// localStorage — an unprocessed phone photo can be several MB, which is
-// both slow to store and a real risk of blowing the per-origin quota.
-function readAndCompressImage(file, maxDim = 1000, quality = 0.85) {
+// The cropper hands back a File; localStorage only stores strings, so the
+// cropped photo is converted to a data URL before it's saved on the visitor.
+function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onerror = () => reject(new Error('Could not read that file.'))
-    reader.onload = () => {
-      const img = new Image()
-      img.onerror = () => reject(new Error('Could not read that image.'))
-      img.onload = () => {
-        let { width, height } = img
-        if (width > height && width > maxDim) {
-          height = Math.round(height * (maxDim / width))
-          width = maxDim
-        } else if (height >= width && height > maxDim) {
-          width = Math.round(width * (maxDim / height))
-          height = maxDim
-        }
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.src = reader.result
-    }
+    reader.onerror = () => reject(new Error('Could not read the cropped photo.'))
+    reader.onload = () => resolve(reader.result)
     reader.readAsDataURL(file)
   })
 }
+
+const RIDER_CARD_ASPECT = 360 / 460
 
 // html2canvas can't parse the oklch()/color-mix() colors Tailwind v4
 // generates for utility classes (including every bg-x/NN or border-x/NN
@@ -1363,7 +1347,7 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
   return (
     <div
       ref={cardRef}
-      className="relative overflow-hidden rounded-[28px] mx-auto"
+      className="relative overflow-hidden rounded-[28px] mx-auto flex flex-col"
       style={{
         width: '360px',
         height: '460px',
@@ -1373,23 +1357,11 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
         boxShadow: '0 24px 60px -16px rgba(0,0,0,0.65)',
       }}
     >
-      {/* Diagonal brand streak — the one deliberate decorative flourish on
-          this card, justified because this is a shareable graphic, not
-          app chrome. */}
-      <div
-        className="absolute"
-        style={{
-          top: '-60px', right: '-80px', width: '260px', height: '140px',
-          background: 'linear-gradient(115deg, rgba(74,222,128,0.32), rgba(74,222,128,0))',
-          transform: 'rotate(-20deg)',
-        }}
-      />
-
       <div
         className="absolute inset-0"
         style={{
           background: photo
-            ? 'linear-gradient(180deg, rgba(3,20,12,0.05) 0%, rgba(3,20,12,0.3) 42%, rgba(3,20,12,0.96) 100%)'
+            ? 'linear-gradient(180deg, rgba(3,20,12,0.2) 0%, rgba(3,20,12,0.4) 40%, rgba(3,20,12,0.96) 100%)'
             : 'radial-gradient(circle at 25% 12%, rgba(74,222,128,0.22), transparent 55%)',
         }}
       />
@@ -1399,56 +1371,68 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
         style={{ border: '2px solid rgba(255,255,255,0.18)' }}
       />
 
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-5">
-        <div className="flex items-center gap-2">
+      {/* Foreground content sits in normal flow (not stacked absolute
+          layers) so the vertical spacing stays predictable at any
+          rider-name/horse-name length. */}
+      <div className="relative flex flex-col h-full">
+        <div className="flex items-center gap-2 px-5 pt-5">
           <img
             src={APP_LOGO_SRC}
             alt="KlipKlop"
-            className="h-8 w-8 object-contain rounded-lg p-1"
+            className="h-7 w-7 object-contain rounded-lg p-1"
             style={{ background: 'rgba(255,255,255,0.92)' }}
           />
           <span className="font-bold text-sm tracking-tight" style={{ color: '#ffffff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
             KlipKlop
           </span>
         </div>
-        <span
-          className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
-          style={{ background: '#22c55e', color: '#ffffff' }}
-        >
-          Nationals 2026
-        </span>
-      </div>
 
-      {number != null && (
-        <div
-          className="absolute flex flex-col items-center justify-center rounded-full"
-          style={{
-            top: '66px', right: '20px', width: '62px', height: '62px',
-            background: 'rgba(3,20,12,0.55)', border: '2px solid rgba(74,222,128,0.6)',
-          }}
-        >
-          <span style={{ color: 'rgba(134,239,172,0.85)', fontSize: '8px', fontWeight: 700, letterSpacing: '0.08em' }}>NO.</span>
-          <span style={{ color: '#ffffff', fontSize: '20px', fontWeight: 900, lineHeight: 1 }}>{number}</span>
-        </div>
-      )}
-
-      <div className="absolute bottom-0 left-0 right-0 p-5">
-        {lvl && (
-          <span
-            className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold mb-2"
-            style={{ color: lvl.text, background: lvl.bg, border: `1px solid ${lvl.border}` }}
+        <div className="mt-4 w-full" style={{ background: '#dc2626', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }}>
+          <p
+            className="w-full text-center py-2"
+            style={{ color: '#ffffff', fontWeight: 900, fontSize: '13px', letterSpacing: '0.08em', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
           >
-            Level {level} · {LEVEL_LABELS[level]}
-          </span>
-        )}
-        <p className="font-black text-2xl leading-tight" style={{ color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
-          {riderName}
-        </p>
-        <div className="flex items-center gap-2 mt-1.5">
-          <span style={{ width: '18px', height: '2px', background: '#4ade80', display: 'inline-block', flexShrink: 0 }} />
-          <p className="font-bold text-base truncate" style={{ color: '#bbf7d0' }}>{horseName}</p>
+            SAWMGA NATIONALS 2026
+          </p>
         </div>
-        <p className="text-[10px] mt-3" style={{ color: 'rgba(255,255,255,0.5)' }}>klipklop.co.za/nationals</p>
+
+        {/* Hero block — horse + level are the emphasis, rider is secondary.
+            Spacing is done with margins, not flex `gap`, since html2canvas
+            doesn't reliably render flexbox gap. */}
+        <div className="flex-1 flex flex-col items-center justify-center w-full px-6 text-center">
+          {number != null && (
+            <div
+              className="flex flex-col items-center justify-center"
+              style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'rgba(3,20,12,0.55)', border: '2px solid rgba(74,222,128,0.6)' }}
+            >
+              <span style={{ color: 'rgba(134,239,172,0.85)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>NO.</span>
+              <span style={{ color: '#ffffff', fontSize: '28px', fontWeight: 900, lineHeight: 1 }}>{number}</span>
+            </div>
+          )}
+          <p
+            className="font-black leading-tight w-full"
+            style={{ color: '#ffffff', fontSize: '32px', textShadow: '0 2px 10px rgba(0,0,0,0.6)', marginTop: '16px' }}
+          >
+            {horseName}
+          </p>
+          {lvl && (
+            <span
+              className="inline-flex items-center justify-center"
+              style={{
+                marginTop: '12px', color: lvl.text, background: lvl.bg, border: `1.5px solid ${lvl.border}`,
+                borderRadius: '9999px', padding: '6px 18px', fontSize: '15px', fontWeight: 800, letterSpacing: '0.02em',
+              }}
+            >
+              LEVEL {level}
+            </span>
+          )}
+        </div>
+
+        <div className="px-5 pb-5 w-full text-center">
+          <p className="text-[10px] uppercase mb-0.5" style={{ color: 'rgba(255,255,255,0.55)', letterSpacing: '0.15em' }}>Rider</p>
+          <p className="font-bold text-base" style={{ color: 'rgba(255,255,255,0.92)' }}>{riderName}</p>
+          <p className="text-[10px] mt-2" style={{ color: 'rgba(255,255,255,0.45)' }}>klipklop.co.za/nationals</p>
+        </div>
       </div>
     </div>
   )
@@ -1479,15 +1463,49 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
   const current = horseCards.find(h => h.horseName === selectedHorse) || null
   const photo = current ? visitor.riderCardPhotos?.[current.horseName] : null
 
-  async function handleFile(e) {
+  const [cropSource, setCropSource] = useState('')
+  const [cropFilename, setCropFilename] = useState('photo.jpg')
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
+
+  function handleFileSelect(e) {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file || !current) return
+    if (!file) return
+    setError('')
+    setCropFilename(file.name || 'photo.jpg')
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCroppedAreaPixels(null)
+    setCropSource(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
+  }
+
+  function closeCropModal() {
+    setCropSource(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return ''
+    })
+    setCroppedAreaPixels(null)
+  }
+
+  async function handleCropConfirm() {
+    if (!cropSource || !croppedAreaPixels || !current) return
     setError('')
     setBusy(true)
     try {
-      const dataUrl = await readAndCompressImage(file)
+      const croppedFile = await createCroppedImageFile({
+        imageSrc: cropSource,
+        cropPixels: croppedAreaPixels,
+        fileName: cropFilename.replace(/\.[^.]+$/, '') + '.jpg',
+        maxDimension: 1000,
+      })
+      const dataUrl = await fileToDataUrl(croppedFile)
       onPhotoChange(current.horseName, dataUrl)
+      closeCropModal()
     } catch {
       setError('Could not use that photo — try a different image.')
     } finally {
@@ -1500,7 +1518,24 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
     setError('')
     setBusy(true)
     try {
-      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: null })
+      const rendered = await html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: null })
+      // html2canvas doesn't clip to the captured element's own border-radius,
+      // so the raw render comes out square-cornered — mask it onto a rounded
+      // canvas to match what the card actually looks like on screen.
+      const radius = 28 * 2
+      const canvas = document.createElement('canvas')
+      canvas.width = rendered.width
+      canvas.height = rendered.height
+      const ctx = canvas.getContext('2d')
+      ctx.beginPath()
+      ctx.moveTo(radius, 0)
+      ctx.arcTo(canvas.width, 0, canvas.width, canvas.height, radius)
+      ctx.arcTo(canvas.width, canvas.height, 0, canvas.height, radius)
+      ctx.arcTo(0, canvas.height, 0, 0, radius)
+      ctx.arcTo(0, 0, canvas.width, 0, radius)
+      ctx.closePath()
+      ctx.clip()
+      ctx.drawImage(rendered, 0, 0)
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
       if (!blob) throw new Error('empty blob')
       const url = URL.createObjectURL(blob)
@@ -1556,7 +1591,7 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
       />
 
       <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={busy}
@@ -1584,6 +1619,50 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
         </button>
       </div>
       {error && <p className="text-red-300 text-xs text-center mt-3">{error}</p>}
+
+      {cropSource && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-3 sm:p-4">
+          <div className="bg-green-950 border border-white/10 rounded-2xl shadow-xl w-full max-w-sm p-5 my-auto">
+            <h3 className="text-white font-bold text-lg">Position your photo</h3>
+            <p className="text-green-300 text-sm mt-1">
+              Drag the photo to reposition it. Scroll your mouse wheel (or pinch with two fingers on mobile) to zoom in and out.
+            </p>
+
+            <div
+              className="relative mt-4 rounded-xl overflow-hidden bg-black"
+              style={{ aspectRatio: `${RIDER_CARD_ASPECT}`, maxHeight: '360px' }}
+            >
+              <Cropper
+                image={cropSource}
+                crop={crop}
+                zoom={zoom}
+                aspect={RIDER_CARD_ASPECT}
+                objectFit="cover"
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={closeCropModal}
+                disabled={busy}
+                className="px-4 py-2.5 rounded-xl bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white text-sm font-semibold transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCropConfirm}
+                disabled={busy || !croppedAreaPixels}
+                className="px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition disabled:opacity-50"
+              >
+                {busy ? 'Saving…' : 'Use this photo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -31,10 +31,15 @@ export async function createCroppedImageFile({
   if (!cropPixels?.width || !cropPixels?.height) throw new Error('Please position the crop first')
 
   const image = await loadImage(imageSrc)
-  const size = Math.min(Math.max(cropPixels.width, cropPixels.height), maxDimension)
+  // Preserve the crop's own aspect ratio (square when the caller used
+  // aspect={1}, whatever ratio they picked otherwise) rather than forcing a
+  // square canvas — only cap the longer side at maxDimension.
+  const scale = Math.min(1, maxDimension / Math.max(cropPixels.width, cropPixels.height))
+  const outWidth = Math.round(cropPixels.width * scale)
+  const outHeight = Math.round(cropPixels.height * scale)
   const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
+  canvas.width = outWidth
+  canvas.height = outHeight
 
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Could not open image editor')
@@ -49,8 +54,8 @@ export async function createCroppedImageFile({
     cropPixels.height,
     0,
     0,
-    size,
-    size,
+    outWidth,
+    outHeight,
   )
 
   const blob = await canvasToBlob(canvas, outputType, quality)
