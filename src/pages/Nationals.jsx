@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Trophy, MapPin, CalendarDays, Search, CheckCircle2, RotateCcw, Zap, Sparkles,
+  Trophy, MapPin, CalendarDays, Search, CheckCircle2, RotateCcw, Sparkles,
   Users, UserPlus, ChevronDown, ListChecks, PlayCircle, ChevronLeft, ChevronRight, Target,
   Menu, X,
 } from 'lucide-react'
@@ -27,7 +27,6 @@ const LEVEL_COLORS = [
   'text-orange-300 border-orange-400/40 bg-orange-400/10',
   'text-green-300 border-green-400/40 bg-green-400/10',
 ]
-const LEVEL_EMOJI = ['🐢', '🌱', '⚡', '🔥', '🏆']
 
 function formatDay(dateStr) {
   if (!dateStr) return 'Date to be confirmed'
@@ -124,7 +123,7 @@ function PageHeader({ event }) {
 function VerifyStep({ firstName, setFirstName, lastName, setLastName, onSubmit, error, submitting }) {
   return (
     <div className="w-full max-w-sm mx-auto px-4 pb-14">
-      <div className="bg-white/10 border border-white/20 rounded-2xl p-6 backdrop-blur">
+      <div className="bg-white/10 border border-white/20 rounded-2xl p-6">
         <h2 className="text-white font-bold text-lg mb-1">Find your entries</h2>
         <p className="text-green-300 text-sm mb-5 leading-relaxed">
           Type your name exactly as it appears on your Nationals entry. No account, no password —
@@ -205,7 +204,7 @@ function SelectStep({ groups, checkedIds, onToggle, onConfirm, onBack }) {
   const anyChecked = checkedIds.size > 0
   return (
     <div className="w-full max-w-lg mx-auto px-4 pb-14">
-      <div className="bg-white/10 border border-white/20 rounded-2xl p-5 sm:p-6 backdrop-blur">
+      <div className="bg-white/10 border border-white/20 rounded-2xl p-5 sm:p-6">
         <h2 className="text-white font-bold text-lg mb-1">Which of these are you?</h2>
         <p className="text-green-300 text-sm mb-5 leading-relaxed">
           We found these entries under that name. Tick every horse and run that's yours.
@@ -237,11 +236,8 @@ function SelectStep({ groups, checkedIds, onToggle, onConfirm, onBack }) {
 function NotFoundStep({ error, onRetry }) {
   return (
     <div className="w-full max-w-sm mx-auto px-4 pb-14 text-center">
-      <div className="bg-white/10 border border-white/20 rounded-2xl p-6 backdrop-blur">
-        <div className="w-12 h-12 bg-amber-400/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl">🔎</span>
-        </div>
-        <h2 className="text-white font-bold text-base mb-2">No entries found</h2>
+      <div className="bg-white/10 border border-white/20 rounded-2xl p-6">
+        <h2 className="text-white font-bold text-lg mb-2">No entries found</h2>
         <p className="text-green-300 text-sm leading-relaxed">{error}</p>
         <button
           onClick={onRetry}
@@ -262,7 +258,7 @@ function LevelBadge({ level, compact }) {
         compact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'
       }`}
     >
-      {LEVEL_EMOJI[level]} Level {level} · {LEVEL_LABELS[level]}
+      Level {level} · {LEVEL_LABELS[level]}
     </span>
   )
 }
@@ -438,7 +434,7 @@ function ScheduleTableRow({ entry, saved, onTimeChange }) {
       <td className="px-2 sm:px-3 py-2 text-green-200 whitespace-nowrap sm:whitespace-normal">{formatDayShort(entry.day)}</td>
       <td className="px-2 sm:px-3 py-2 text-green-300 font-bold whitespace-nowrap sm:whitespace-normal">{entry.scheduled_time || '—'}</td>
       <td className="px-2 sm:px-3 py-2 text-green-500 font-semibold whitespace-nowrap sm:whitespace-normal">{entry.arena || '—'}</td>
-      <td className="px-2 sm:px-3 py-2 text-white font-medium whitespace-nowrap sm:whitespace-normal">{entry.game || 'Game TBC'}</td>
+      <td className="px-2 sm:px-3 py-2 text-white font-semibold whitespace-nowrap sm:whitespace-normal">{entry.game || 'Game TBC'}</td>
       <td className="px-2 sm:px-3 py-2 text-green-300 whitespace-nowrap sm:whitespace-normal">{entry.horse_name}</td>
       <td className="px-2 sm:px-3 py-2 text-green-400 whitespace-nowrap sm:whitespace-normal">{entry.level ?? '—'}</td>
       {onTimeChange && (
@@ -570,7 +566,7 @@ function AddFriendForm({ entries, onAdd, onCancel }) {
   const groups = useMemo(() => groupByHorse(candidates), [candidates])
 
   return (
-    <div className="bg-white/10 border border-white/20 rounded-2xl p-5 mb-4 backdrop-blur">
+    <div className="bg-white/10 border border-white/20 rounded-2xl p-5 mb-4">
       {phase === 'search' && (
         <form onSubmit={handleSearch} className="space-y-3">
           <p className="text-white font-semibold text-sm">Add a friend</p>
@@ -637,7 +633,7 @@ function FriendCard({ friend, entries, expanded, onToggle, onRemove }) {
   }, [friendEntries])
 
   return (
-    <div className="bg-white/10 border border-white/20 rounded-2xl overflow-hidden backdrop-blur">
+    <div className="bg-white/10 border border-white/20 rounded-2xl overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between px-4 sm:px-5 py-3.5 text-left hover:bg-white/5 transition"
@@ -670,7 +666,7 @@ function FriendsView({ entries, friends, onAddFriend, onRemoveFriend }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-white font-bold text-lg">Friends</p>
+        <h2 className="text-white font-bold text-lg">Friends</h2>
         {!showAdd && (
           <button
             onClick={() => setShowAdd(true)}
@@ -723,7 +719,7 @@ function TimesView({ myEntries, visitor }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-white font-bold text-lg">Your times</p>
+        <h2 className="text-white font-bold text-lg">Your times</h2>
         <span className="text-green-400 text-xs font-semibold">{complete} / {total} runs logged</span>
       </div>
       {complete === total && (
@@ -750,7 +746,7 @@ function TimesView({ myEntries, visitor }) {
             {rows.map(({ entry, run1, run2, best, level }) => (
               <tr key={entry.id}>
                 <td className="px-3 py-2 text-green-200 whitespace-nowrap">{formatDay(entry.day)}</td>
-                <td className="px-3 py-2 text-white font-medium whitespace-nowrap">{entry.game}</td>
+                <td className="px-3 py-2 text-white font-semibold whitespace-nowrap">{entry.game}</td>
                 <td className="px-3 py-2 text-green-300 whitespace-nowrap">{entry.horse_name}</td>
                 <td className="px-3 py-2 text-green-400 whitespace-nowrap">{entry.arena || '—'}</td>
                 <td className="px-3 py-2 text-right text-green-100">{run1 || '—'}</td>
@@ -833,7 +829,7 @@ function MobileNavDrawer({ active, onChange, open, onClose }) {
       <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
       <div className="fixed left-0 top-0 bottom-0 w-72 max-w-[80vw] bg-green-950 border-r border-green-800/60 z-50 flex flex-col p-4 gap-1.5 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-white font-black text-sm">Menu</span>
+          <span className="text-white font-bold text-sm">Menu</span>
           <button onClick={onClose} className="p-1.5 rounded-lg text-green-400 hover:text-white hover:bg-white/10 transition">
             <X size={18} />
           </button>
@@ -886,7 +882,7 @@ function HorseTabs({ horses, active, onChange }) {
               : 'bg-white/10 text-green-200 border border-white/10 hover:bg-white/20 hover:text-white'
           }`}
         >
-          🐴 {h}
+          {h}
         </button>
       ))}
     </div>
@@ -972,11 +968,11 @@ function LiveDayView({ myEntries, visitor, onTimeChange }) {
       {!current ? (
         <EmptyPanel text="No runs for this horse on this day." />
       ) : (
-        <div className="bg-white/10 border border-white/20 rounded-3xl p-6 sm:p-8 backdrop-blur text-center">
+        <div className="bg-white/10 border border-white/20 rounded-3xl p-6 sm:p-8 text-center">
           <p className="text-green-400 text-xs font-bold uppercase tracking-widest mb-2">
             Run {index + 1} of {runEntries.length}
           </p>
-          <h2 className="text-white font-black text-3xl sm:text-4xl mb-1">{current.game || 'Game TBC'}</h2>
+          <h2 className="text-white font-bold text-2xl sm:text-3xl mb-1">{current.game || 'Game TBC'}</h2>
           <p className="text-green-300 text-sm mb-4">
             {current.horse_name}
             {current.session_label ? ` · ${current.session_label}` : ''}
@@ -1041,7 +1037,6 @@ function LevelPicker({ active, onChange }) {
               : 'bg-white/10 text-green-200 border border-white/10 hover:bg-white/20 hover:text-white'
           }`}
         >
-          <span>{LEVEL_EMOJI[lvl]}</span>
           Level {lvl} · {LEVEL_LABELS[lvl]}
         </button>
       ))}
@@ -1112,7 +1107,7 @@ function LevelTargetView({ visitor, onTargetLevelChange, onLevelTimeChange }) {
 
   return (
     <div>
-      <p className="text-white font-bold text-lg mb-1">Level target</p>
+      <h2 className="text-white font-bold text-lg mb-1">Level target</h2>
       <p className="text-green-300 text-sm mb-4 leading-relaxed">
         Pick the level you want to stay in this season. Each game below shows the time window that
         keeps you there — ride faster and you'll bump up a level, slower and you'll drop.
@@ -1179,13 +1174,13 @@ function Dashboard({ visitor, entries, activeTab, setActiveTab, onEditSelection,
         <div className="flex gap-2 flex-shrink-0">
           <button
             onClick={onEditSelection}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white transition"
           >
             Edit
           </button>
           <button
             onClick={onNotYou}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white transition"
           >
             <RotateCcw size={12} />
             Not you?
@@ -1238,11 +1233,8 @@ function Dashboard({ visitor, entries, activeTab, setActiveTab, onEditSelection,
         </div>
       </div>
 
-      <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Zap size={18} className="text-yellow-400 flex-shrink-0" />
-          <p className="text-green-200 text-sm">Questions about rules, levels, or nationals eligibility?</p>
-        </div>
+      <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+        <p className="text-green-300 text-sm min-w-0">Questions about rules, levels, or nationals eligibility?</p>
         <Link
           to="/klippies"
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold bg-green-500 hover:bg-green-400 text-white transition flex-shrink-0"
