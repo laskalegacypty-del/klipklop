@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import html2canvas from 'html2canvas'
 import {
   Trophy, MapPin, CalendarDays, Search, CheckCircle2, RotateCcw, Sparkles,
   Users, UserPlus, ChevronDown, ListChecks, PlayCircle, ChevronLeft, ChevronRight, Target,
-  Menu, X, Download,
+  Menu, X, Download, IdCard, Camera,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { APP_LOGO_SRC } from '../constants/branding'
@@ -772,6 +773,7 @@ const NAV_ITEMS = [
   { key: 'times', label: 'Times', icon: ListChecks },
   { key: 'leveltarget', label: 'Level Target', icon: Target },
   { key: 'export', label: 'Export PDF', icon: Download },
+  { key: 'ridercard', label: 'Rider Card', icon: IdCard },
 ]
 
 function NavButtons({ active, onChange, itemClassName }) {
@@ -1314,7 +1316,194 @@ function handleExportPdf() {
   window.print()
 }
 
-function Dashboard({ visitor, entries, event, activeTab, setActiveTab, onEditSelection, onNotYou, onTimeChange, onAddFriend, onRemoveFriend, onTargetLevelChange, onLevelTimeChange }) {
+// Downscales and recompresses an uploaded photo before it goes into
+// localStorage — an unprocessed phone photo can be several MB, which is
+// both slow to store and a real risk of blowing the per-origin quota.
+function readAndCompressImage(file, maxDim = 1000, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read that file.'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('Could not read that image.'))
+      img.onload = () => {
+        let { width, height } = img
+        if (width > height && width > maxDim) {
+          height = Math.round(height * (maxDim / width))
+          width = maxDim
+        } else if (height >= width && height > maxDim) {
+          width = Math.round(width * (maxDim / height))
+          height = maxDim
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+function RiderCardPreview({ cardRef, visitor, horseCards }) {
+  const photo = visitor.riderCardPhoto
+
+  return (
+    <div
+      ref={cardRef}
+      className="relative overflow-hidden rounded-3xl mx-auto"
+      style={{
+        width: '340px',
+        height: '425px',
+        background: photo
+          ? `url(${photo}) center / cover no-repeat`
+          : 'linear-gradient(165deg, #052e1a 0%, #0d5c33 55%, #063a21 100%)',
+      }}
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          background: photo
+            ? 'linear-gradient(180deg, rgba(3,20,12,0.15) 0%, rgba(3,20,12,0.35) 45%, rgba(3,20,12,0.94) 100%)'
+            : 'radial-gradient(circle at 30% 20%, rgba(74,222,128,0.18), transparent 55%)',
+        }}
+      />
+
+      <div className="absolute inset-0 border-2 border-white/15 rounded-3xl pointer-events-none" />
+
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-5">
+        <div className="flex items-center gap-2">
+          <img src={APP_LOGO_SRC} alt="KlipKlop" className="h-8 w-8 object-contain rounded-lg bg-white/90 p-1" />
+          <span className="text-white font-bold text-sm tracking-tight" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+            KlipKlop
+          </span>
+        </div>
+        <span className="px-3 py-1 rounded-full bg-green-500 text-white text-[10px] font-bold uppercase tracking-widest">
+          Nationals 2026
+        </span>
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 p-5">
+        <h2
+          className="text-white font-black text-2xl leading-tight mb-3"
+          style={{ textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}
+        >
+          {visitor.firstName} {visitor.lastName}
+        </h2>
+        <div className="space-y-1.5">
+          {horseCards.map(h => (
+            <div
+              key={h.horseName}
+              className="flex items-center justify-between border-t border-white/20 pt-1.5 first:border-t-0 first:pt-0"
+            >
+              <span className="text-green-50 text-sm font-semibold truncate pr-2">{h.horseName}</span>
+              {h.number != null && (
+                <span className="text-green-300 text-sm font-black flex-shrink-0">#{h.number}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RiderCardView({ visitor, myEntries, onPhotoChange }) {
+  const cardRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const horseCards = useMemo(() => {
+    const groups = groupByHorse(myEntries)
+    return groups.map(g => ({ horseName: g.horseName, number: g.entries[0]?.run_number ?? null }))
+  }, [myEntries])
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setError('')
+    setBusy(true)
+    try {
+      const dataUrl = await readAndCompressImage(file)
+      onPhotoChange(dataUrl)
+    } catch {
+      setError('Could not use that photo — try a different image.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleExportPng() {
+    if (!cardRef.current) return
+    setError('')
+    setBusy(true)
+    try {
+      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: null })
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+      if (!blob) throw new Error('empty blob')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const safeName = `${visitor.firstName} ${visitor.lastName}`.trim().replace(/\s+/g, '-').toLowerCase() || 'rider'
+      a.download = `${safeName}-nationals-card.png`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Could not export the card — try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!horseCards.length) return <EmptyPanel text="Find your entries first to build your rider card." />
+
+  return (
+    <div>
+      <h2 className="text-white font-bold text-lg mb-1">Rider card</h2>
+      <p className="text-green-300 text-sm mb-5 leading-relaxed">
+        Your name, horses and Nationals numbers on one branded card — add a riding photo and export it as a PNG to share.
+      </p>
+
+      <RiderCardPreview cardRef={cardRef} visitor={visitor} horseCards={horseCards} />
+
+      <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy}
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white text-sm font-semibold transition disabled:opacity-50"
+        >
+          <Camera size={15} />
+          {visitor.riderCardPhoto ? 'Change photo' : 'Add a riding photo'}
+        </button>
+        {visitor.riderCardPhoto && (
+          <button
+            onClick={() => onPhotoChange(null)}
+            disabled={busy}
+            className="px-4 py-2.5 rounded-xl bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white text-sm font-semibold transition disabled:opacity-50"
+          >
+            Remove photo
+          </button>
+        )}
+        <button
+          onClick={handleExportPng}
+          disabled={busy}
+          className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition disabled:opacity-50"
+        >
+          <Download size={15} />
+          {busy ? 'Working…' : 'Download PNG'}
+        </button>
+      </div>
+      {error && <p className="text-red-300 text-xs text-center mt-3">{error}</p>}
+    </div>
+  )
+}
+
+function Dashboard({ visitor, entries, event, activeTab, setActiveTab, onEditSelection, onNotYou, onTimeChange, onAddFriend, onRemoveFriend, onTargetLevelChange, onLevelTimeChange, onPhotoChange }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [exportTarget, setExportTarget] = useState('me')
 
@@ -1427,6 +1616,9 @@ function Dashboard({ visitor, entries, event, activeTab, setActiveTab, onEditSel
               onTargetChange={setExportTarget}
               onDownload={handleExportPdf}
             />
+          )}
+          {activeTab === 'ridercard' && (
+            <RiderCardView visitor={visitor} myEntries={myEntries} onPhotoChange={onPhotoChange} />
           )}
         </div>
       </div>
@@ -1611,6 +1803,14 @@ export default function Nationals() {
     })
   }
 
+  function handleRiderCardPhotoChange(dataUrl) {
+    setVisitor(prev => {
+      const next = { ...prev, riderCardPhoto: dataUrl }
+      saveVisitor(next)
+      return next
+    })
+  }
+
   const groups = useMemo(() => groupByHorse(candidateEntries), [candidateEntries])
 
   return (
@@ -1669,6 +1869,7 @@ export default function Nationals() {
           onRemoveFriend={handleRemoveFriend}
           onTargetLevelChange={handleTargetLevelChange}
           onLevelTimeChange={handleLevelTimeChange}
+          onPhotoChange={handleRiderCardPhotoChange}
         />
       )}
 
