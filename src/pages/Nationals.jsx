@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   Trophy, MapPin, CalendarDays, Search, CheckCircle2, RotateCcw, Sparkles,
@@ -1182,15 +1183,23 @@ function ExportView({ options, target, onTargetChange, onDownload }) {
 // Off-screen (not display:none — some browsers skip display:none content when
 // printing even after a media-query override) print layout, toggled visible
 // only inside the @media print rule injected by handleExportPdf.
+// A logged time if there is one, otherwise a blank line long enough to
+// write a time on by hand — for a friend (never digitally tracked) or any
+// of your own runs you haven't logged yet.
+function WritableCell({ value }) {
+  if (value) return <>{value}</>
+  return <span style={{ display: 'inline-block', width: '40px', borderBottom: '1px solid #9ca3af' }}>&nbsp;</span>
+}
+
 function PrintExportArea({ target, entries, event }) {
   const targetEntries = target ? entriesForIds(entries, target.selectedEntryIds) : []
   const groups = groupByHorse(targetEntries)
   const dateLabel = event
     ? new Date(event.date + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
     : null
-  const hasTimes = !!target?.times
+  const hasComputed = !!target?.times
 
-  return (
+  const content = (
     <div id="nationals-print-area" style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', background: 'white' }}>
       <div className="p-10 text-gray-900">
         <div className="flex items-center justify-between border-b-2 border-gray-900 pb-4 mb-6">
@@ -1223,10 +1232,10 @@ function PrintExportArea({ target, entries, event }) {
                   <th className="py-1.5 pr-2">Arena</th>
                   <th className="py-1.5 pr-2">Game</th>
                   <th className="py-1.5 pr-2">Level</th>
-                  {hasTimes && (
+                  <th className="py-1.5 pr-2 text-right">Run 1</th>
+                  <th className="py-1.5 pr-2 text-right">Run 2</th>
+                  {hasComputed && (
                     <>
-                      <th className="py-1.5 pr-2 text-right">Run 1</th>
-                      <th className="py-1.5 pr-2 text-right">Run 2</th>
                       <th className="py-1.5 pr-2 text-right">Best</th>
                       <th className="py-1.5 text-right">Achieved</th>
                     </>
@@ -1243,10 +1252,10 @@ function PrintExportArea({ target, entries, event }) {
                       <td className="py-1.5 pr-2">{entry.arena || '—'}</td>
                       <td className="py-1.5 pr-2 font-semibold">{entry.game || '—'}</td>
                       <td className="py-1.5 pr-2">{entry.level ?? '—'}</td>
-                      {hasTimes && (
+                      <td className="py-1.5 pr-2 text-right"><WritableCell value={t?.run1} /></td>
+                      <td className="py-1.5 pr-2 text-right"><WritableCell value={t?.run2} /></td>
+                      {hasComputed && (
                         <>
-                          <td className="py-1.5 pr-2 text-right">{t?.run1 || '—'}</td>
-                          <td className="py-1.5 pr-2 text-right">{t?.run2 || '—'}</td>
                           <td className="py-1.5 pr-2 text-right font-semibold">{t?.best != null ? t.best.toFixed(3) : '—'}</td>
                           <td className="py-1.5 text-right">{t?.level != null ? `L${t.level}` : '—'}</td>
                         </>
@@ -1265,6 +1274,17 @@ function PrintExportArea({ target, entries, event }) {
       </div>
     </div>
   )
+
+  // Rendered via portal, as a direct child of <body> — not nested inside the
+  // app's own layout tree — so the print stylesheet can hide literally
+  // everything else with a single rule and let this content sit in normal
+  // document flow, which is what lets it paginate across as many physical
+  // pages as it needs. (An earlier version pinned this area with
+  // position:fixed so it would start at the top of page 1, but fixed-position
+  // content in print is clipped to one page's height — anything past it was
+  // silently cut off instead of flowing to page 2, which is why a rider with
+  // more than ~3 horses only ever saw the first 3 in their downloaded PDF.)
+  return createPortal(content, document.body)
 }
 
 function handleExportPdf() {
@@ -1276,18 +1296,15 @@ function handleExportPdf() {
   style.textContent = `
     @media print {
       @page { size: A4 portrait; margin: 12mm; }
-      body * { visibility: hidden !important; }
+      body > *:not(#nationals-print-area) { display: none !important; }
       #nationals-print-area {
-        display: block !important;
-        visibility: visible !important;
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
         width: 100% !important;
         background: white !important;
       }
       #nationals-print-area * {
-        visibility: visible !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
