@@ -1182,9 +1182,6 @@ function ExportView({ options, target, onTargetChange, onDownload }) {
   )
 }
 
-// Off-screen (not display:none — some browsers skip display:none content when
-// printing even after a media-query override) print layout, toggled visible
-// only inside the @media print rule injected by handleExportPdf.
 // A logged time if there is one, otherwise a blank line long enough to
 // write a time on by hand — for a friend (never digitally tracked) or any
 // of your own runs you haven't logged yet.
@@ -1347,64 +1344,111 @@ function readAndCompressImage(file, maxDim = 1000, quality = 0.85) {
   })
 }
 
-function RiderCardPreview({ cardRef, visitor, horseCards }) {
-  const photo = visitor.riderCardPhoto
+// html2canvas can't parse the oklch()/color-mix() colors Tailwind v4
+// generates for utility classes (including every bg-x/NN or border-x/NN
+// opacity variant), so every colour inside the captured card is a plain
+// inline rgba()/hex value instead of a Tailwind colour class — className is
+// only used here for layout (flex, spacing, radius), never colour.
+const CARD_LEVEL_STYLES = [
+  { text: '#d1d5db', bg: 'rgba(156,163,175,0.16)', border: 'rgba(156,163,175,0.4)' },
+  { text: '#fde047', bg: 'rgba(250,204,21,0.16)', border: 'rgba(250,204,21,0.4)' },
+  { text: '#93c5fd', bg: 'rgba(96,165,250,0.16)', border: 'rgba(96,165,250,0.4)' },
+  { text: '#fdba74', bg: 'rgba(251,146,60,0.16)', border: 'rgba(251,146,60,0.4)' },
+  { text: '#86efac', bg: 'rgba(74,222,128,0.16)', border: 'rgba(74,222,128,0.4)' },
+]
+
+function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo }) {
+  const lvl = level != null && CARD_LEVEL_STYLES[level] ? CARD_LEVEL_STYLES[level] : null
 
   return (
     <div
       ref={cardRef}
-      className="relative overflow-hidden rounded-3xl mx-auto"
+      className="relative overflow-hidden rounded-[28px] mx-auto"
       style={{
-        width: '340px',
-        height: '425px',
+        width: '360px',
+        height: '460px',
         background: photo
           ? `url(${photo}) center / cover no-repeat`
-          : 'linear-gradient(165deg, #052e1a 0%, #0d5c33 55%, #063a21 100%)',
+          : 'linear-gradient(160deg, #041b10 0%, #0d5c33 55%, #063a21 100%)',
+        boxShadow: '0 24px 60px -16px rgba(0,0,0,0.65)',
       }}
     >
+      {/* Diagonal brand streak — the one deliberate decorative flourish on
+          this card, justified because this is a shareable graphic, not
+          app chrome. */}
+      <div
+        className="absolute"
+        style={{
+          top: '-60px', right: '-80px', width: '260px', height: '140px',
+          background: 'linear-gradient(115deg, rgba(74,222,128,0.32), rgba(74,222,128,0))',
+          transform: 'rotate(-20deg)',
+        }}
+      />
+
       <div
         className="absolute inset-0"
         style={{
           background: photo
-            ? 'linear-gradient(180deg, rgba(3,20,12,0.15) 0%, rgba(3,20,12,0.35) 45%, rgba(3,20,12,0.94) 100%)'
-            : 'radial-gradient(circle at 30% 20%, rgba(74,222,128,0.18), transparent 55%)',
+            ? 'linear-gradient(180deg, rgba(3,20,12,0.05) 0%, rgba(3,20,12,0.3) 42%, rgba(3,20,12,0.96) 100%)'
+            : 'radial-gradient(circle at 25% 12%, rgba(74,222,128,0.22), transparent 55%)',
         }}
       />
 
-      <div className="absolute inset-0 border-2 border-white/15 rounded-3xl pointer-events-none" />
+      <div
+        className="absolute inset-0 rounded-[28px] pointer-events-none"
+        style={{ border: '2px solid rgba(255,255,255,0.18)' }}
+      />
 
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-5">
         <div className="flex items-center gap-2">
-          <img src={APP_LOGO_SRC} alt="KlipKlop" className="h-8 w-8 object-contain rounded-lg bg-white/90 p-1" />
-          <span className="text-white font-bold text-sm tracking-tight" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+          <img
+            src={APP_LOGO_SRC}
+            alt="KlipKlop"
+            className="h-8 w-8 object-contain rounded-lg p-1"
+            style={{ background: 'rgba(255,255,255,0.92)' }}
+          />
+          <span className="font-bold text-sm tracking-tight" style={{ color: '#ffffff', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
             KlipKlop
           </span>
         </div>
-        <span className="px-3 py-1 rounded-full bg-green-500 text-white text-[10px] font-bold uppercase tracking-widest">
+        <span
+          className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"
+          style={{ background: '#22c55e', color: '#ffffff' }}
+        >
           Nationals 2026
         </span>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-5">
-        <h2
-          className="text-white font-black text-2xl leading-tight mb-3"
-          style={{ textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}
+      {number != null && (
+        <div
+          className="absolute flex flex-col items-center justify-center rounded-full"
+          style={{
+            top: '66px', right: '20px', width: '62px', height: '62px',
+            background: 'rgba(3,20,12,0.55)', border: '2px solid rgba(74,222,128,0.6)',
+          }}
         >
-          {visitor.firstName} {visitor.lastName}
-        </h2>
-        <div className="space-y-1.5">
-          {horseCards.map(h => (
-            <div
-              key={h.horseName}
-              className="flex items-center justify-between border-t border-white/20 pt-1.5 first:border-t-0 first:pt-0"
-            >
-              <span className="text-green-50 text-sm font-semibold truncate pr-2">{h.horseName}</span>
-              {h.number != null && (
-                <span className="text-green-300 text-sm font-black flex-shrink-0">#{h.number}</span>
-              )}
-            </div>
-          ))}
+          <span style={{ color: 'rgba(134,239,172,0.85)', fontSize: '8px', fontWeight: 700, letterSpacing: '0.08em' }}>NO.</span>
+          <span style={{ color: '#ffffff', fontSize: '20px', fontWeight: 900, lineHeight: 1 }}>{number}</span>
         </div>
+      )}
+
+      <div className="absolute bottom-0 left-0 right-0 p-5">
+        {lvl && (
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold mb-2"
+            style={{ color: lvl.text, background: lvl.bg, border: `1px solid ${lvl.border}` }}
+          >
+            Level {level} · {LEVEL_LABELS[level]}
+          </span>
+        )}
+        <p className="font-black text-2xl leading-tight" style={{ color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
+          {riderName}
+        </p>
+        <div className="flex items-center gap-2 mt-1.5">
+          <span style={{ width: '18px', height: '2px', background: '#4ade80', display: 'inline-block', flexShrink: 0 }} />
+          <p className="font-bold text-base truncate" style={{ color: '#bbf7d0' }}>{horseName}</p>
+        </div>
+        <p className="text-[10px] mt-3" style={{ color: 'rgba(255,255,255,0.5)' }}>klipklop.co.za/nationals</p>
       </div>
     </div>
   )
@@ -1418,18 +1462,32 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
 
   const horseCards = useMemo(() => {
     const groups = groupByHorse(myEntries)
-    return groups.map(g => ({ horseName: g.horseName, number: g.entries[0]?.run_number ?? null }))
+    return groups.map(g => ({
+      horseName: g.horseName,
+      number: g.entries[0]?.run_number ?? null,
+      level: g.entries[0]?.level != null ? Number(g.entries[0].level) : null,
+    }))
   }, [myEntries])
+
+  const [selectedHorse, setSelectedHorse] = useState(() => horseCards[0]?.horseName || null)
+  useEffect(() => {
+    if (!horseCards.some(h => h.horseName === selectedHorse)) {
+      setSelectedHorse(horseCards[0]?.horseName || null)
+    }
+  }, [horseCards, selectedHorse])
+
+  const current = horseCards.find(h => h.horseName === selectedHorse) || null
+  const photo = current ? visitor.riderCardPhotos?.[current.horseName] : null
 
   async function handleFile(e) {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
+    if (!file || !current) return
     setError('')
     setBusy(true)
     try {
       const dataUrl = await readAndCompressImage(file)
-      onPhotoChange(dataUrl)
+      onPhotoChange(current.horseName, dataUrl)
     } catch {
       setError('Could not use that photo — try a different image.')
     } finally {
@@ -1438,7 +1496,7 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
   }
 
   async function handleExportPng() {
-    if (!cardRef.current) return
+    if (!cardRef.current || !current) return
     setError('')
     setBusy(true)
     try {
@@ -1448,11 +1506,12 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const safeName = `${visitor.firstName} ${visitor.lastName}`.trim().replace(/\s+/g, '-').toLowerCase() || 'rider'
+      const safeName = `${visitor.firstName} ${visitor.lastName} ${current.horseName}`.trim().replace(/\s+/g, '-').toLowerCase() || 'rider'
       a.download = `${safeName}-nationals-card.png`
       a.click()
       URL.revokeObjectURL(url)
-    } catch {
+    } catch (err) {
+      console.error('Rider card export failed', err)
       setError('Could not export the card — try again.')
     } finally {
       setBusy(false)
@@ -1460,15 +1519,41 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
   }
 
   if (!horseCards.length) return <EmptyPanel text="Find your entries first to build your rider card." />
+  if (!current) return null
 
   return (
     <div>
       <h2 className="text-white font-bold text-lg mb-1">Rider card</h2>
       <p className="text-green-300 text-sm mb-5 leading-relaxed">
-        Your name, horses and Nationals numbers on one branded card — add a riding photo and export it as a PNG to share.
+        One shareable card per horse — your name, this horse, your Nationals number and level. Add a riding photo and export as a PNG.
       </p>
 
-      <RiderCardPreview cardRef={cardRef} visitor={visitor} horseCards={horseCards} />
+      {horseCards.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto mb-5 pb-1 justify-center" style={{ scrollbarWidth: 'none' }}>
+          {horseCards.map(h => (
+            <button
+              key={h.horseName}
+              onClick={() => setSelectedHorse(h.horseName)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition flex-shrink-0 ${
+                selectedHorse === h.horseName
+                  ? 'bg-green-500 text-white'
+                  : 'bg-white/10 text-green-200 border border-white/10 hover:bg-white/20 hover:text-white'
+              }`}
+            >
+              {h.horseName}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <RiderCardPreview
+        cardRef={cardRef}
+        riderName={`${visitor.firstName} ${visitor.lastName}`}
+        horseName={current.horseName}
+        number={current.number}
+        level={current.level}
+        photo={photo}
+      />
 
       <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
@@ -1478,11 +1563,11 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
           className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white text-sm font-semibold transition disabled:opacity-50"
         >
           <Camera size={15} />
-          {visitor.riderCardPhoto ? 'Change photo' : 'Add a riding photo'}
+          {photo ? 'Change photo' : 'Add a riding photo'}
         </button>
-        {visitor.riderCardPhoto && (
+        {photo && (
           <button
-            onClick={() => onPhotoChange(null)}
+            onClick={() => onPhotoChange(current.horseName, null)}
             disabled={busy}
             className="px-4 py-2.5 rounded-xl bg-white/10 text-green-200 border border-white/20 hover:bg-white/20 hover:text-white text-sm font-semibold transition disabled:opacity-50"
           >
@@ -1495,7 +1580,7 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
           className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-400 text-white text-sm font-bold transition disabled:opacity-50"
         >
           <Download size={15} />
-          {busy ? 'Working…' : 'Download PNG'}
+          {busy ? 'Working…' : `Download ${current.horseName}'s card`}
         </button>
       </div>
       {error && <p className="text-red-300 text-xs text-center mt-3">{error}</p>}
@@ -1803,9 +1888,12 @@ export default function Nationals() {
     })
   }
 
-  function handleRiderCardPhotoChange(dataUrl) {
+  function handleRiderCardPhotoChange(horseName, dataUrl) {
     setVisitor(prev => {
-      const next = { ...prev, riderCardPhoto: dataUrl }
+      const nextPhotos = { ...(prev?.riderCardPhotos || {}) }
+      if (dataUrl) nextPhotos[horseName] = dataUrl
+      else delete nextPhotos[horseName]
+      const next = { ...prev, riderCardPhotos: nextPhotos }
       saveVisitor(next)
       return next
     })
