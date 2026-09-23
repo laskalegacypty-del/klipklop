@@ -1639,6 +1639,13 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
               className="relative mt-4 mx-auto rounded-xl overflow-hidden bg-black"
               style={{ aspectRatio: `${RIDER_CARD_ASPECT}`, height: '360px', width: 'auto', maxWidth: '100%' }}
             >
+              {/* Tailwind's preflight sets `img { max-width: 100% }` globally,
+                  which fights react-easy-crop's own cover-sizing (it sizes
+                  the image via `width: auto; height: 100%` or vice versa) —
+                  the max-width cap was overriding the auto dimension and
+                  squashing the image into the container's exact box shape.
+                  This scopes the override to just the cropper's own media. */}
+              <style>{`.reactEasyCrop_Image, .reactEasyCrop_Video { max-width: none !important; max-height: none !important; }`}</style>
               <Cropper
                 image={cropSource}
                 crop={crop}
