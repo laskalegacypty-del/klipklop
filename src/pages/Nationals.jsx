@@ -1397,35 +1397,42 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
         </div>
 
         {/* Hero block — horse + level are the emphasis, rider is secondary.
-            Spacing is done with margins, not flex `gap`, since html2canvas
-            doesn't reliably render flexbox gap. */}
-        <div className="flex-1 flex flex-col items-center justify-center w-full px-6 text-center">
-          {number != null && (
-            <div
-              className="flex flex-col items-center justify-center"
-              style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'rgba(3,20,12,0.55)', border: '2px solid rgba(74,222,128,0.6)' }}
+            Centering here is done with margin:auto / textAlign, not flex
+            `align-items`/`justify-content`, since html2canvas doesn't
+            reliably center flex children — it left this whole block
+            visibly off-center in the exported PNG even though it renders
+            centered on screen. The outer flex is only for vertical
+            space-filling (default `stretch` on its one child), never for
+            horizontal alignment. */}
+        <div className="flex-1 flex flex-col justify-center w-full">
+          <div className="px-6" style={{ textAlign: 'center' }}>
+            {number != null && (
+              <div
+                className="flex flex-col items-center justify-center"
+                style={{ width: '76px', height: '76px', margin: '0 auto', borderRadius: '50%', background: 'rgba(3,20,12,0.55)', border: '2px solid rgba(74,222,128,0.6)' }}
+              >
+                <span style={{ color: 'rgba(134,239,172,0.85)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', textAlign: 'center' }}>NO.</span>
+                <span style={{ color: '#ffffff', fontSize: '28px', fontWeight: 900, lineHeight: 1, textAlign: 'center' }}>{number}</span>
+              </div>
+            )}
+            <p
+              className="font-black leading-tight w-full"
+              style={{ color: '#ffffff', fontSize: '32px', textShadow: '0 2px 10px rgba(0,0,0,0.6)', marginTop: '16px', textAlign: 'center' }}
             >
-              <span style={{ color: 'rgba(134,239,172,0.85)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', textAlign: 'center' }}>NO.</span>
-              <span style={{ color: '#ffffff', fontSize: '28px', fontWeight: 900, lineHeight: 1, textAlign: 'center' }}>{number}</span>
-            </div>
-          )}
-          <p
-            className="font-black leading-tight w-full"
-            style={{ color: '#ffffff', fontSize: '32px', textShadow: '0 2px 10px rgba(0,0,0,0.6)', marginTop: '16px', textAlign: 'center' }}
-          >
-            {horseName}
-          </p>
-          {lvl && (
-            <span
-              className="inline-flex items-center justify-center"
-              style={{
-                marginTop: '12px', color: lvl.text, background: lvl.bg, border: `1.5px solid ${lvl.border}`,
-                borderRadius: '9999px', padding: '6px 18px', fontSize: '15px', fontWeight: 800, letterSpacing: '0.02em',
-              }}
-            >
-              LEVEL {level}
-            </span>
-          )}
+              {horseName}
+            </p>
+            {lvl && (
+              <span
+                className="inline-block"
+                style={{
+                  marginTop: '12px', color: lvl.text, background: lvl.bg, border: `1.5px solid ${lvl.border}`,
+                  borderRadius: '9999px', padding: '6px 18px', fontSize: '15px', fontWeight: 800, letterSpacing: '0.02em', textAlign: 'center',
+                }}
+              >
+                LEVEL {level}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="px-5 pb-5 w-full">
