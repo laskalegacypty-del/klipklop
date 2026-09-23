@@ -1351,6 +1351,12 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
       style={{
         width: '360px',
         height: '460px',
+        // Explicit classic font stack, not Tailwind's default (which leads
+        // with `ui-sans-serif`/`system-ui`) — html2canvas predates those
+        // CSS Fonts Level 4 keywords and doesn't reliably resolve them,
+        // so the export fell back to a wrong, "weird" looking font even
+        // though the live page (using the real browser) rendered fine.
+        fontFamily: 'Arial, Helvetica, sans-serif',
         background: photo
           ? `url(${photo}) center / cover no-repeat`
           : 'linear-gradient(160deg, #041b10 0%, #0d5c33 55%, #063a21 100%)',
