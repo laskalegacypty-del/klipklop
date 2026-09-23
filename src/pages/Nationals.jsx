@@ -1389,8 +1389,8 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
 
         <div className="mt-4 w-full" style={{ background: '#dc2626', boxShadow: '0 4px 14px rgba(0,0,0,0.4)' }}>
           <p
-            className="w-full text-center py-2"
-            style={{ color: '#ffffff', fontWeight: 900, fontSize: '13px', letterSpacing: '0.08em', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+            className="w-full py-2"
+            style={{ color: '#ffffff', fontWeight: 900, fontSize: '13px', letterSpacing: '0.08em', textShadow: '0 1px 2px rgba(0,0,0,0.3)', textAlign: 'center' }}
           >
             SAWMGA NATIONALS 2026
           </p>
@@ -1405,13 +1405,13 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
               className="flex flex-col items-center justify-center"
               style={{ width: '76px', height: '76px', borderRadius: '50%', background: 'rgba(3,20,12,0.55)', border: '2px solid rgba(74,222,128,0.6)' }}
             >
-              <span style={{ color: 'rgba(134,239,172,0.85)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em' }}>NO.</span>
-              <span style={{ color: '#ffffff', fontSize: '28px', fontWeight: 900, lineHeight: 1 }}>{number}</span>
+              <span style={{ color: 'rgba(134,239,172,0.85)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', textAlign: 'center' }}>NO.</span>
+              <span style={{ color: '#ffffff', fontSize: '28px', fontWeight: 900, lineHeight: 1, textAlign: 'center' }}>{number}</span>
             </div>
           )}
           <p
             className="font-black leading-tight w-full"
-            style={{ color: '#ffffff', fontSize: '32px', textShadow: '0 2px 10px rgba(0,0,0,0.6)', marginTop: '16px' }}
+            style={{ color: '#ffffff', fontSize: '32px', textShadow: '0 2px 10px rgba(0,0,0,0.6)', marginTop: '16px', textAlign: 'center' }}
           >
             {horseName}
           </p>
@@ -1428,10 +1428,10 @@ function RiderCardPreview({ cardRef, riderName, horseName, number, level, photo 
           )}
         </div>
 
-        <div className="px-5 pb-5 w-full text-center">
-          <p className="text-[10px] uppercase mb-0.5" style={{ color: 'rgba(255,255,255,0.55)', letterSpacing: '0.15em' }}>Rider</p>
-          <p className="font-bold text-base" style={{ color: 'rgba(255,255,255,0.92)' }}>{riderName}</p>
-          <p className="text-[10px] mt-2" style={{ color: 'rgba(255,255,255,0.45)' }}>klipklop.co.za/nationals</p>
+        <div className="px-5 pb-5 w-full">
+          <p className="text-[10px] uppercase mb-0.5" style={{ color: 'rgba(255,255,255,0.55)', letterSpacing: '0.15em', textAlign: 'center' }}>Rider</p>
+          <p className="font-bold text-base" style={{ color: 'rgba(255,255,255,0.92)', textAlign: 'center' }}>{riderName}</p>
+          <p className="text-[10px] mt-2" style={{ color: 'rgba(255,255,255,0.45)', textAlign: 'center' }}>klipklop.co.za/nationals</p>
         </div>
       </div>
     </div>
@@ -1629,8 +1629,8 @@ function RiderCardView({ visitor, myEntries, onPhotoChange }) {
             </p>
 
             <div
-              className="relative mt-4 rounded-xl overflow-hidden bg-black"
-              style={{ aspectRatio: `${RIDER_CARD_ASPECT}`, maxHeight: '360px' }}
+              className="relative mt-4 mx-auto rounded-xl overflow-hidden bg-black"
+              style={{ aspectRatio: `${RIDER_CARD_ASPECT}`, height: '360px', width: 'auto', maxWidth: '100%' }}
             >
               <Cropper
                 image={cropSource}
