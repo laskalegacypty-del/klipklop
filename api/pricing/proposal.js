@@ -41,6 +41,25 @@ function priceRows(prices) {
   return ROLES.map(r => `<tr><td style="padding:4px 12px 4px 0">${r.singular}</td><td>${formatRand(SEAT_PRICES[r.key])} list</td><td style="padding-left:12px"><b>${prices[r.key] === SEAT_PRICES[r.key] ? 'unchanged' : `R${prices[r.key]}`}</b></td></tr>`).join('')
 }
 
+// Creates the table on first use so no separate D1 migration run is needed.
+// Mirrors migrations/d1/0002_pricing_proposals.sql; safe to run repeatedly.
+let tableReady = null
+function ensureTable(db) {
+  if (!tableReady) {
+    tableReady = db.batch([
+      db.prepare(`CREATE TABLE IF NOT EXISTS pricing_proposals (
+        id TEXT PRIMARY KEY, association TEXT NOT NULL, contact_name TEXT NOT NULL, email TEXT NOT NULL,
+        phone TEXT NOT NULL, note TEXT, selected_tier TEXT NOT NULL, counts TEXT NOT NULL,
+        proposed_prices TEXT NOT NULL, list_prices TEXT NOT NULL, totals TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'within range', 'needs review')),
+        ip_hash TEXT, created_at TEXT NOT NULL)`),
+      db.prepare('CREATE INDEX IF NOT EXISTS pricing_proposals_ip_idx ON pricing_proposals (ip_hash, created_at)'),
+      db.prepare('CREATE INDEX IF NOT EXISTS pricing_proposals_email_idx ON pricing_proposals (email, created_at)'),
+    ]).catch(err => { tableReady = null; throw err })
+  }
+  return tableReady
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(204).end(); return }
   if (req.method !== 'POST') { sendJson(res, 405, { error: 'Method not allowed' }); return }
@@ -76,6 +95,7 @@ export default async function handler(req, res) {
   const ipHash = await hashIp(clientIp(req))
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString()
   try {
+    await ensureTable(db)
     const byIp = await db.prepare('SELECT COUNT(*) AS n FROM pricing_proposals WHERE ip_hash = ? AND created_at >= ?').bind(ipHash, since).first()
     const byEmail = await db.prepare('SELECT COUNT(*) AS n FROM pricing_proposals WHERE lower(email) = ? AND created_at >= ?').bind(email, since).first()
     if ((byIp?.n || 0) >= RATE_LIMIT_PER_HOUR || (byEmail?.n || 0) >= RATE_LIMIT_PER_HOUR) {
