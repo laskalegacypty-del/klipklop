@@ -43,6 +43,7 @@ import Klippies from './pages/Klippies'
 import KlippiesWaitlist from './pages/KlippiesWaitlist'
 import Nationals from './pages/Nationals'
 import Legal from './pages/Legal'
+import Pricing from './pages/Pricing'
 import { APP_NAME, APP_LOGO_SRC } from './constants/branding'
 
 const Assistant = lazy(() => import('./pages/user/Assistant'))
@@ -156,6 +157,7 @@ export default function App() {
         <Route path="/list" element={<KlippiesWaitlist />} />
         <Route path="/nationals" element={<Nationals />} />
         <Route path="/legal" element={<Legal />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/share/:token" element={<ShareTimes />} />
         <Route path="/event-day/help/:token" element={<EventDayHelper />} />
         <Route path="/suspended" element={

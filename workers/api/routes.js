@@ -12,6 +12,7 @@ import { handlePushSend } from '../../api/push/send.js'
 import chatHandler from '../../api/rules/chat.js'
 import shareCreateHandler from '../../api/share/create.js'
 import shareTokenHandler from '../../api/share/[token].js'
+import pricingProposalHandler from '../../api/pricing/proposal.js'
 import klippiesWaitlistHandler from '../../api/klippies/waitlist.js'
 import klippiesRequestHandler from '../../api/klippies/request.js'
 import klippiesLogHandler from '../../api/klippies/log.js'
@@ -68,6 +69,9 @@ async function route(request, env) {
   }
   if (pathname === '/api/share/create' && method === 'POST') {
     return invokeHandler(shareCreateHandler, request, raw, {})
+  }
+  if (pathname === '/api/pricing/proposal' && method === 'POST') {
+    return invokeHandler(pricingProposalHandler, request, raw, {})
   }
   if (pathname === '/api/klippies/waitlist' && (method === 'GET' || method === 'POST')) {
     return invokeHandler(klippiesWaitlistHandler, request, raw, {})

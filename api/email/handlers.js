@@ -19,7 +19,7 @@ async function requireAdminCaller(request) {
   return { user, profile, admin }
 }
 
-async function sendResend({ to, subject, html }) {
+export async function sendResend({ to, subject, html }) {
   const key = process.env.RESEND_API_KEY
   if (!key) throw new Error('RESEND_API_KEY is not configured')
   const emailRes = await fetch('https://api.resend.com/emails', {
