@@ -16,8 +16,10 @@
     "d1:export": "node scripts/export-supabase-to-d1.mjs",
     "dev:worker-api": "wrangler dev -c workers/api/wrangler.toml --port 3001",
     "deploy:api": "wrangler deploy -c workers/api/wrangler.toml",
-    "deploy": "npm run build && wrangler deploy",
-    "deploy:cf": "npm run deploy:api && npm run deploy",
+    "deploy:sawmga": "npm run build && wrangler deploy -c wrangler.sawmga.toml",
+    "deploy:hub": "npm run deploy --prefix apps/hub",
+    "deploy": "npm run deploy:sawmga",
+    "deploy:cf": "npm run deploy:api && npm run deploy:sawmga && npm run deploy:hub",
     "secret:service-role": "node scripts/put-service-role.mjs",
     "go-live": "node scripts/go-live-cloudflare.mjs"
   },

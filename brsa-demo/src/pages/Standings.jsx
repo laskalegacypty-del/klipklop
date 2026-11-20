@@ -59,7 +59,7 @@ function Board({ columns, rows }) {
 }
 
 export function Standings() {
-  const { officialStandings, world, eventById, horseStandings, riderById } = useDemo()
+  const { officialStandings, lteStandings, world, eventById, horseStandings, riderById } = useDemo()
   const [tab, setTab] = useState('points')
   const [q, setQ] = useState('')
   const [klass, setKlass] = useState('all')
@@ -68,6 +68,7 @@ export function Standings() {
   const [province, setProvince] = useState('all')
   const west = eventById('west-fest')
   const riders = officialStandings()
+  const lteRiders = lteStandings()
   const classes = [...new Set(world.riders.map((r) => r.class))]
   const provinces = [...new Set(world.riders.map((r) => r.province))]
   const seasons = Object.keys(world.priorYearStandings || {})
@@ -135,6 +136,20 @@ export function Standings() {
       }))
   }, [world.riders, klass, q])
 
+  const lteRows = useMemo(() => {
+    return lteRiders
+      .filter((r) => (klass === 'all' || r.class === klass) && (province === 'all' || r.province === province) && matches(r.name, `${r.class} ${r.province}`))
+      .map((r, i) => ({
+        id: r.id,
+        rank: i + 1,
+        name: r.name,
+        class: r.class,
+        province: r.province,
+        lte: rand(r.lte ?? 0),
+        to: `/riders/${r.id}`,
+      }))
+  }, [lteRiders, klass, province, q])
+
   const searchRider = (
     <Input className={filterControl} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" />
   )
@@ -171,7 +186,8 @@ export function Standings() {
           { id: 'points', label: 'Points' },
           { id: 'horse', label: 'Horse' },
           { id: 'prior', label: 'Prior years' },
-          { id: 'earnings', label: 'Earnings' },
+          { id: 'earnings', label: 'Season $' },
+          { id: 'lte', label: 'LTE' },
           { id: 'province', label: 'Province' },
         ]}
         activeTab={tab}
@@ -186,11 +202,23 @@ export function Standings() {
             columns={[
               { key: 'rank', label: 'Rank', className: 'font-semibold' },
               { key: 'name', label: 'Rider', filter: searchRider },
-              { key: 'class', label: 'Class', filter: classFilter },
+              { key: 'class', label: 'Membership', filter: classFilter },
               { key: 'province', label: 'Province', filter: provinceFilter },
               { key: 'points', label: 'Points', className: 'font-semibold' },
             ]}
             rows={pointRows}
+          />
+        ) : null}
+        {tab === 'lte' ? (
+          <Board
+            columns={[
+              { key: 'rank', label: 'Rank', className: 'font-semibold' },
+              { key: 'name', label: 'Rider', filter: searchRider },
+              { key: 'class', label: 'Membership', filter: classFilter },
+              { key: 'province', label: 'Province', filter: provinceFilter },
+              { key: 'lte', label: 'LTE', className: 'font-semibold' },
+            ]}
+            rows={lteRows}
           />
         ) : null}
         {tab === 'horse' ? (

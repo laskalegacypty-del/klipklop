@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useDemo } from '../demo/store'
+import { COMPLAINT_FEE, rand } from '../demo/money'
 import { isFedStaff } from '../demo/world'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
@@ -17,6 +18,7 @@ export function Complaints() {
   const [reply, setReply] = useState({})
   const desk = isFedStaff(user.role) || user.role === 'producer'
   const who = rider?.id || fan?.id
+  const wallet = rider?.wallet ?? fan?.wallet ?? 0
   const mine = (world.complaints || []).filter((c) => c.fromId === who)
   const all = world.complaints || []
   const list = desk ? all : mine
@@ -37,8 +39,8 @@ export function Complaints() {
         title="Queries & complaints"
         description={
           desk
-            ? 'BRSA owns this queue. Reply and close items here. Time disputes stay on My times.'
-            : 'Separate from a race-time query. WhatsApp and email still work if you want a human on the other end.'
+            ? 'BRSA owns this queue. Reply and close items here. Verified complaints refund the R500 fee. Time disputes stay on My times.'
+            : `R${COMPLAINT_FEE} fee (refundable if verified). Separate from a race-time query.`
         }
       />
       {world.links?.whatsapp || world.links?.email ? (
@@ -66,6 +68,9 @@ export function Complaints() {
         <Card className="mb-5">
           <CardHeader>
             <CardTitle>Send a complaint</CardTitle>
+            <CardDescription>
+              Fee {rand(COMPLAINT_FEE)} is taken from your wallet now and refunded if BRSA verifies the complaint. Wallet balance {rand(wallet)}.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={reason} onChange={(e) => setReason(e.target.value)}>
@@ -83,7 +88,7 @@ export function Complaints() {
                 setMessage('')
               }}
             >
-              Send
+              Send · pay {rand(COMPLAINT_FEE)}
             </Button>
           </CardContent>
         </Card>
@@ -99,6 +104,7 @@ export function Complaints() {
               <CardDescription>
                 {desk ? `${fromName(c)} · ${c.fromRole} · ` : ''}
                 {new Date(c.at).toLocaleString('en-ZA')}
+                {c.fee ? ` · fee ${rand(c.fee)} held` : ''}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -125,7 +131,10 @@ export function Complaints() {
                   >
                     Reply
                   </Button>
-                  <Button onClick={() => resolveComplaint(c.id)}>Mark resolved</Button>
+                  <Button onClick={() => resolveComplaint(c.id, { verified: true })}>Verify & refund {rand(c.fee || COMPLAINT_FEE)}</Button>
+                  <Button variant="ghost" onClick={() => resolveComplaint(c.id, { verified: false })}>
+                    Close without refund
+                  </Button>
                 </div>
               ) : null}
             </CardContent>
@@ -141,6 +150,7 @@ export function Complaints() {
               <CardTitle>{c.reason}</CardTitle>
               <CardDescription>
                 {desk ? `${fromName(c)} · ` : ''}Closed {c.resolvedAt ? new Date(c.resolvedAt).toLocaleString('en-ZA') : ''}
+                {c.verified ? ' · verified · fee refunded' : c.fee ? ' · closed without refund' : ''}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-stone-600">

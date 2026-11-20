@@ -32,6 +32,16 @@ function jwtRole(token) {
   return JSON.parse(json).role || null
 }
 
+function keyKind(key) {
+  if (key.startsWith('sb_secret_')) return 'service_role'
+  if (key.startsWith('sb_publishable_') || key.startsWith('sb_anon_')) return 'anon'
+  try {
+    return jwtRole(key)
+  } catch {
+    return null
+  }
+}
+
 const key = loadKey()
 if (!key) {
   console.error('SUPABASE_SERVICE_ROLE_KEY is empty.')
@@ -39,20 +49,17 @@ if (!key) {
   process.exit(1)
 }
 
-let role
-try {
-  role = jwtRole(key)
-} catch {
-  console.error('That value is not a JWT. Copy service_role from Supabase → Settings → API.')
+const role = keyKind(key)
+if (!role) {
+  console.error('That value is not a service_role JWT or sb_secret_ key. Copy service_role from Supabase → Settings → API.')
   process.exit(1)
 }
-
 if (role === 'anon') {
-  console.error('That is the anon key. Need service_role (the secret one).')
+  console.error('That is the anon/publishable key. Need service_role (the secret one).')
   process.exit(1)
 }
 if (role !== 'service_role') {
-  console.error(`JWT role is "${role}", expected service_role.`)
+  console.error(`Key role is "${role}", expected service_role.`)
   process.exit(1)
 }
 

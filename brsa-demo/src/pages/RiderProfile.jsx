@@ -4,6 +4,7 @@ import { useDemo } from '../demo/store'
 import { rand, showsAttended } from '../demo/money'
 import { isPhotoSrc } from '../lib/imageCrop'
 import { PhotoStage } from '../components/PhotoCropper'
+import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
@@ -15,7 +16,8 @@ import { StatCard } from '../components/ui/StatCard'
 export function RiderProfile() {
   const { riderId } = useParams()
   const navigate = useNavigate()
-  const { world, riderById, user, rider, boostRider, payRiderDirect, officialStandings, saveProfile, registerHorse, toggleFollow } = useDemo()
+  const { world, riderById, user, rider, boostRider, payRiderDirect, officialStandings, topRider, saveProfile, registerHorse, toggleFollow } =
+    useDemo()
   const card = riderById(riderId)
   const [bio, setBio] = useState(card?.bio ?? '')
   const [addingHorse, setAddingHorse] = useState(false)
@@ -28,6 +30,8 @@ export function RiderProfile() {
   const who = rider?.id || world.users.find((u) => u.id === world.currentUserId)?.fanId
   const following = world.follows?.[who] ?? []
   const results = world.results.filter((r) => r.riderId === card.id && r.time != null)
+  const rodeos = world.events.filter((e) => world.entries.some((en) => en.eventId === e.id && en.riderId === card.id && en.paid))
+  const isTop = topRider?.id === card.id || card.rankTitle === 'Top Rider'
 
   return (
     <div>
@@ -58,9 +62,13 @@ export function RiderProfile() {
           />
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="font-display text-4xl font-semibold">{card.name}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-display text-4xl font-semibold">{card.name}</h1>
+                {isTop ? <Badge variant="success">Top Rider</Badge> : null}
+              </div>
               <p className="mt-1 text-sm text-brand-200">
                 {card.sa} · {card.class} · {card.province}
+                {rank ? ` · #${rank}` : ''}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -80,9 +88,10 @@ export function RiderProfile() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Rank" value={`#${rank}`} />
+      <div className="grid gap-4 md:grid-cols-4">
+        <StatCard label="Rank" value={rank ? `#${rank}` : '—'} />
         <StatCard label="Points" value={card.points} />
+        <StatCard label="LTE" value={rand(card.lte ?? 0)} />
         <StatCard label="Shows" value={shows} />
       </div>
 
@@ -136,6 +145,28 @@ export function RiderProfile() {
             ) : (
               <p className="whitespace-pre-wrap leading-relaxed text-stone-600">{card.bio}</p>
             )}
+            <p className="text-xs uppercase tracking-wide text-stone-500">Prior achievements &amp; records</p>
+            <ul className="mb-3 space-y-1">
+              {(card.achievements || []).length ? (
+                card.achievements.map((a) => <li key={a}>{a}</li>)
+              ) : (
+                <li className="text-stone-500">None listed yet.</li>
+              )}
+            </ul>
+            <p className="text-xs uppercase tracking-wide text-stone-500">Rodeos entered</p>
+            <ul className="mb-3 space-y-1">
+              {rodeos.length ? (
+                rodeos.map((e) => (
+                  <li key={e.id}>
+                    <Link className="underline" to={`/events/${e.id}`}>
+                      {e.name}
+                    </Link>
+                  </li>
+                ))
+              ) : (
+                <li className="text-stone-500">No paid entries yet.</li>
+              )}
+            </ul>
             <p className="text-xs uppercase tracking-wide text-stone-500">Season results</p>
             <ul className="space-y-1">
               {results.map((r) => (

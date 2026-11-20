@@ -16,7 +16,20 @@ export function Feed() {
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
-            <Card key={item.id} className={item.type === 'boost' || item.type === 'award' || item.type === 'birthday' ? 'border-season' : ''}>
+            <Card
+              key={item.id}
+              className={
+                item.type === 'boost' ||
+                item.type === 'award' ||
+                item.type === 'birthday' ||
+                item.type === 'follow' ||
+                item.type === 'entry' ||
+                item.type === 'rank' ||
+                item.type === 'rule'
+                  ? 'border-season'
+                  : ''
+              }
+            >
               <CardContent>
                 <p className="text-xs uppercase tracking-wide text-stone-500">
                   {item.category || item.type} · {new Date(item.at).toLocaleString('en-ZA')}

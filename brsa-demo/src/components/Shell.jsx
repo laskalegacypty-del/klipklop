@@ -26,14 +26,23 @@ import { AccountMenu } from './AccountMenu'
 import { Button } from './ui/Button'
 import { Input } from './ui/Input'
 
+const LOCKED_ALLOW = ['/wallet', '/complaints', '/rules', '/barry', '/ask']
+
 export function Shell() {
-  const { world, user, rider, viewingFromAdmin, exitViewAs, demoSwitch, unpaidInvoiceCount, pendingComplaints } = useDemo()
+  const { world, user, rider, viewingFromAdmin, exitViewAs, demoSwitch, unpaidInvoiceCount, pendingComplaints, accessLocked } =
+    useDemo()
   const navigate = useNavigate()
   const location = useLocation()
   const [q, setQ] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const fed = isFedStaff(user.role)
   const sys = isSysAdmin(user.role)
+
+  useEffect(() => {
+    if (!accessLocked) return
+    const ok = LOCKED_ALLOW.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))
+    if (!ok) navigate('/wallet', { replace: true })
+  }, [accessLocked, location.pathname, navigate])
 
   const hits = useMemo(() => {
     const query = q.trim().toLowerCase()
@@ -47,8 +56,14 @@ export function Shell() {
     const events = world.events
       .filter((e) => e.name.toLowerCase().includes(query))
       .map((e) => ({ type: 'Event', label: e.name, to: `/events/${e.id}` }))
-    return [...riders, ...horses, ...events].slice(0, 8)
-  }, [q, world.events, world.horses, world.riders])
+    const producers = (world.producers || [])
+      .filter((p) => p.name.toLowerCase().includes(query) || p.region.toLowerCase().includes(query))
+      .map((p) => ({ type: 'Producer', label: `${p.name} · ${p.region}`, to: '/producer' }))
+    const contacts = (world.contacts || [])
+      .filter((c) => c.name.toLowerCase().includes(query) || c.region.toLowerCase().includes(query))
+      .map((c) => ({ type: 'Producer', label: `${c.name} · ${c.region}`, to: '/producer' }))
+    return [...riders, ...horses, ...events, ...producers, ...contacts].slice(0, 8)
+  }, [q, world.contacts, world.events, world.horses, world.producers, world.riders])
 
   const nav = [
     { to: '/', label: 'Home', icon: Home, show: true, end: true, dock: user.role !== 'rider' },
@@ -233,6 +248,21 @@ export function Shell() {
               <Button size="sm" variant="charcoal" onClick={goAdminDesk}>
                 Back to help desk
               </Button>
+            </div>
+          </div>
+        ) : null}
+        {accessLocked ? (
+          <div className="bg-red-700 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
+              <p>
+                <span className="font-semibold">Membership overdue — app access limited.</span>
+                <span className="opacity-90"> Pay your membership under Money to get back in. Complaints and Rules stay open.</span>
+              </p>
+              <Link to="/wallet">
+                <Button size="sm" variant="secondary">
+                  Pay membership
+                </Button>
+              </Link>
             </div>
           </div>
         ) : null}

@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import {
+  COMPLAINT_FEE,
   computeDivisionsAndPlaces,
   entryFee,
   classForBirthdate,
   estimatePayout,
   FINE_TYPES,
+  isEarlyBirdActive,
   membershipFee,
   parseTimesheet,
   pointsForResult,
@@ -36,6 +38,10 @@ function loadWorld() {
           users,
           currentUserId,
           accent: parsed.accent ?? seed.accent,
+          earlyBirdEnds: parsed.earlyBirdEnds ?? seed.earlyBirdEnds,
+          kickOutOverdue: parsed.kickOutOverdue ?? seed.kickOutOverdue,
+          membershipIncludesApp: parsed.membershipIncludesApp ?? seed.membershipIncludesApp,
+          appPrice: parsed.appPrice ?? seed.appPrice,
           viewingFromAdmin: parsed.viewingFromAdmin ?? false,
           viewAsReturnId: parsed.viewAsReturnId ?? null,
           viewAsLog: parsed.viewAsLog ?? [],
@@ -44,6 +50,8 @@ function loadWorld() {
           links: { ...seed.links, ...(parsed.links || {}) },
           transactions: parsed.transactions ?? seed.transactions,
           follows: parsed.follows ?? seed.follows,
+          producers: parsed.producers?.length ? parsed.producers : seed.producers,
+          contacts: parsed.contacts ?? seed.contacts,
         }
       }
     }
@@ -97,6 +105,11 @@ export function DemoProvider({ children }) {
     const producer = user.producerId ? world.producers.find((p) => p.id === user.producerId) : null
     const topRider = [...world.riders].sort((a, b) => b.points - a.points)[0]
     const isOps = user.role === 'producer' || isFedStaff(user.role)
+    const earlyBird = isEarlyBirdActive(world.earlyBirdEnds)
+
+    function feeForMembership(klass) {
+      return membershipFee(klass, { earlyBird })
+    }
 
     function riderById(id) {
       return world.riders.find((r) => r.id === id)
@@ -116,6 +129,11 @@ export function DemoProvider({ children }) {
     function unpaidMembership(riderId) {
       return world.invoices.filter((i) => i.riderId === riderId && i.type === 'membership' && !i.paid)
     }
+    function membershipLocked(riderId) {
+      if (!world.kickOutOverdue) return false
+      return unpaidMembership(riderId).length > 0
+    }
+    const accessLocked = user.role === 'rider' && rider ? membershipLocked(rider.id) : false
     function entriesFor(eventId, { paidOnly = false } = {}) {
       return world.entries
         .filter((e) => e.eventId === eventId && (!paidOnly || e.paid))
@@ -127,6 +145,9 @@ export function DemoProvider({ children }) {
     }
     function officialStandings() {
       return [...world.riders].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
+    }
+    function lteStandings() {
+      return [...world.riders].sort((a, b) => (b.lte ?? 0) - (a.lte ?? 0) || a.name.localeCompare(b.name))
     }
     function horseStandings(division = null) {
       const officialIds = new Set(world.events.filter((e) => e.official).map((e) => e.id))
@@ -201,10 +222,20 @@ export function DemoProvider({ children }) {
       toast.success('Season restored on this device')
     }
     function setMembershipIncludesApp(value) {
-      setWorld((w) => ({ ...w, membershipIncludesApp: value }))
+      setWorld((w) => ({ ...w, membershipIncludesApp: Boolean(value) }))
+      toast.success(value ? 'App included in membership' : 'App billed separately')
     }
     function setAppPrice(value) {
       setWorld((w) => ({ ...w, appPrice: Number(value) || 0 }))
+      toast.success(`App price set to R${Number(value) || 0}`)
+    }
+    function setEarlyBirdEnds(date) {
+      setWorld((w) => ({ ...w, earlyBirdEnds: date || null }))
+      toast.success(date ? `Early bird ends ${date}` : 'Early bird window cleared')
+    }
+    function setKickOutOverdue(value) {
+      setWorld((w) => ({ ...w, kickOutOverdue: Boolean(value) }))
+      toast.success(value ? 'Overdue members are kicked out of the app' : 'Kick-out disabled')
     }
     function setAccent(accent, { quiet } = {}) {
       if (!isSysAdmin(user.role)) {
@@ -249,6 +280,12 @@ export function DemoProvider({ children }) {
           results,
           invoices: next.invoices.map((i) => (i.id === invoiceId ? { ...i, paid: true, paidAt: new Date().toISOString() } : i)),
         }
+        if (inv.type === 'membership' && inv.riderId) {
+          next = {
+            ...next,
+            riders: next.riders.map((x) => (x.id === inv.riderId ? { ...x, membershipNote: 'Member' } : x)),
+          }
+        }
         return next
       })
       toast.success('Paid')
@@ -256,33 +293,56 @@ export function DemoProvider({ children }) {
 
     function issueMembershipInvoice(riderId, { klass } = {}) {
       const r = riderById(riderId)
-      const amount = membershipFee(klass || r?.class)
+      const band = klass || r?.class || 'Adult'
+      const amount = feeForMembership(band)
+      const tier = earlyBird ? 'early bird' : 'standard'
       const invoiceId = `inv-mem-${riderId}-${Date.now()}`
+      let appAddon = 0
+      if (!world.membershipIncludesApp && world.appPrice > 0) appAddon = Number(world.appPrice) || 0
+      const total = amount + appAddon
       setWorld((w) => {
+        const invoices = [
+          ...w.invoices,
+          {
+            id: invoiceId,
+            riderId,
+            type: 'membership',
+            label: `${band} membership 2026/27 (${tier})${appAddon ? ` + app R${appAddon}` : ''}`,
+            amount: total,
+            paid: false,
+            createdAt: new Date().toISOString(),
+          },
+        ]
         let next = {
           ...w,
-          invoices: [
-            ...w.invoices,
+          invoices,
+          riders: w.riders.map((x) =>
+            x.id === riderId ? { ...x, membershipNote: `Member · due (${tier})` } : x,
+          ),
+          feed: [
             {
-              id: invoiceId,
+              id: `feed-mem-${invoiceId}`,
+              type: 'system',
+              at: new Date().toISOString(),
               riderId,
-              type: 'membership',
-              label: `${klass || r?.class || 'Adult'} membership 2026/27`,
-              amount,
-              paid: false,
-              createdAt: new Date().toISOString(),
+              text: `Membership due for ${r?.name || 'rider'} — ${band} ${tier} R${total}.`,
             },
+            ...w.feed,
           ],
         }
         const riderRow = next.riders.find((x) => x.id === riderId)
-        if (riderRow?.debitOrder && riderRow.wallet >= amount) {
+        if (riderRow?.debitOrder && riderRow.wallet >= total) {
           next = {
             ...next,
-            riders: next.riders.map((x) => (x.id === riderId ? { ...x, wallet: x.wallet - amount } : x)),
+            riders: next.riders.map((x) =>
+              x.id === riderId ? { ...x, wallet: x.wallet - total, membershipNote: 'Member' } : x,
+            ),
             invoices: next.invoices.map((i) => (i.id === invoiceId ? { ...i, paid: true, paidAt: new Date().toISOString() } : i)),
           }
-          next = addTx(next, { ownerId: riderId, ownerType: 'rider', dir: 'debit', amount, label: 'Membership auto-renew (debit order)' })
+          next = addTx(next, { ownerId: riderId, ownerType: 'rider', dir: 'debit', amount: total, label: 'Membership auto-renew (debit order)' })
           queueMicrotask(() => toast.success('Membership auto-paid from wallet'))
+        } else {
+          queueMicrotask(() => toast.success(`Membership invoice issued · R${total}`))
         }
         return next
       })
@@ -349,13 +409,32 @@ export function DemoProvider({ children }) {
             riderId,
             type: 'membership',
             label: `${klass} membership (day member / guest)`,
-            amount: membershipFee(klass),
+            amount: feeForMembership(klass),
             paid: false,
             createdAt: new Date().toISOString(),
           })
         }
-        let next = { ...w, entries: [...w.entries, entry], results, invoices }
-        if (payNow) next = addTx(next, { ownerId: riderId, ownerType: 'rider', dir: 'debit', amount: fee, label: `Entry ${eventById(eventId)?.name}` })
+        const eventName = eventById(eventId)?.name ?? 'Event'
+        const horseName = horseById(horseId)?.name
+        let next = {
+          ...w,
+          entries: [...w.entries, entry],
+          results,
+          invoices,
+          feed: [
+            {
+              id: `feed-entry-${entryId}`,
+              type: 'entry',
+              at: new Date().toISOString(),
+              riderId,
+              eventId,
+              text: `${r?.name || 'Rider'} entered ${eventName}${horseName ? ` on ${horseName}` : ''}${dayMember ? ' (day member)' : ''}.`,
+              to: `/events/${eventId}`,
+            },
+            ...w.feed,
+          ],
+        }
+        if (payNow) next = addTx(next, { ownerId: riderId, ownerType: 'rider', dir: 'debit', amount: fee, label: `Entry ${eventName}` })
         return next
       })
       toast.success(payNow ? 'Entered and paid — you’re on the draw' : 'Entered — pay to appear on the draw')
@@ -467,7 +546,14 @@ export function DemoProvider({ children }) {
           next = {
             ...next,
             riders: next.riders.map((r) =>
-              r.id === share.riderId ? { ...r, wallet: r.wallet + cash, earnings: r.earnings + share.amount } : r,
+              r.id === share.riderId
+                ? {
+                    ...r,
+                    wallet: r.wallet + cash,
+                    earnings: r.earnings + share.amount,
+                    lte: (r.lte ?? 0) + share.amount,
+                  }
+                : r,
             ),
             brsaWallet: (next.brsaWallet ?? 0) + split.brsaAdmin / Math.max(shares.length, 1),
           }
@@ -490,12 +576,19 @@ export function DemoProvider({ children }) {
         if (nextTop && nextTop.id !== prevTop) {
           feed.unshift({
             id: `feed-top-${eventId}`,
-            type: 'system',
+            type: 'rank',
             at: new Date().toISOString(),
             riderId: nextTop.id,
             text: `${nextTop.name} is the new Top Rider.`,
             to: `/riders/${nextTop.id}`,
           })
+          next = {
+            ...next,
+            riders: next.riders.map((r) => ({
+              ...r,
+              rankTitle: r.id === nextTop.id ? 'Top Rider' : r.rankTitle === 'Top Rider' ? null : r.rankTitle,
+            })),
+          }
           queueMicrotask(() => toast.success(`${nextTop.name} is Top Rider`))
         } else {
           queueMicrotask(() => toast.success(`${event.name} is official`))
@@ -944,10 +1037,28 @@ export function DemoProvider({ children }) {
     function toggleFollow(riderId) {
       const who = fan?.id || rider?.id
       if (!who) return
+      const followerName = fan?.name || rider?.name || 'Someone'
+      const targetName = riderById(riderId)?.name || 'a rider'
       setWorld((w) => {
         const current = w.follows?.[who] ?? []
-        const next = current.includes(riderId) ? current.filter((x) => x !== riderId) : [...current, riderId]
-        return { ...w, follows: { ...w.follows, [who]: next } }
+        const following = current.includes(riderId)
+        const next = following ? current.filter((x) => x !== riderId) : [...current, riderId]
+        let feed = w.feed
+        if (!following) {
+          feed = [
+            {
+              id: `feed-follow-${Date.now()}`,
+              type: 'follow',
+              at: new Date().toISOString(),
+              fromFanId: fan?.id,
+              riderId,
+              text: `${followerName} started following ${targetName}.`,
+              to: `/riders/${riderId}`,
+            },
+            ...w.feed,
+          ]
+        }
+        return { ...w, follows: { ...w.follows, [who]: next }, feed }
       })
     }
 
@@ -967,7 +1078,8 @@ export function DemoProvider({ children }) {
         const nextSa = `SA${1000 + w.riders.length + 1}`
         const riderId = `r-${fanId}`
         const user = w.users.find((u) => u.fanId === fanId)
-        const amount = membershipFee(klass)
+        const amount = feeForMembership(klass)
+        const tier = earlyBird ? 'early bird' : 'standard'
         return {
           ...w,
           riders: [
@@ -982,13 +1094,14 @@ export function DemoProvider({ children }) {
               lte: 0,
               earnings: 0,
               wallet: f.wallet,
-              membershipNote: 'Member · due',
+              membershipNote: `Member · due (${tier})`,
               debitOrder: false,
               joinedAt: new Date().toISOString().slice(0, 10),
               bio: f.bio || '',
               sponsors: [],
-              photo: f.name.slice(0, 1),
-              cover: 'dust',
+              photo: f.photo || f.name.slice(0, 1),
+              cover: f.cover || 'dust',
+              achievements: [],
               bank: f.bank || {},
             },
           ],
@@ -998,7 +1111,7 @@ export function DemoProvider({ children }) {
               id: `inv-mem-${riderId}`,
               riderId,
               type: 'membership',
-              label: `${klass} membership 2026/27`,
+              label: `${klass} membership 2026/27 (${tier})`,
               amount,
               paid: false,
               createdAt: new Date().toISOString(),
@@ -1044,23 +1157,63 @@ export function DemoProvider({ children }) {
         toast.error('Sign in as a rider or supporter to send a complaint')
         return
       }
-      setWorld((w) => ({
-        ...w,
-        complaints: [
-          {
-            id: `cmp-${Date.now()}`,
-            fromId: who.id,
-            fromRole: rider ? 'rider' : 'fan',
-            reason,
-            message,
-            status: 'open',
-            at: new Date().toISOString(),
-            replies: [],
-          },
-          ...(w.complaints || []),
-        ],
-      }))
-      toast.success('Complaint sent')
+      const ownerType = rider ? 'rider' : 'fan'
+      const fee = COMPLAINT_FEE
+      if ((who.wallet ?? 0) < fee) {
+        toast.error(`Complaint fee is R${fee} — top up your wallet first`)
+        return
+      }
+      const complaintId = `cmp-${Date.now()}`
+      const invoiceId = `inv-cmp-${complaintId}`
+      setWorld((w) => {
+        let next = {
+          ...w,
+          [ownerType === 'rider' ? 'riders' : 'fans']: (ownerType === 'rider' ? w.riders : w.fans).map((x) =>
+            x.id === who.id ? { ...x, wallet: Math.max(0, (x.wallet || 0) - fee) } : x,
+          ),
+          invoices: [
+            ...w.invoices,
+            {
+              id: invoiceId,
+              riderId: ownerType === 'rider' ? who.id : undefined,
+              fanId: ownerType === 'fan' ? who.id : undefined,
+              type: 'complaint',
+              label: `Complaint fee — ${reason}`,
+              amount: fee,
+              paid: true,
+              paidAt: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+              complaintId,
+              refundable: true,
+            },
+          ],
+          complaints: [
+            {
+              id: complaintId,
+              fromId: who.id,
+              fromRole: ownerType,
+              reason,
+              message,
+              status: 'open',
+              fee,
+              feeInvoiceId: invoiceId,
+              feeRefunded: false,
+              at: new Date().toISOString(),
+              replies: [],
+            },
+            ...(w.complaints || []),
+          ],
+        }
+        next = addTx(next, {
+          ownerId: who.id,
+          ownerType,
+          dir: 'debit',
+          amount: fee,
+          label: `Complaint fee (refundable if verified)`,
+        })
+        return next
+      })
+      toast.success(`Complaint sent · R${fee} held (refundable if verified)`)
     }
 
     function replyToComplaint(id, text) {
@@ -1075,13 +1228,78 @@ export function DemoProvider({ children }) {
       toast.success('Reply sent')
     }
 
-    function resolveComplaint(id) {
+    function resolveComplaint(id, { verified = false } = {}) {
       if (user.role !== 'producer' && !isFedStaff(user.role)) return
+      setWorld((w) => {
+        const c = (w.complaints || []).find((x) => x.id === id)
+        if (!c) return w
+        let next = {
+          ...w,
+          complaints: (w.complaints || []).map((row) =>
+            row.id === id
+              ? {
+                  ...row,
+                  status: 'resolved',
+                  verified: Boolean(verified),
+                  feeRefunded: Boolean(verified) && !row.feeRefunded,
+                  resolvedAt: new Date().toISOString(),
+                }
+              : row,
+          ),
+        }
+        if (verified && c.fee && !c.feeRefunded) {
+          const ownerType = c.fromRole === 'fan' ? 'fan' : 'rider'
+          if (ownerType === 'rider') {
+            next = {
+              ...next,
+              riders: next.riders.map((r) => (r.id === c.fromId ? { ...r, wallet: r.wallet + c.fee } : r)),
+            }
+          } else {
+            next = {
+              ...next,
+              fans: next.fans.map((f) => (f.id === c.fromId ? { ...f, wallet: f.wallet + c.fee } : f)),
+            }
+          }
+          next = addTx(next, {
+            ownerId: c.fromId,
+            ownerType,
+            dir: 'credit',
+            amount: c.fee,
+            label: 'Complaint fee refund (verified)',
+          })
+          next = {
+            ...next,
+            invoices: next.invoices.map((i) =>
+              i.id === c.feeInvoiceId ? { ...i, refunded: true, refundedAt: new Date().toISOString() } : i,
+            ),
+          }
+          queueMicrotask(() => toast.success(`Resolved · R${c.fee} refunded`))
+        } else {
+          queueMicrotask(() => toast.success(verified ? 'Marked resolved' : 'Closed without refund'))
+        }
+        return next
+      })
+    }
+
+    function saveFanProfile(fanId, patch) {
       setWorld((w) => ({
         ...w,
-        complaints: (w.complaints || []).map((c) => (c.id === id ? { ...c, status: 'resolved', resolvedAt: new Date().toISOString() } : c)),
+        fans: w.fans.map((f) => (f.id === fanId ? { ...f, ...patch } : f)),
       }))
-      toast.success('Marked resolved')
+      toast.success('Profile saved')
+    }
+
+    function setEventAdminFee(eventId, amount) {
+      if (!isOps) {
+        toast.error('Only producers or BRSA can set producing cost')
+        return
+      }
+      const n = Math.max(0, Number(amount) || 0)
+      setWorld((w) => ({
+        ...w,
+        events: w.events.map((e) => (e.id === eventId ? { ...e, adminFee: n } : e)),
+      }))
+      toast.success(`Producing cost set to R${n}`)
     }
 
     function downloadMemberList() {
@@ -1110,17 +1328,23 @@ export function DemoProvider({ children }) {
       isSysAdmin: isSysAdmin(user.role),
       viewingFromAdmin: Boolean(world.viewingFromAdmin),
       topRider,
+      accessLocked,
+      earlyBird,
+      membershipFeeNow: feeForMembership,
+      memberCount: world.riders.length,
       riderById,
       horseById,
       eventById,
       fanById,
       unpaidFines,
       unpaidMembership,
+      membershipLocked,
       unpaidInvoiceCount,
       pendingComplaints,
       entriesFor,
       resultsFor,
       officialStandings,
+      lteStandings,
       horseStandings,
       topSupporters,
       estimateEventPayout: (eventId) => {
@@ -1136,8 +1360,11 @@ export function DemoProvider({ children }) {
       resetDemo,
       setMembershipIncludesApp,
       setAppPrice,
+      setEarlyBirdEnds,
+      setKickOutOverdue,
       setAccent,
       setLinks,
+      setEventAdminFee,
       payInvoice,
       issueMembershipInvoice,
       enterEvent,
@@ -1161,6 +1388,7 @@ export function DemoProvider({ children }) {
       saveEvent,
       createEvent,
       saveProfile,
+      saveFanProfile,
       saveHorse,
       registerHorse,
       postCommunity,

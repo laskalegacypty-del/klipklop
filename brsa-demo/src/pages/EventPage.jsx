@@ -60,7 +60,7 @@ export function EventPage() {
       <Tabs tabs={tabs} activeTab={tab} onChange={(id) => setParams({ tab: id })} />
       <div className="mt-5">
         {tab === 'flyer' && <Flyer event={event} producer={producer} />}
-        {tab === 'enter' && <Enter event={event} />}
+        {tab === 'enter' && <Enter event={event} guest={params.get('guest') === '1'} />}
         {tab === 'draw' && <Draw event={event} />}
         {tab === 'results' && <Results event={event} />}
         {tab === 'payout' && <Payout event={event} />}
@@ -70,6 +70,9 @@ export function EventPage() {
 }
 
 function Flyer({ event, producer }) {
+  const { isOps, setEventAdminFee } = useDemo()
+  const [adminFee, setAdminFee] = useState(String(event.adminFee ?? PRODUCING_COST))
+
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <Card className="md:col-span-2">
@@ -101,14 +104,31 @@ function Flyer({ event, producer }) {
           <p className="font-semibold">{producer?.name}</p>
           <p>{producer?.phone}</p>
           <p className="text-stone-600">{producer?.email}</p>
-          <p className="pt-3 text-stone-500">Per-event admin / producing cost: {rand(event.adminFee)}</p>
+          <p className="pt-3 text-stone-500">Per-event admin / producing cost: {rand(event.adminFee ?? PRODUCING_COST)}</p>
+          {isOps ? (
+            <label className="mt-3 block text-sm font-medium">
+              Adjust producing cost (R)
+              <div className="mt-1 flex gap-2">
+                <input
+                  className="h-9 w-full rounded-md border border-dust-200 bg-white px-3 text-sm"
+                  value={adminFee}
+                  onChange={(e) => setAdminFee(e.target.value)}
+                  type="number"
+                  min="0"
+                />
+                <Button size="sm" variant="secondary" onClick={() => setEventAdminFee(event.id, adminFee)}>
+                  Save
+                </Button>
+              </div>
+            </label>
+          ) : null}
         </CardContent>
       </Card>
     </div>
   )
 }
 
-function Enter({ event }) {
+function Enter({ event, guest = false }) {
   const { user, rider, unpaidFines, unpaidMembership, enterEvent, world, horseById, payInvoice } = useDemo()
   const horses = rider ? world.horses.filter((h) => h.riderId === rider.id) : []
   const [klass, setKlass] = useState(rider?.class ?? 'Adult')
@@ -120,6 +140,7 @@ function Enter({ event }) {
   const already = rider
     ? world.entries.find((e) => e.eventId === event.id && e.riderId === rider.id)
     : null
+  const dayMember = guest || /day/i.test(rider?.membershipNote || '')
 
   if (user.role !== 'rider' || !rider) {
     return (
@@ -162,7 +183,7 @@ function Enter({ event }) {
     )
   }
 
-  if (dues.length) {
+  if (dues.length && !dayMember) {
     return (
       <Card className="border-red-200 bg-red-50">
         <CardHeader>
@@ -220,9 +241,15 @@ function Enter({ event }) {
         <CardDescription>
           {horseById(horseId)?.name ?? 'Pick a horse'} · {klass}
           {carryOver ? ' + carry-over' : ''} · {rand(fee)}
+          {dayMember ? ' · day member / gate' : ''}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 max-w-md">
+        {dayMember ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            Day-member / gate entry. Membership invoice is raised with the entry; payout can clear it later.
+          </p>
+        ) : null}
         <label className="text-sm font-medium">
           Horse
           <Select className="mt-1" value={horseId} onChange={(e) => setHorseId(e.target.value)}>
@@ -249,13 +276,16 @@ function Enter({ event }) {
         </label>
         <p className="text-sm text-stone-600">Total {rand(fee)}</p>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button size="lg" onClick={() => enterEvent({ eventId: event.id, riderId: rider.id, horseId, klass, carryOver, payNow: true })}>
+          <Button
+            size="lg"
+            onClick={() => enterEvent({ eventId: event.id, riderId: rider.id, horseId, klass, carryOver, payNow: true, guest: dayMember })}
+          >
             Pay {rand(fee)} on my phone
           </Button>
           <Button
             variant="secondary"
             size="lg"
-            onClick={() => enterEvent({ eventId: event.id, riderId: rider.id, horseId, klass, carryOver, payNow: false })}
+            onClick={() => enterEvent({ eventId: event.id, riderId: rider.id, horseId, klass, carryOver, payNow: false, guest: dayMember })}
           >
             Put me on the list — I will pay later
           </Button>

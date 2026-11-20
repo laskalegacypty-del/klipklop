@@ -11,14 +11,34 @@ export const CLASS_FEES = {
 
 export const CARRY_OVER_FEE = 300
 export const PRODUCING_COST = 150
+export const COMPLAINT_FEE = 500
 
-export const MEMBERSHIP_FEES = {
-  Peewee: 300,
-  Junior: 350,
-  Youth: 400,
-  Adult: 600,
-  Senior: 600,
-  'Futurity horse': 350,
+/** Signed 30 OCT early-bird annual membership (adjustable window in store). */
+export const MEMBERSHIP_EARLY_BIRD = {
+  Peewee: 350,
+  Junior: 400,
+  Youth: 450,
+  Adult: 650,
+  Senior: 650,
+}
+
+/** Signed 30 OCT standard annual membership after early bird. */
+export const MEMBERSHIP_STANDARD = {
+  Peewee: 450,
+  Junior: 550,
+  Youth: 600,
+  Adult: 750,
+  Senior: 750,
+}
+
+/** @deprecated prefer membershipFee(klass, { earlyBird }) */
+export const MEMBERSHIP_FEES = MEMBERSHIP_EARLY_BIRD
+
+export function isEarlyBirdActive(earlyBirdEnds, now = new Date()) {
+  if (!earlyBirdEnds) return true
+  const end = new Date(earlyBirdEnds)
+  if (Number.isNaN(end.getTime())) return true
+  return now.getTime() <= end.getTime()
 }
 
 export const HOF_CATEGORIES = [
@@ -67,8 +87,9 @@ export function entryFee(klass, carryOver) {
   return (CLASS_FEES[klass] ?? 350) + (carryOver ? CARRY_OVER_FEE : 0)
 }
 
-export function membershipFee(klass) {
-  return MEMBERSHIP_FEES[klass] ?? MEMBERSHIP_FEES.Adult
+export function membershipFee(klass, { earlyBird = true } = {}) {
+  const table = earlyBird ? MEMBERSHIP_EARLY_BIRD : MEMBERSHIP_STANDARD
+  return table[klass] ?? table.Adult
 }
 
 export function placePoints(place) {

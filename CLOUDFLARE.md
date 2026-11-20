@@ -14,8 +14,9 @@ The script refuses the anon key if you paste the wrong JWT.
 
 ## Preview URLs
 
-- App (SPA Worker `klipklop`): https://klipklop.klipklop.workers.dev
-- Utilities Worker `klipklop-api` (debug only; the app talks to it via a service binding): https://klipklop-api.klipklop.workers.dev
+- Hub portal (Worker `klipklop`): https://klipklop.klipklop.workers.dev — see [HUB.md](HUB.md)
+- SAWMGA division (Worker `klipklop-sawmga`): https://klipklop-sawmga.klipklop.workers.dev
+- Utilities Worker `klipklop-api` (debug only; SAWMGA talks to it via a service binding): https://klipklop-api.klipklop.workers.dev
 
 Same-origin `/api/*` on the app URL is forwarded to `klipklop-api`. `/api/health` returns `{ ok: true, service: "klipklop-api" }`.
 `GET /api/bff` reports backend mode, bindings, and which resources are D1-ready.
@@ -35,10 +36,11 @@ Do not build a generic SQL proxy. Flip one resource at a time onto `/api/{resour
 # utilities first (service binding target must exist)
 npm run deploy:api
 
-# SPA (vite build + wrangler deploy)
+# SAWMGA division + hub portal
 # Bake VITE_* from a local env file; empty values in `.env` will break login.
 set -a && . ./.env.cf-build && set +a
-npm run deploy
+npm run deploy:sawmga
+npm run deploy:hub
 ```
 
 Or `npm run deploy:cf` after exporting `VITE_*`.

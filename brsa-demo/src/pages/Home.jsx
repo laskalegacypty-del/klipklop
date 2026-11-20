@@ -9,7 +9,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { StatCard } from '../components/ui/StatCard'
 
 export function Home() {
-  const { world, topRider, eventById, rider, unpaidFines, unpaidMembership, payInvoice } = useDemo()
+  const { world, topRider, eventById, rider, unpaidFines, unpaidMembership, payInvoice, accessLocked } = useDemo()
   const live = world.events.find((e) => e.status === 'live') || eventById('west-fest')
   const featured = world.events.find((e) => e.featured) || live
   const fines = rider ? unpaidFines(rider.id) : []
@@ -19,7 +19,23 @@ export function Home() {
     <div>
       <PageHeader title="Barrel Racing South Africa" description={`${world.season} season`} />
 
-      {rider && dues.length ? (
+      {rider && accessLocked ? (
+        <Card className="mb-5 border-red-400 bg-red-50">
+          <CardHeader>
+            <CardTitle>Kick-out warning — membership overdue</CardTitle>
+            <CardDescription>
+              App access is limited until {dues[0]?.label || 'membership'} ({rand(dues[0]?.amount || 0)}) is paid. Money, complaints and rules stay open.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dues[0] ? (
+              <Button size="lg" onClick={() => payInvoice(dues[0].id, { fromWallet: true })}>
+                Pay {rand(dues[0].amount)} now
+              </Button>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : rider && dues.length ? (
         <Card className="mb-5 border-red-300 bg-red-50">
           <CardHeader>
             <CardTitle>Membership renewal is due</CardTitle>
@@ -112,7 +128,12 @@ export function Home() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <StatCard icon={Crown} label="Top rider right now" value={topRider?.name ?? '—'} hint={`${topRider?.points ?? 0} points`} />
+        <StatCard
+          icon={Crown}
+          label="Top rider right now"
+          value={topRider?.name ?? '—'}
+          hint={topRider ? `${topRider.points} points · rank updates on News when it changes` : '—'}
+        />
         <StatCard icon={CalendarDays} label="Up next" value={featured?.name ?? '—'} hint={featured ? `${featured.date} · ${featured.venue}` : ''} />
       </div>
     </div>

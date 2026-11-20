@@ -28,10 +28,13 @@ export function ProducerPage() {
     riderById,
     horseById,
     eventById,
+    demoSwitch,
   } = useDemo()
   const [fine, setFine] = useState({ riderId: 'sunny', amount: 250, label: 'Late admin fee', fineType: 'late-admin' })
   const [news, setNews] = useState('')
   const [adj, setAdj] = useState({ riderId: 'sunny', delta: 1, note: 'Correction' })
+  const [producerQ, setProducerQ] = useState('')
+  const [producerRegion, setProducerRegion] = useState('all')
 
   if ((user.role !== 'producer' || !producer) && !isFedStaff(user.role)) {
     return <EmptyState title="Producer desk" description="Event running, fines, official results and news live here." />
@@ -95,7 +98,7 @@ export function ProducerPage() {
       <Card className="mt-4">
         <CardHeader>
           <CardTitle>Growth by province</CardTitle>
-          <CardDescription>Total members · joined since 1 July</CardDescription>
+          <CardDescription>Total members · joined since 1 July — feeds Producer of the Year</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 text-sm">
           {Object.entries(byProvince).map(([province, row]) => (
@@ -103,6 +106,60 @@ export function ProducerPage() {
               {province}: {row.total}+{row.joined}
             </p>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle>Contactable producers</CardTitle>
+          <CardDescription>Search by name or region.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input value={producerQ} onChange={(e) => setProducerQ(e.target.value)} placeholder="Search producers" />
+            <Select value={producerRegion} onChange={(e) => setProducerRegion(e.target.value)} className="sm:w-56">
+              <option value="all">All regions</option>
+              {[...new Set([...(world.producers || []).map((p) => p.region), ...(world.contacts || []).map((c) => c.region)])].map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            {[
+              ...(world.producers || []).map((p) => ({ ...p, kind: 'producer' })),
+              ...(world.contacts || [])
+                .filter((c) => !(world.producers || []).some((p) => p.name === c.name))
+                .map((c) => ({ ...c, kind: 'contact', email: null })),
+            ]
+              .filter((p) => (producerRegion === 'all' || p.region === producerRegion) && (!producerQ.trim() || `${p.name} ${p.region}`.toLowerCase().includes(producerQ.trim().toLowerCase())))
+              .map((p) => (
+                <div key={`${p.kind}-${p.name}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dust-200 px-3 py-2 text-sm">
+                  <div>
+                    <p className="font-semibold">{p.name}</p>
+                    <p className="text-stone-500">
+                      {p.region}
+                      {p.phone ? ` · ${p.phone}` : ''}
+                      {p.email ? ` · ${p.email}` : ''}
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
+          {user.role === 'producer' ? (
+            <p className="text-sm text-stone-600">
+              Switch to your rider login from Looking as in the header when you need to enter as a competitor.
+              {world.users.some((u) => u.role === 'rider') ? (
+                <>
+                  {' '}
+                  <Button size="sm" variant="ghost" onClick={() => demoSwitch('rider')}>
+                    Open rider view
+                  </Button>
+                </>
+              ) : null}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

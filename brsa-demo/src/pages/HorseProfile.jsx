@@ -59,6 +59,16 @@ export function HorseProfile() {
           <p>Dam · {horse.dam}</p>
           <p>LTE · {rand(horse.lte)}</p>
           <p>Futurity · {horse.futurity ? 'Yes' : 'No'}</p>
+          {(horse.achievements || []).length ? (
+            <div className="pt-2">
+              <p className="text-xs uppercase tracking-wide text-stone-500">Prior achievements</p>
+              <ul className="mt-1 space-y-1">
+                {horse.achievements.map((a) => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {mine ? (
             <Input
               defaultValue={horse.sire}

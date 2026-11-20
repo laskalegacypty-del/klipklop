@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Eye, RotateCcw } from 'lucide-react'
 import { useDemo } from '../demo/store'
 import { ACCENT_PRESETS } from '../demo/accents'
+import { MEMBERSHIP_EARLY_BIRD, MEMBERSHIP_STANDARD, rand } from '../demo/money'
 import { isFedStaff, isSysAdmin, roleLabel } from '../demo/world'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -15,11 +16,35 @@ import { Select } from '../components/ui/Select'
 const REASONS = ['Support', 'Fines & entries', 'Results', 'Membership']
 
 export function AdminPage({ mode = 'office' } = {}) {
-  const { world, user, viewingFromAdmin, setAccent, switchUser, exitViewAs, resetDemo, unpaidFines, setLinks, pendingComplaints } =
-    useDemo()
+  const {
+    world,
+    user,
+    viewingFromAdmin,
+    setAccent,
+    switchUser,
+    exitViewAs,
+    resetDemo,
+    unpaidFines,
+    setLinks,
+    pendingComplaints,
+    issueMembershipInvoice,
+    setMembershipIncludesApp,
+    setAppPrice,
+    setEarlyBirdEnds,
+    setKickOutOverdue,
+    earlyBird,
+    membershipFeeNow,
+    memberCount,
+    downloadMemberList,
+  } = useDemo()
   const [q, setQ] = useState('')
   const [reason, setReason] = useState('Support')
   const [links, setLocalLinks] = useState(() => ({ ...world.links }))
+  const [memRider, setMemRider] = useState(world.riders[0]?.id || 'sunny')
+  const [memClass, setMemClass] = useState('Adult')
+  const [appPrice, setLocalAppPrice] = useState(String(world.appPrice ?? 180))
+  const [earlyBirdEnds, setLocalEarlyBird] = useState(world.earlyBirdEnds || '')
+  const [shareCount, setShareCount] = useState(false)
   const fed = isFedStaff(user.role)
   const sys = isSysAdmin(user.role)
   const showDev = mode === 'dev'
@@ -136,6 +161,118 @@ export function AdminPage({ mode = 'office' } = {}) {
               <Link to="/complaints">
                 <Button>Open complaints</Button>
               </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle>Members</CardTitle>
+              <CardDescription>Total member count is admin-only unless you choose to share it.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-3">
+              <p className="text-2xl font-semibold">{memberCount}</p>
+              <Badge>{earlyBird ? 'Early bird fees' : 'Standard fees'}</Badge>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={shareCount} onChange={(e) => setShareCount(e.target.checked)} />
+                Share count on Home
+              </label>
+              {shareCount ? <Badge variant="success">Shared · {memberCount}</Badge> : null}
+              <Button variant="secondary" onClick={downloadMemberList}>
+                Download member list PDF
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle>Membership &amp; app pricing</CardTitle>
+              <CardDescription>
+                Issue renewals, set early-bird window, and choose whether the app is included in membership.
+                Current {memClass} fee: {rand(membershipFeeNow(memClass))}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid max-w-xl gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-medium">
+                  Rider
+                  <Select className="mt-1" value={memRider} onChange={(e) => setMemRider(e.target.value)}>
+                    {world.riders.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} · {r.sa}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+                <label className="text-sm font-medium">
+                  Class
+                  <Select className="mt-1" value={memClass} onChange={(e) => setMemClass(e.target.value)}>
+                    {Object.keys(MEMBERSHIP_EARLY_BIRD).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              </div>
+              <Button onClick={() => issueMembershipInvoice(memRider, { klass: memClass })}>Issue membership invoice</Button>
+
+              <label className="text-sm font-medium">
+                Early bird ends
+                <div className="mt-1 flex gap-2">
+                  <Input type="date" value={earlyBirdEnds} onChange={(e) => setLocalEarlyBird(e.target.value)} />
+                  <Button variant="secondary" onClick={() => setEarlyBirdEnds(earlyBirdEnds)}>
+                    Save
+                  </Button>
+                </div>
+              </label>
+
+              <div className="grid gap-2 text-xs text-stone-600 sm:grid-cols-2">
+                <div>
+                  <p className="font-semibold text-stone-800">Early bird</p>
+                  {Object.entries(MEMBERSHIP_EARLY_BIRD).map(([k, v]) => (
+                    <p key={k}>
+                      {k} · {rand(v)}
+                    </p>
+                  ))}
+                </div>
+                <div>
+                  <p className="font-semibold text-stone-800">Standard</p>
+                  {Object.entries(MEMBERSHIP_STANDARD).map(([k, v]) => (
+                    <p key={k}>
+                      {k} · {rand(v)}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(world.membershipIncludesApp)}
+                  onChange={(e) => setMembershipIncludesApp(e.target.checked)}
+                />
+                App subscription included in annual membership
+              </label>
+              {!world.membershipIncludesApp ? (
+                <label className="text-sm font-medium">
+                  Separate app price (R)
+                  <div className="mt-1 flex gap-2">
+                    <Input value={appPrice} onChange={(e) => setLocalAppPrice(e.target.value)} type="number" min="0" />
+                    <Button variant="secondary" onClick={() => setAppPrice(appPrice)}>
+                      Save
+                    </Button>
+                  </div>
+                </label>
+              ) : null}
+
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(world.kickOutOverdue)}
+                  onChange={(e) => setKickOutOverdue(e.target.checked)}
+                />
+                Kick out overdue members (limit app until membership paid)
+              </label>
             </CardContent>
           </Card>
 

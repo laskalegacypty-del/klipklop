@@ -61,6 +61,10 @@ export function createSeed() {
     season: '2026/27',
     membershipIncludesApp: true,
     appPrice: 180,
+    /** Early-bird window end (inclusive). After this, standard membership fees apply. */
+    earlyBirdEnds: '2026-08-31',
+    /** Overdue unpaid membership locks the app until paid (wallet/complaints still open). */
+    kickOutOverdue: true,
     accent: defaultAccent(),
     brsaWallet: 18400,
     sponsor: {
@@ -97,7 +101,11 @@ export function createSeed() {
         achievements: ['2025 Rookie of the Year', '2026 West Fest Jackpot Champion — 1D', 'Gauteng Adult Division — Season Top 5'],
         bank: { bank: 'FNB', account: '6274 1190 03', branch: '250655' },
       }),
-      rider('ruan', 'Ruan Botha', 'SA1002', 'Adult', 'Western Cape', 18, 31200, 9800, 1100, 'Member', { joinedAt: '2023-07-01' }),
+      rider('ruan', 'Ruan Botha', 'SA1002', 'Adult', 'Western Cape', 18, 31200, 9800, 1100, 'Member', {
+        joinedAt: '2023-07-01',
+        rankTitle: 'Top Rider',
+        achievements: ['2025/26 Season points champion', 'BRSA Open record — 16.210'],
+      }),
       rider('lindi', 'Lindi van Wyk', 'SA1008', 'Youth', 'Free State', 12, 14100, 3600, 280, 'Member', { birthday: '2008-09-12', joinedAt: '2025-08-02' }),
       rider('jaco', 'Jaco Steyn', 'SA1015', 'Senior', 'Gauteng', 14, 22100, 5100, 640, 'Member', { joinedAt: '2022-07-01' }),
       rider('thandi', 'Thandi Mokoena', 'SA1020', 'Adult', 'KwaZulu-Natal', 16, 19800, 4400, 510, 'Member', { joinedAt: '2024-09-18' }),
@@ -153,6 +161,8 @@ export function createSeed() {
         wallet: 200,
         debitOrder: false,
         bio: 'West Coast. Biggest fan of Liani and Diesel.',
+        photo: null,
+        cover: null,
         bank: { bank: 'Capitec', account: '1522 8841 09', branch: '470010' },
       },
     ],
@@ -164,6 +174,14 @@ export function createSeed() {
         phone: '082 441 0091',
         email: 'ansie@westfest.example',
         eventIds: ['west-fest', 'karoo-rodeo', 'highveld-mini'],
+      },
+      {
+        id: 'nico',
+        name: 'Nico Kruger',
+        region: 'Gauteng',
+        phone: '082 111 2001',
+        email: 'nico@highveld.example',
+        eventIds: ['highveld-mini'],
       },
     ],
     contacts: [
@@ -267,8 +285,8 @@ export function createSeed() {
         id: 'inv-mem-sunny',
         riderId: 'sunny',
         type: 'membership',
-        label: 'Adult membership 2026/27',
-        amount: 600,
+        label: 'Adult membership 2026/27 (early bird)',
+        amount: 650,
         paid: true,
         paidAt: '2026-07-02T09:00:00+02:00',
         createdAt: '2026-07-01T08:00:00+02:00',
@@ -277,8 +295,8 @@ export function createSeed() {
         id: 'inv-mem-kyle',
         riderId: 'kyle',
         type: 'membership',
-        label: 'Adult membership 2026/27',
-        amount: 600,
+        label: 'Adult membership 2026/27 (early bird)',
+        amount: 650,
         paid: false,
         createdAt: '2026-07-01T08:00:00+02:00',
       },
@@ -332,6 +350,23 @@ export function createSeed() {
         type: 'rule',
         at: '2026-07-15T09:00:00+02:00',
         text: 'Rule update: producing cost (R150) comes off first; BRSA then keeps 30% of the remainder and pays out 70%.',
+      },
+      {
+        id: 'feed-follow-1',
+        type: 'follow',
+        at: '2026-08-18T10:00:00+02:00',
+        fromFanId: 'sarel',
+        riderId: 'sunny',
+        text: 'Sarel Venter started following Liani van der Walt.',
+      },
+      {
+        id: 'feed-entry-1',
+        type: 'entry',
+        at: '2026-09-08T11:00:00+02:00',
+        riderId: 'ruan',
+        eventId: 'west-fest',
+        text: 'Ruan Botha entered West Fest Jackpot on Comet.',
+        to: '/events/west-fest',
       },
       {
         id: 'feed-hof',
@@ -430,6 +465,7 @@ function rider(id, name, sa, klass, province, points, lte, earnings, wallet, mem
     cover: extra.cover ?? 'dust',
     bank: extra.bank ?? { bank: '', account: '', branch: '' },
     achievements: extra.achievements ?? [],
+    rankTitle: extra.rankTitle ?? null,
   }
 }
 
