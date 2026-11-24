@@ -1,0 +1,22 @@
+{
+  "name": "@klipklop/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./tokens.css": "./src/tokens.css",
+    "./controls.css": "./src/controls.css",
+    "./index.css": "./src/index.css",
+    "./theme": "./src/theme.js"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "files": [
+    "src"
+  ]
+}

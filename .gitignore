@@ -37,3 +37,5 @@ vercel.dev.json
 workers/api/.dev.vars
 scripts/.d1-export.sql
 .env.cf-build
+
+supabase/.temp/

@@ -1,0 +1,13 @@
+name = "klipklop-horse-health"
+account_id = "8b60730ec10ba7eb7e85d214fa2505c2"
+main = "worker.js"
+compatibility_date = "2026-09-10"
+workers_dev = true
+
+# Horse health tracker — care logs, vaccinations, due alerts.
+# Preview: https://klipklop-horse-health.klipklop.workers.dev
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"

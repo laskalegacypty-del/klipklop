@@ -15,6 +15,8 @@ The script refuses the anon key if you paste the wrong JWT.
 ## Preview URLs
 
 - Hub portal (Worker `klipklop`): https://klipklop.klipklop.workers.dev — see [HUB.md](HUB.md)
+- Rider (Worker `klipklop-rider`): https://klipklop-rider.klipklop.workers.dev
+- Horse Health (Worker `klipklop-horse-health`): https://klipklop-horse-health.klipklop.workers.dev
 - SAWMGA division (Worker `klipklop-sawmga`): https://klipklop-sawmga.klipklop.workers.dev
 - Utilities Worker `klipklop-api` (debug only; SAWMGA talks to it via a service binding): https://klipklop-api.klipklop.workers.dev
 

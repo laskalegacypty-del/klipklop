@@ -1,0 +1,202 @@
+@import '@klipklop/ui/index.css';
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--kk-font);
+  background:
+    radial-gradient(70% 45% at 50% -10%, color-mix(in srgb, var(--kk-accent) 14%, transparent), transparent 55%),
+    var(--kk-bg);
+  color: var(--kk-ink);
+}
+
+.app-shell {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.app-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.app-brand img {
+  width: 2.5rem;
+  height: auto;
+  border-radius: var(--kk-radius-sm);
+}
+
+.app-brand h1 {
+  margin: 0;
+  font-family: var(--kk-font-display);
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.app-brand p {
+  margin: 0.15rem 0 0;
+  font-size: var(--kk-text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kk-ink-faint);
+}
+
+.tabs-bar {
+  margin-bottom: 1.25rem;
+}
+
+.panel {
+  display: none;
+}
+
+.panel.is-active {
+  display: block;
+}
+
+.section-lead {
+  margin: 0 0 1rem;
+  color: var(--kk-ink-muted);
+  font-size: var(--kk-text-sm);
+}
+
+.horse-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .horse-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.horse-card {
+  text-align: left;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--kk-border);
+  border-radius: var(--kk-radius);
+  background: var(--kk-surface);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.horse-card:hover,
+.horse-card.is-active {
+  border-color: color-mix(in srgb, var(--kk-accent) 55%, var(--kk-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--kk-accent) 35%, transparent);
+}
+
+.horse-card h3 {
+  margin: 0;
+  font-family: var(--kk-font-display);
+  font-size: 1.2rem;
+}
+
+.horse-card p {
+  margin: 0.35rem 0 0;
+  font-size: var(--kk-text-sm);
+  color: var(--kk-ink-muted);
+}
+
+.alert-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.alert-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--kk-radius);
+  border: 1px solid var(--kk-border);
+  background: var(--kk-surface);
+}
+
+.alert-item.is-overdue {
+  border-color: color-mix(in srgb, var(--kk-danger) 45%, var(--kk-border));
+  background: color-mix(in srgb, var(--kk-danger) 8%, var(--kk-surface));
+}
+
+.alert-item.is-soon {
+  border-color: color-mix(in srgb, var(--kk-warning) 45%, var(--kk-border));
+  background: color-mix(in srgb, var(--kk-warning) 10%, var(--kk-surface));
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid .span-2 {
+    grid-column: 1 / -1;
+  }
+}
+
+.detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.detail-head h2 {
+  margin: 0;
+  font-family: var(--kk-font-display);
+  font-size: var(--kk-text-2xl);
+}
+
+.detail-head p {
+  margin: 0.25rem 0 0;
+  color: var(--kk-ink-muted);
+  font-size: var(--kk-text-sm);
+}
+
+.toast {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(120%);
+  padding: 0.65rem 1rem;
+  border-radius: var(--kk-radius);
+  background: var(--kk-ink);
+  color: var(--kk-bg);
+  font-size: var(--kk-text-sm);
+  font-weight: 650;
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.toast.is-in {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}

@@ -1,0 +1,13 @@
+name = "klipklop-admin"
+account_id = "8b60730ec10ba7eb7e85d214fa2505c2"
+main = "worker.js"
+compatibility_date = "2026-09-10"
+workers_dev = true
+
+# Admin-only UI template / styleguide. Do not attach apex.
+# Preview: https://klipklop-admin.klipklop.workers.dev
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"

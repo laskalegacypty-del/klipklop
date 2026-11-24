@@ -1,0 +1,83 @@
+/*
+  KlipKlop UI tokens — controls are colour-agnostic in code (only --kk-*).
+  Defaults below are the shared KlipKlop shell palette (refine later).
+  Each association app (SAWMGA, BRSA, …) overrides these in its own theme.
+*/
+
+:root,
+.kk-theme {
+  /* Surfaces */
+  --kk-bg: #f4f2ee;
+  --kk-surface: #ffffff;
+  --kk-surface-raised: #ffffff;
+  --kk-surface-muted: #ebe7e0;
+
+  /* Ink */
+  --kk-ink: #161412;
+  --kk-ink-muted: #5c574f;
+  --kk-ink-faint: #8a847a;
+  --kk-ink-inverse: #f7f4ef;
+
+  /* Borders / focus */
+  --kk-border: #d9d3c8;
+  --kk-border-strong: #b7b0a4;
+  --kk-ring: var(--kk-accent);
+
+  /* Brand slot — KlipKlop defaults; association apps override */
+  --kk-accent: #3f3a34;
+  --kk-accent-hover: #2c2925;
+  --kk-accent-soft: #ece8e2;
+  --kk-accent-ink: #f7f4ef;
+
+  /* Status — still overridable, but semantic */
+  --kk-danger: #9b1c1c;
+  --kk-danger-hover: #7f1d1d;
+  --kk-danger-ink: #ffffff;
+  --kk-danger-soft: #fde8e8;
+  --kk-success: #1f3d2a;
+  --kk-success-ink: #d8ebe0;
+  --kk-warning: #8a5a12;
+  --kk-warning-soft: #f5e6c8;
+  --kk-warning-ink: #2a1c08;
+
+  /* Type */
+  --kk-font: 'Figtree', system-ui, sans-serif;
+  --kk-font-display: 'Fraunces', Georgia, serif;
+  --kk-text-xs: 0.75rem;
+  --kk-text-sm: 0.875rem;
+  --kk-text-md: 1rem;
+  --kk-text-lg: 1.125rem;
+  --kk-text-xl: 1.35rem;
+  --kk-text-2xl: 1.75rem;
+  --kk-text-hero: clamp(2.5rem, 8vw, 4.5rem);
+
+  /* Shape / elevation */
+  --kk-radius-sm: 0.35rem;
+  --kk-radius: 0.55rem;
+  --kk-radius-lg: 0.85rem;
+  --kk-shadow: 0 1px 0 rgba(22, 20, 18, 0.04);
+  --kk-shadow-lg: 0 18px 40px rgba(22, 20, 18, 0.12);
+
+  /* Control sizing */
+  --kk-control-h-sm: 2.25rem;
+  --kk-control-h: 2.5rem;
+  --kk-control-h-lg: 2.75rem;
+  --kk-control-px: 1rem;
+  --kk-focus-ring: 0 0 0 2px var(--kk-bg), 0 0 0 4px var(--kk-ring);
+}
+
+.kk-theme--dark {
+  --kk-bg: #0d0c0b;
+  --kk-surface: #171513;
+  --kk-surface-raised: #1f1c19;
+  --kk-surface-muted: #24201c;
+  --kk-ink: #f3efe8;
+  --kk-ink-muted: #b3aca1;
+  --kk-ink-faint: #7d766c;
+  --kk-ink-inverse: #12100e;
+  --kk-border: #322e28;
+  --kk-border-strong: #4a443c;
+  --kk-accent-soft: #2a2621;
+  --kk-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  --kk-shadow-lg: 0 22px 48px rgba(0, 0, 0, 0.45);
+}

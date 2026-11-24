@@ -18,8 +18,11 @@
     "deploy:api": "wrangler deploy -c workers/api/wrangler.toml",
     "deploy:sawmga": "npm run build && wrangler deploy -c wrangler.sawmga.toml",
     "deploy:hub": "npm run deploy --prefix apps/hub",
+    "deploy:admin": "npm run deploy --prefix apps/admin",
+    "deploy:rider": "npm run deploy --prefix apps/rider",
+    "deploy:horse-health": "npm run deploy --prefix apps/horse-health",
     "deploy": "npm run deploy:sawmga",
-    "deploy:cf": "npm run deploy:api && npm run deploy:sawmga && npm run deploy:hub",
+    "deploy:cf": "npm run deploy:api && npm run deploy:sawmga && npm run deploy:hub && npm run deploy:admin && npm run deploy:rider && npm run deploy:horse-health",
     "secret:service-role": "node scripts/put-service-role.mjs",
     "go-live": "node scripts/go-live-cloudflare.mjs"
   },
